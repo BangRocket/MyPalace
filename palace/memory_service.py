@@ -1,7 +1,5 @@
 """Memory CRUD and semantic search service."""
 
-import json
-
 from sqlalchemy import desc, select
 
 from palace.database import async_session
@@ -45,7 +43,7 @@ class MemoryService:
                 agent_id=agent_id,
                 source=source,
                 importance=importance,
-                metadata_json=json.dumps(metadata) if metadata else None,
+                metadata_json=metadata,
                 created_at=utcnow(),
                 updated_at=utcnow(),
             )
@@ -105,7 +103,7 @@ class MemoryService:
             if importance is not None:
                 memory.importance = importance
             if metadata is not None:
-                memory.metadata_json = json.dumps(metadata)
+                memory.metadata_json = metadata
             memory.updated_at = utcnow()
             await db.commit()
             return memory

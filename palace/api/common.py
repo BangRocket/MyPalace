@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from pydantic import BaseModel, Field
@@ -99,7 +98,7 @@ class MemoryOut(BaseModel):
             updated_at=m.updated_at.isoformat() if m.updated_at else None,
             accessed_at=m.accessed_at.isoformat() if m.accessed_at else None,
             access_count=m.access_count,
-            metadata=json.loads(m.metadata_json) if m.metadata_json else None,
+            metadata=m.metadata_json,
         )
 
 

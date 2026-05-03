@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from sqlalchemy import Column, DateTime
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 
 
@@ -31,7 +32,10 @@ class Memory(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
     accessed_at: datetime | None = Field(default=None, sa_column=_ts_column(nullable=True))
     access_count: int = Field(default=0)
-    metadata_json: str | None = None
+    metadata_json: dict | None = Field(
+        default=None,
+        sa_column=Column(JSONB, nullable=True),
+    )
 
 
 class Session(SQLModel, table=True):

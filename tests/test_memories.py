@@ -100,3 +100,33 @@ def test_list_user_memories(client, mock_memory_service):
     data = resp.json()["data"]
     assert len(data) == 1
     assert data[0]["user_id"] == "user-1"
+
+
+def test_create_memory_with_dict_metadata(client, mock_memory_service):
+    """Slice-1 contract: metadata is a dict on the wire AND in the model.
+    No more json.loads at the API boundary."""
+    memory_with_meta = FakeMemory(
+        id="mem-meta-1",
+        user_id="user-1",
+        agent_id=None,
+        content="With metadata",
+        memory_type="preference",
+        source=None,
+        importance=1.0,
+        created_at=datetime(2026, 1, 1, 12, 0, 0),
+        updated_at=datetime(2026, 1, 1, 12, 0, 0),
+        accessed_at=None,
+        access_count=0,
+        metadata_json={"category": "ui", "confidence": 0.9},
+    )
+    mock_memory_service.create.return_value = memory_with_meta
+
+    resp = client.post("/v1/memories", json={
+        "user_id": "user-1",
+        "content": "With metadata",
+        "metadata": {"category": "ui", "confidence": 0.9},
+    })
+
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["metadata"] == {"category": "ui", "confidence": 0.9}
