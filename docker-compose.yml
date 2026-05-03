@@ -1,0 +1,59 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: palace-postgres
+    environment:
+      POSTGRES_USER: palace
+      POSTGRES_PASSWORD: palace
+      POSTGRES_DB: palace
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5442:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U palace -d palace"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: palace-qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:6333/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  palace:
+    build: .
+    container_name: palace-api
+    ports:
+      - "8000:8000"
+    environment:
+      PALACE_DATABASE_URL: postgresql+asyncpg://palace:palace@postgres/palace
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_COLLECTION: palace_memories
+      EMBEDDING_PROVIDER: huggingface
+      EMBEDDING_MODEL: BAAI/bge-large-en-v1.5
+      HF_TOKEN: ${HF_TOKEN:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LLM_PROVIDER: ${LLM_PROVIDER:-openrouter}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-openai/gpt-4o-mini}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - ./palace:/app/palace
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  qdrant-data:

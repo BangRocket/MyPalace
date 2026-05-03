@@ -1,0 +1,32 @@
+"""Palace Memory Service configuration."""
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+        populate_by_name=True,
+    )
+
+    database_url: str = Field(
+        default="postgresql+asyncpg://palace:palace@localhost/palace",
+        validation_alias="PALACE_DATABASE_URL",
+    )
+    qdrant_url: str = "http://localhost:6333"
+    qdrant_collection: str = "palace_memories"
+    embedding_provider: str = "huggingface"
+    embedding_model: str = "BAAI/bge-large-en-v1.5"
+    hf_token: str | None = None
+    openai_api_key: str | None = None
+    llm_provider: str = "openrouter"
+    llm_api_key: str | None = None
+    llm_model: str = "openai/gpt-4o-mini"
+    log_level: str = "INFO"
+
+
+settings = Settings()
