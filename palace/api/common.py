@@ -26,6 +26,35 @@ class CreateMemoryRequest(BaseModel):
     metadata: dict[str, Any] | None = None
 
 
+class BatchMessage(BaseModel):
+    """A single message in a batch-create request. Extra keys allowed and
+    flow through into per-memory metadata (per-message keys win over request
+    metadata on collision)."""
+    model_config = {"extra": "allow"}
+    role: str
+    content: str
+
+
+class BatchCreateMemoriesRequest(BaseModel):
+    user_id: str
+    messages: list[BatchMessage]
+    agent_id: str | None = None
+    memory_type: str = "episodic"
+    metadata: dict[str, Any] | None = None
+    source: str | None = None
+    infer: bool = False  # accepted but ignored in slice 1 (spec D7)
+
+
+class ListMemoriesRequest(BaseModel):
+    user_id: str | None = None
+    agent_id: str | None = None
+    run_id: str | None = None
+    memory_type: str | None = None
+    metadata: dict[str, Any] | None = None
+    limit: int = 50
+    offset: int = 0
+
+
 class UpdateMemoryRequest(BaseModel):
     content: str | None = None
     memory_type: str | None = None

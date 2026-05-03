@@ -1,6 +1,6 @@
 """Memory CRUD and semantic search service."""
 
-from sqlalchemy import desc, select
+from sqlalchemy import and_, desc, select
 
 from palace.database import async_session
 from palace.embeddings import EmbeddingProvider, get_embedder
@@ -59,6 +59,37 @@ class MemoryService:
             {"user_id": user_id, "agent_id": agent_id, "memory_type": memory_type},
         )
         return memory
+
+    async def create_batch(
+        self,
+        user_id: str,
+        messages: list[dict],
+        agent_id: str | None = None,
+        memory_type: str = "episodic",
+        metadata: dict | None = None,
+        source: str | None = None,
+        infer: bool = False,  # accepted but ignored in slice 1
+    ) -> list[Memory]:
+        """One memory per message. Per-message keys (other than 'content')
+        merge into metadata, with per-message keys winning over request-level
+        metadata on key collision."""
+        base_metadata = metadata or {}
+        results: list[Memory] = []
+        for msg in messages:
+            content = msg["content"]
+            extra = {k: v for k, v in msg.items() if k != "content"}
+            merged = {**base_metadata, **extra}
+            mem = await self.create(
+                user_id=user_id,
+                content=content,
+                memory_type=memory_type,
+                agent_id=agent_id,
+                source=source,
+                importance=1.0,
+                metadata=merged or None,
+            )
+            results.append(mem)
+        return results
 
     async def get(self, memory_id: str) -> Memory | None:
         """Fetch a memory by ID and bump its access counter."""
@@ -121,6 +152,36 @@ class MemoryService:
         await vector_store.delete(memory_id)
         return True
 
+    async def delete_for_user(
+        self,
+        user_id: str,
+        agent_id: str | None = None,
+        run_id: str | None = None,
+    ) -> int:
+        """Delete all memories for a user (optionally filtered by agent/run).
+        Removes from postgres AND from Qdrant. Returns count deleted."""
+        clauses = [Memory.user_id == user_id]
+        if agent_id is not None:
+            clauses.append(Memory.agent_id == agent_id)
+        if run_id is not None:
+            clauses.append(Memory.metadata_json.op("@>")({"run_id": run_id}))
+
+        async with async_session() as db:
+            stmt = select(Memory).where(and_(*clauses))
+            result = await db.execute(stmt)
+            memories = list(result.scalars().all())
+            ids = [m.id for m in memories]
+            for m in memories:
+                await db.delete(m)
+            await db.commit()
+
+        # Remove vectors in batches of 500
+        for i in range(0, len(ids), 500):
+            chunk = ids[i:i + 500]
+            for mid in chunk:
+                await vector_store.delete(mid)
+        return len(ids)
+
     async def search(
         self,
         query: str,
@@ -167,6 +228,40 @@ class MemoryService:
                 .order_by(desc(Memory.created_at))
                 .limit(limit),
             )
+            return list(result.scalars().all())
+
+    async def list_filtered(
+        self,
+        user_id: str | None = None,
+        agent_id: str | None = None,
+        run_id: str | None = None,
+        memory_type: str | None = None,
+        metadata: dict | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[Memory]:
+        """List memories with filters. Metadata matching uses JSONB
+        containment (`@>`)."""
+        clauses = []
+        if user_id is not None:
+            clauses.append(Memory.user_id == user_id)
+        if agent_id is not None:
+            clauses.append(Memory.agent_id == agent_id)
+        if memory_type is not None:
+            clauses.append(Memory.memory_type == memory_type)
+        if run_id is not None:
+            clauses.append(Memory.metadata_json.op("@>")({"run_id": run_id}))
+        if metadata:
+            clauses.append(Memory.metadata_json.op("@>")(metadata))
+
+        stmt = (
+            select(Memory)
+            .where(and_(*clauses)) if clauses else select(Memory)
+        )
+        stmt = stmt.order_by(desc(Memory.created_at)).limit(limit).offset(offset)
+
+        async with async_session() as db:
+            result = await db.execute(stmt)
             return list(result.scalars().all())
 
 

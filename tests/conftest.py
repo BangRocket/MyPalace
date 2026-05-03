@@ -10,9 +10,12 @@ from fastapi.testclient import TestClient
 def mock_memory_service():
     mock = MagicMock()
     mock.create = AsyncMock()
+    mock.create_batch = AsyncMock()
+    mock.list_filtered = AsyncMock(return_value=[])
     mock.get = AsyncMock()
     mock.update = AsyncMock()
     mock.delete = AsyncMock()
+    mock.delete_for_user = AsyncMock(return_value=0)
     mock.search = AsyncMock(return_value=[])
     mock.list_for_user = AsyncMock(return_value=[])
     mock.init = AsyncMock()
