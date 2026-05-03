@@ -25,7 +25,38 @@ A reconnaissance pass across `mypalclara/core/memory/`, `mypalclara/core/memory_
 - **~18 of those are actually called from outside the memory module.** Phase 1 already covers ~7. The remaining ~11 are what slices 2-5 deliver.
 - Three external call patterns reach into Palace via *sub-objects*: `PALACE.embedding_model.embed(...)`, `PALACE.graph.search(...)`, and `episode_store.x` access. These shape the drop-in design — see decision D1.
 
-The full surface map is in the conversation transcript and is the basis for the slice ordering below. Anything not surfaced there is treated as internal to mypalclara's memory subsystem and not in scope.
+### External call sites — exhaustive list
+
+Methods invoked from outside `mypalclara/core/memory/`. Driven from this list, not the full 47-method internal surface.
+
+**`gateway/processor.py`:**
+- `MM.load_user_workspace(user_id, vm_manager)` — slice 2+
+- `MM.check_intentions(user_id, content, ctx)` — slice 4
+- `MM.build_prompt_layered(user_id, msg, recent, ...)` — slice 5
+- `MM.build_prompt(user_mems, proj_mems, summary, recent, msg, ...)` — slice 5 (fallback)
+- `MM.format_intentions_for_prompt(fired)` — slice 4
+- `MM.get_last_retrieved_memory_ids(user_id)` — slice 3
+- `MM.promote_memory(memory_id, user_id, grade, signal_type)` — slice 3
+- `MM.reflect_on_session(messages, user_id, session_id)` — slice 4
+
+**`core/prompt_builder.py`:**
+- `PALACE.get_all(user_id, agent_id, limit)` — **slice 1**
+- `PALACE.embedding_model.embed(text, "search")` — slice 2 candidate (POST /v1/embeddings)
+- `PALACE.search(query, filters, limit)` — phase 1
+- `PALACE.graph.search(msg, {user_id}, limit)` — phase 3 (FalkorDB)
+- `episode_store.search(query, filters, limit)` — slice 2
+- `episode_store.get_recent(user_id, limit)` — slice 2
+- `episode_store.get_active_arcs(user_id)` — slice 2
+
+**`core/mcp/memory_integration.py`:**
+- `PALACE.add(messages, user_id, agent_id, metadata)` — **slice 1**
+- `PALACE.search(query, user_id, agent_id, limit, filters)` — phase 1
+- `PALACE.get_all(user_id, agent_id, limit)` — **slice 1**
+
+**`adapters/game/engine.py`:**
+- `PALACE.search(query, user_id, agent_id, limit)` — phase 1
+
+**Slice 1 routable subset (from this list):** `add`, `search`, `get_all`, `get`, `delete`, `delete_all`, `update`. The remaining items map to slices 2-5 or phase 3 as annotated above. Anything not in this list is treated as internal to mypalclara's memory subsystem and not in scope.
 
 ---
 
@@ -92,9 +123,10 @@ All responses use the existing `ApiResponse` envelope: `{ "data": ..., "meta": {
 → 200 { "data": [Memory, Memory], "meta": {"count": 2, "took_ms": ...} }
 ```
 
-- One input message → one Memory row, content = message content. Role + any other message keys go into `metadata_json` as `{"role": "...", ...metadata}`.
+- One input message → one Memory row, with `content = message["content"]`.
+- Per-memory `metadata_json` is computed as `{**request.metadata, **{k: v for k, v in message.items() if k != "content"}}`. So role and any other per-message keys (e.g. `name`, `timestamp`) merge in, with per-message keys winning over request-level metadata on key collision.
+- All created memories share `agent_id`, `memory_type`, and `source` from the request.
 - `infer` is accepted but ignored in slice 1. Forward-compatible no-op for the future smart-ingest path.
-- All created memories share `agent_id`, `memory_type`, `metadata` (with role merged in), and `source` from the request.
 
 ### `POST /v1/memories/list`
 
@@ -284,7 +316,7 @@ Unit tests use `httpx.MockTransport` — no live server. Each test asserts: (a) 
 
 ### Shape — explicit pass-throughs (per D6)
 
-Every method on the embedded `ClaraMemory` and `MemoryManager` gets an explicit entry in the router. Slice-1 routable methods branch on `USE_PALACE_SERVICE`; everything else delegates to the embedded singleton with a one-line `return getattr(_EMBEDDED, ...)(...)`. No `__getattr__` fallthrough.
+Every method on the embedded `ClaraMemory` and `MemoryManager` gets an explicit entry in the router. Slice-1 routable methods branch on `USE_PALACE_SERVICE`; everything else delegates to the embedded singleton with a one-line `return await _maybe_await(_EMBEDDED.method(...))` (the `_maybe_await` helper handles ClaraMemory's sync return values inside the async router). No `__getattr__` fallthrough — adding a new ClaraMemory method requires adding an explicit router entry, otherwise `RoutedPalace` raises `AttributeError` at call time.
 
 ```python
 # examples/mypalclara_router.py
@@ -359,6 +391,13 @@ class RoutedPalace:
         if USE_PALACE_SERVICE:
             return await _remote().delete(memory_id)
         return await _maybe_await(_EMBEDDED_PALACE.delete(memory_id))
+
+    async def update(self, memory_id, **fields):
+        # Phase 1 endpoint; ClaraMemory's update equivalent depends on which
+        # fields are passed. Branch on remote when toggle is on.
+        if USE_PALACE_SERVICE:
+            return await _remote().update(memory_id, **fields)
+        return await _maybe_await(_EMBEDDED_PALACE.update(memory_id, **fields))
 
     async def update_memory_visibility(self, memory_id, visibility):
         # Slice 2+ candidate; embedded for now.
@@ -508,6 +547,16 @@ palace-memory/
 | Integration (new, opt-in) | `pytest -m integration` | ~30-60s | Live postgres+qdrant per session via TestContainers; CRUD/search/list/delete-all + client-vs-server e2e |
 
 CI is out of scope for slice 1.
+
+---
+
+## Branching strategy
+
+- **Slice 1** is built on the `phase-2` branch (created off `main`). When slice 1 is done and reviewed, `phase-2` merges into `main` and is deleted.
+- **Slices 2-5** each get their own short-lived branch off `main`, named `phase-2-slice-2-episodes`, `phase-2-slice-3-fsrs`, etc. Each slice merges into `main` independently when done.
+- **Phase 3** items (graph, Redis, gRPC, auth, multi-tenancy) get a fresh branching cycle when started.
+
+This avoids a long-running `phase-2` integration branch that drifts from `main` over weeks.
 
 ---
 
