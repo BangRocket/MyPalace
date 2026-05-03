@@ -28,6 +28,8 @@ dev = [
     "pytest-httpx>=0.35",
     "httpx>=0.28",
     "ruff>=0.9",
+    "testcontainers[postgres]>=4.9",
+    "psycopg[binary]>=3",
 ]
 
 [tool.ruff]
@@ -38,6 +40,19 @@ target-version = "py312"
 select = ["E", "F", "I", "W", "N", "UP", "B", "C4", "SIM"]
 ignore = ["UP046"]  # Generic[T] is the canonical Pydantic v2 idiom
 
+[tool.ruff.lint.per-file-ignores]
+"palace_client/palace_client/exceptions.py" = ["N818"]  # PalaceNotFound, PalaceTransport are deliberate public API names
+
+[tool.setuptools.packages.find]
+include = ["palace*"]
+exclude = ["palace_client*"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
 testpaths = ["tests"]
+markers = [
+    "integration: tests that require live postgres + qdrant containers (opt-in via -m integration)",
+]
+addopts = "-m 'not integration'"

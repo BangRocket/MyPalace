@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from pydantic import BaseModel, Field
@@ -25,6 +24,35 @@ class CreateMemoryRequest(BaseModel):
     source: str | None = None
     importance: float = 1.0
     metadata: dict[str, Any] | None = None
+
+
+class BatchMessage(BaseModel):
+    """A single message in a batch-create request. Extra keys allowed and
+    flow through into per-memory metadata (per-message keys win over request
+    metadata on collision)."""
+    model_config = {"extra": "allow"}
+    role: str
+    content: str
+
+
+class BatchCreateMemoriesRequest(BaseModel):
+    user_id: str
+    messages: list[BatchMessage]
+    agent_id: str | None = None
+    memory_type: str = "episodic"
+    metadata: dict[str, Any] | None = None
+    source: str | None = None
+    infer: bool = False  # accepted but ignored in slice 1 (spec D7)
+
+
+class ListMemoriesRequest(BaseModel):
+    user_id: str | None = None
+    agent_id: str | None = None
+    run_id: str | None = None
+    memory_type: str | None = None
+    metadata: dict[str, Any] | None = None
+    limit: int = 50
+    offset: int = 0
 
 
 class UpdateMemoryRequest(BaseModel):
@@ -99,7 +127,7 @@ class MemoryOut(BaseModel):
             updated_at=m.updated_at.isoformat() if m.updated_at else None,
             accessed_at=m.accessed_at.isoformat() if m.accessed_at else None,
             access_count=m.access_count,
-            metadata=json.loads(m.metadata_json) if m.metadata_json else None,
+            metadata=m.metadata_json,
         )
 
 

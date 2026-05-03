@@ -63,11 +63,14 @@ class VectorStore:
         )
         return [(p.id, p.score) for p in response.points]
 
-    async def delete(self, memory_id: str) -> None:
-        """Remove a vector by memory ID."""
+    async def delete(self, memory_id: str | list[str]) -> None:
+        """Remove a vector (or batch of vectors) by memory ID(s)."""
+        ids = [memory_id] if isinstance(memory_id, str) else memory_id
+        if not ids:
+            return
         await self.client.delete(
             collection_name=self.collection,
-            points_selector=[memory_id],
+            points_selector=ids,
         )
 
 
