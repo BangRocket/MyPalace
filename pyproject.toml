@@ -38,6 +38,9 @@ target-version = "py312"
 select = ["E", "F", "I", "W", "N", "UP", "B", "C4", "SIM"]
 ignore = ["UP046"]  # Generic[T] is the canonical Pydantic v2 idiom
 
+[tool.ruff.lint.per-file-ignores]
+"palace_client/palace_client/exceptions.py" = ["N818"]  # PalaceNotFound, PalaceTransport are deliberate public API names
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
