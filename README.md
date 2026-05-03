@@ -1,87 +1,194 @@
 # Palace Memory Service
 
-A standalone memory service for AI assistants, extracted from [mypalclara](https://github.com/BangRocket/mypalclara)'s Palace memory system.
+A standalone, lightweight memory service for AI assistants. Stores facts, preferences, and conversation history; serves them back via semantic search and LLM-ready context blocks.
 
-## Quick Start
+Extracted from [mypalclara](https://github.com/BangRocket/mypalclara)'s Palace memory system as an independent microservice with no `mypalclara` dependency.
+
+---
+
+## What it does
+
+- **Memory CRUD + semantic search** — embed text, store in Qdrant, retrieve by similarity
+- **Session/message persistence** — conversation threads with PostgreSQL
+- **Context assembly** — combine relevant memories + recent messages into a single payload for LLM prompts
+- **Pluggable embeddings** — HuggingFace (local) or OpenAI (API)
+- **Pluggable LLM backend** — any OpenAI-compatible chat completion endpoint (OpenRouter, OpenAI, etc.)
+
+### What it does *not* do (v1, by design)
+
+No graph memory, no FSRS spaced-repetition, no reflection workers, no gRPC, no multi-tenancy, no auth. See `docs/SPEC.md` for the v1 scope and `docs/plan.md` for the long-range vision.
+
+---
+
+## Quick start
 
 ```bash
-# 1. Start PostgreSQL + Qdrant
+# 1. Start postgres + qdrant (docker or podman)
 docker-compose up -d postgres qdrant
+# or:  podman run -d --name palace-postgres -p 5442:5432 \
+#         -e POSTGRES_USER=palace -e POSTGRES_PASSWORD=palace -e POSTGRES_DB=palace \
+#         docker.io/library/postgres:16-alpine
+#      podman run -d --name palace-qdrant -p 6333:6333 docker.io/qdrant/qdrant:latest
 
-# 2. Install dependencies (Python 3.12+)
-pip install -e ".[dev]"
+# 2. Install (Python 3.12)
+python3.12 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 
-# 3. Copy env vars
+# 3. Configure
 cp .env.example .env
 
-# 4. Run the server
-uvicorn palace.main:app --reload --port 8000
+# 4. Run
+.venv/bin/uvicorn palace.main:app --reload --port 8000
 ```
 
-Or everything in Docker:
+Or fully containerized: `docker-compose up --build`.
+
+API docs at <http://localhost:8000/docs>.
+
+### Smoke test
 
 ```bash
-docker-compose up --build
+# Store a memory
+curl -X POST http://localhost:8000/v1/memories \
+  -H 'Content-Type: application/json' \
+  -d '{"user_id":"u1","content":"User loves dark mode and uses Vim daily","memory_type":"preference"}'
+
+# Semantic search
+curl -X POST http://localhost:8000/v1/memories/search \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"editor preferences","user_id":"u1","limit":5}'
+
+# Assemble context for an LLM prompt
+curl -X POST http://localhost:8000/v1/context \
+  -H 'Content-Type: application/json' \
+  -d '{"user_id":"u1","query":"what does the user prefer?","max_memories":5}'
 ```
+
+---
 
 ## API
 
-```
-GET    /health
+All responses use the envelope `{ "data": ..., "meta": { "count": N, "took_ms": N } }`. Errors return HTTP 4xx/5xx with FastAPI's default body.
 
-POST   /v1/memories              # Store a memory
-POST   /v1/memories/search       # Semantic search
-GET    /v1/memories/{id}         # Retrieve memory
-PATCH  /v1/memories/{id}         # Update memory
-DELETE /v1/memories/{id}         # Delete memory
-GET    /v1/users/{user_id}/memories
+### Memories
 
-POST   /v1/sessions              # Create session
-GET    /v1/sessions/{id}         # Get session + messages
-POST   /v1/sessions/{id}/messages
-PATCH  /v1/sessions/{id}
-DELETE /v1/sessions/{id}
+| Method | Path | Body |
+|---|---|---|
+| `POST` | `/v1/memories` | `{ user_id, content, memory_type?, agent_id?, source?, importance?, metadata? }` |
+| `POST` | `/v1/memories/search` | `{ query, user_id?, agent_id?, memory_type?, limit?, min_score? }` |
+| `GET`  | `/v1/memories/{id}` | — |
+| `PATCH`| `/v1/memories/{id}` | `{ content?, memory_type?, importance?, metadata? }` |
+| `DELETE`| `/v1/memories/{id}` | — |
+| `GET`  | `/v1/users/{user_id}/memories?limit=50` | — |
 
-POST   /v1/context               # Assemble context for LLM prompts
-```
+`memory_type` is a free-form string; conventional values: `semantic`, `episodic`, `preference`, `fact`.
 
-## Project Structure
+### Sessions
 
-```
-palace/
-  config.py          # Settings (env vars)
-  models.py          # Memory, Session, Message tables
-  database.py        # Async SQLAlchemy engine
-  embeddings.py      # HuggingFace / OpenAI embedders
-  vector.py          # Qdrant vector store
-  llm.py             # Async LLM client
-  memory_service.py  # CRUD + semantic search
-  session_service.py # Session + message management
-  context_service.py # Context assembly for prompts
-  api/
-    common.py        # Pydantic request/response models
-    memories.py      # Memory routes
-    sessions.py      # Session routes
-    context.py       # Context routes
-  main.py            # FastAPI app factory
-```
+| Method | Path | Body |
+|---|---|---|
+| `POST` | `/v1/sessions` | `{ user_id, title? }` |
+| `GET`  | `/v1/sessions/{id}` | — (returns session + ordered messages) |
+| `POST` | `/v1/sessions/{id}/messages` | `{ user_id, role, content }` |
+| `PATCH`| `/v1/sessions/{id}` | `{ title?, summary? }` |
+| `DELETE`| `/v1/sessions/{id}` | — (cascades to messages) |
+
+### Context
+
+| Method | Path | Body |
+|---|---|---|
+| `POST` | `/v1/context` | `{ user_id, query, session_id?, max_memories?, max_messages? }` |
+
+### Health
+
+| Method | Path |
+|---|---|
+| `GET` | `/health` |
+
+---
 
 ## Configuration
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PALACE_DATABASE_URL` | `postgresql+asyncpg://palace:palace@localhost/palace` | Postgres connection |
-| `QDRANT_URL` | `http://localhost:6333` | Qdrant vector store |
-| `EMBEDDING_PROVIDER` | `huggingface` | `huggingface` or `openai` |
-| `EMBEDDING_MODEL` | `BAAI/bge-large-en-v1.5` | Embedding model |
-| `LLM_PROVIDER` | `openrouter` | LLM provider for any LLM ops |
-| `LLM_MODEL` | `openai/gpt-4o-mini` | Default LLM model |
+All settings come from environment variables (or `.env`).
 
-## Tests
+| Variable | Default | Notes |
+|---|---|---|
+| `PALACE_DATABASE_URL` | `postgresql+asyncpg://palace:palace@localhost/palace` | asyncpg driver required |
+| `QDRANT_URL` | `http://localhost:6333` | |
+| `QDRANT_COLLECTION` | `palace_memories` | created on startup if missing |
+| `EMBEDDING_PROVIDER` | `huggingface` | `huggingface` or `openai` |
+| `EMBEDDING_MODEL` | `BAAI/bge-large-en-v1.5` | for HF; pass an OpenAI model name when provider is openai |
+| `HF_TOKEN` | — | optional, for gated models |
+| `OPENAI_API_KEY` | — | required if `EMBEDDING_PROVIDER=openai` |
+| `LLM_PROVIDER` | `openrouter` | `openrouter` or `openai` |
+| `LLM_API_KEY` | — | required for any LLM call |
+| `LLM_MODEL` | `openai/gpt-4o-mini` | OpenRouter-style or OpenAI model id |
+| `LOG_LEVEL` | `INFO` | |
+
+---
+
+## Architecture
+
+```
+palace/
+├── main.py              FastAPI app + lifespan (creates tables, ensures Qdrant collection)
+├── config.py            Pydantic Settings (.env aware)
+├── models.py            SQLModel tables: Memory, Session, Message
+├── database.py          Async SQLAlchemy engine + session factory
+├── embeddings.py        EmbeddingProvider protocol + HF and OpenAI impls
+├── vector.py            Async Qdrant wrapper (ensure/upsert/query/delete)
+├── llm.py               Async chat-completion client (OpenAI-compatible)
+├── memory_service.py    CRUD + semantic search; lazy embedder
+├── session_service.py   Session + message lifecycle
+├── context_service.py   Memory search + recent messages → prompt context
+└── api/
+    ├── common.py        Pydantic request/response models, ApiResponse envelope
+    ├── memories.py      memory routes + users-router for /v1/users/{id}/memories
+    ├── sessions.py      session routes
+    └── context.py       context route
+```
+
+### Behavior notes
+
+- **Create memory** → INSERT into postgres, then embed + UPSERT into Qdrant. Embedding happens *outside* the DB transaction so a slow embedder doesn't hold a row lock.
+- **Search** → embed query, Qdrant `query_points` with `user_id`/`agent_id`/`memory_type` filters, then fetch full rows from postgres in one IN-clause. Search bumps `access_count` and `accessed_at` on the returned rows.
+- **Update content** → re-embeds and UPSERTs (Qdrant point id == memory id).
+- **Delete** → removes the postgres row, then deletes the Qdrant point.
+
+---
+
+## Running tests
 
 ```bash
-pytest
+.venv/bin/python -m pytest
 ```
+
+The test suite uses mocks (no postgres or qdrant required) and covers all 13 routes.
+
+For end-to-end verification, the smoke commands above exercise the whole stack against a live DB + Qdrant.
+
+---
+
+## Platform notes
+
+### macOS x86_64
+
+`torch` is capped at `2.2.2` on macOS x86_64 (Apple deprecated x86 wheels for newer torch). `pyproject.toml` therefore pins `numpy<2` and `transformers<5` to stay ABI-compatible with that torch. If you are on Apple Silicon (`arm64`) or Linux, those pins are still safe — just not strictly required.
+
+If you'd rather avoid the torch dependency entirely, set:
+
+```bash
+EMBEDDING_PROVIDER=openai
+EMBEDDING_MODEL=text-embedding-3-small
+OPENAI_API_KEY=sk-...
+```
+
+The embedder is loaded lazily, so importing the app no longer triggers a model download.
+
+### Container engines
+
+`docker-compose.yml` works under both Docker Desktop and `podman compose`. With plain `podman run`, see the Quick start above for the equivalent commands.
+
+---
 
 ## License
 
