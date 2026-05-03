@@ -14,7 +14,9 @@ dependencies = [
     "pydantic>=2.10",
     "pydantic-settings>=2.7",
     "python-dotenv>=1.0",
-    "sentence-transformers>=3.3",
+    "sentence-transformers>=3.3,<5",
+    "transformers<5",  # torch 2.2.2 (macOS x86 ceiling) is incompatible with transformers 5.x
+    "numpy<2",         # torch 2.2.2 was built against numpy 1.x ABI
     "openai>=1.59",
     "structlog>=24.4",
 ]
