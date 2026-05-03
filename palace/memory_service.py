@@ -1,6 +1,7 @@
 """Memory CRUD and semantic search service."""
 
 from sqlalchemy import and_, desc, select
+from sqlalchemy import delete as sa_delete
 
 from palace.database import async_session
 from palace.embeddings import EmbeddingProvider, get_embedder
@@ -167,19 +168,16 @@ class MemoryService:
             clauses.append(Memory.metadata_json.op("@>")({"run_id": run_id}))
 
         async with async_session() as db:
-            stmt = select(Memory).where(and_(*clauses))
+            stmt = sa_delete(Memory).where(and_(*clauses)).returning(Memory.id)
             result = await db.execute(stmt)
-            memories = list(result.scalars().all())
-            ids = [m.id for m in memories]
-            for m in memories:
-                await db.delete(m)
+            ids = [row[0] for row in result.all()]
             await db.commit()
 
         # Remove vectors in batches of 500
         for i in range(0, len(ids), 500):
             chunk = ids[i:i + 500]
-            for mid in chunk:
-                await vector_store.delete(mid)
+            if chunk:
+                await vector_store.delete(chunk)
         return len(ids)
 
     async def search(

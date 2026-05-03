@@ -2,6 +2,9 @@
 
 from datetime import datetime
 from unittest.mock import AsyncMock
+from unittest.mock import patch as patch_obj
+
+import pytest
 
 
 class FakeMemory:
@@ -193,6 +196,52 @@ def test_batch_create_per_message_keys_win(client, mock_memory_service):
     assert resp.status_code == 200
     data = resp.json()["data"]
     assert data[0]["metadata"]["session_id"] == "from_message"
+
+
+@pytest.mark.asyncio
+async def test_create_batch_merges_metadata_per_message_keys_win():
+    """Direct unit test of MemoryService.create_batch: per-message keys
+    must win over request-level metadata when keys collide."""
+    from palace.memory_service import MemoryService
+
+    svc = MemoryService()
+    captured_calls = []
+
+    async def fake_create(**kwargs):
+        captured_calls.append(kwargs)
+        return FakeMemory(
+            id=f"m-{len(captured_calls)}",
+            user_id=kwargs["user_id"],
+            agent_id=kwargs.get("agent_id"),
+            content=kwargs["content"],
+            memory_type=kwargs.get("memory_type", "semantic"),
+            source=kwargs.get("source"),
+            importance=kwargs.get("importance", 1.0),
+            created_at=datetime(2026, 1, 1),
+            updated_at=datetime(2026, 1, 1),
+            accessed_at=None,
+            access_count=0,
+            metadata_json=kwargs.get("metadata"),
+        )
+
+    with patch_obj.object(svc, "create", side_effect=fake_create):
+        await svc.create_batch(
+            user_id="u1",
+            messages=[
+                {"role": "user", "content": "hi", "session_id": "from_message"},
+                {"role": "assistant", "content": "hey"},
+            ],
+            metadata={"session_id": "from_request", "shared": "x"},
+        )
+
+    # Per-message session_id wins; shared still inherited from request
+    assert captured_calls[0]["metadata"] == {
+        "session_id": "from_message", "shared": "x", "role": "user",
+    }
+    # Second message has no session_id, so request value is used
+    assert captured_calls[1]["metadata"] == {
+        "session_id": "from_request", "shared": "x", "role": "assistant",
+    }
 
 
 def test_batch_create_infer_ignored_in_slice_1(client, mock_memory_service):
