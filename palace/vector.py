@@ -54,14 +54,14 @@ class VectorStore:
                 FieldCondition(key="memory_type", match=MatchValue(value=memory_type)),
             )
 
-        results = await self.client.search(
+        response = await self.client.query_points(
             collection_name=self.collection,
-            query_vector=vector,
+            query=vector,
             limit=limit,
             query_filter=Filter(must=conditions) if conditions else None,
             score_threshold=min_score,
         )
-        return [(r.id, r.score) for r in results]
+        return [(p.id, p.score) for p in response.points]
 
     async def delete(self, memory_id: str) -> None:
         """Remove a vector by memory ID."""

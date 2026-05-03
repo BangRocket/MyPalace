@@ -3,11 +3,16 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
+from sqlalchemy import Column, DateTime
 from sqlmodel import Field, SQLModel
 
 
 def utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+def _ts_column(*, nullable: bool = False) -> Column:
+    return Column(DateTime(timezone=True), nullable=nullable)
 
 
 class Memory(SQLModel, table=True):
@@ -22,9 +27,9 @@ class Memory(SQLModel, table=True):
     memory_type: str = Field(default="semantic", index=True)
     source: str | None = None
     importance: float = Field(default=1.0)
-    created_at: datetime = Field(default_factory=utcnow)
-    updated_at: datetime = Field(default_factory=utcnow)
-    accessed_at: datetime | None = None
+    created_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
+    updated_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
+    accessed_at: datetime | None = Field(default=None, sa_column=_ts_column(nullable=True))
     access_count: int = Field(default=0)
     metadata_json: str | None = None
 
@@ -39,8 +44,8 @@ class Session(SQLModel, table=True):
     title: str | None = None
     summary: str | None = None
     context_snapshot: str | None = None
-    created_at: datetime = Field(default_factory=utcnow)
-    updated_at: datetime = Field(default_factory=utcnow)
+    created_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
+    updated_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
 
 
 class Message(SQLModel, table=True):
@@ -53,4 +58,4 @@ class Message(SQLModel, table=True):
     user_id: str = Field(index=True)
     role: str
     content: str
-    created_at: datetime = Field(default_factory=utcnow)
+    created_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
