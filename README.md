@@ -190,6 +190,63 @@ The embedder is loaded lazily, so importing the app no longer triggers a model d
 
 ---
 
+## Drop-in mode for mypalclara (phase 2, slice 1)
+
+Palace ships an async Python client (`palace_client/`) that mypalclara can
+use to delegate per-method memory calls to a remote Palace instance,
+falling back to the embedded `ClaraMemory` for everything not yet routable.
+
+Install the client into mypalclara's environment:
+
+```bash
+pip install "git+https://github.com/BangRocket/palace-memory.git@<sha>#subdirectory=palace_client"
+```
+
+Copy `examples/mypalclara_router.py` into mypalclara as
+`mypalclara/core/memory/routed.py`, adjust the embedded imports, then
+replace every `from mypalclara.core.memory import PALACE` with the routed
+version. Toggle behavior at runtime:
+
+```bash
+export USE_PALACE_SERVICE=true
+export PALACE_SERVICE_URL=http://palace.local:8000
+export PALACE_API_KEY=  # optional, forward-compat for phase 3
+```
+
+The router uses **explicit pass-throughs** — every public method of
+ClaraMemory + MemoryManager has its own entry, no `__getattr__`
+fallthrough. Slice-1 methods routed to remote: `add`, `search`,
+`get_all`, `delete_all`, `get`, `delete`, `update`. Everything else stays
+embedded until later slices land.
+
+See `docs/superpowers/specs/2026-05-03-palace-phase-2-design.md` for the
+full design and slice roadmap.
+
+## Integration tests
+
+Default `pytest` runs only the fast mock-based suite (~2s). Live
+end-to-end tests against real postgres + qdrant are opt-in:
+
+```bash
+pytest                       # mocks only — fast iteration
+pytest -m integration        # live containers via testcontainers-python
+```
+
+The integration suite spins up postgres + qdrant containers per session
+(via [testcontainers-python](https://testcontainers-python.readthedocs.io/)),
+truncates tables between tests, and exercises:
+
+- Memory CRUD, semantic search ranking, batch create + filtered list,
+  delete-all with filters (`tests/integration/test_memories_live.py`).
+- Session/message lifecycle and context assembly
+  (`tests/integration/test_sessions_live.py`).
+- `palace_client` against a live Palace via in-process ASGI transport,
+  proving wire-contract agreement (`tests/integration/test_client_e2e.py`).
+
+Requires Docker or podman with a running machine. First run pulls
+postgres + qdrant images and downloads the small embedding model
+(`sentence-transformers/all-MiniLM-L6-v2`); subsequent runs are 30-60s.
+
 ## License
 
 PolyForm Noncommercial 1.0.0
