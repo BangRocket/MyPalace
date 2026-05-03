@@ -65,25 +65,44 @@ class PalaceClient:
             raise PalaceTransport(str(e)) from e
 
         if resp.status_code == 404:
-            payload = self._safe_json(resp)
+            payload = self._safe_json_for_error(resp)
             raise PalaceNotFound(
                 self._error_message(payload, "Not found"),
                 status_code=404, payload=payload,
             )
         if resp.status_code >= 400:
-            payload = self._safe_json(resp)
+            payload = self._safe_json_for_error(resp)
             raise PalaceError(
                 self._error_message(payload, f"HTTP {resp.status_code}"),
                 status_code=resp.status_code, payload=payload,
             )
-        return self._safe_json(resp)
+        return self._parse_json_or_raise(resp)
 
     @staticmethod
-    def _safe_json(resp: httpx.Response) -> dict:
+    def _safe_json_for_error(resp: httpx.Response) -> dict:
+        """Best-effort JSON parse of an error response body. Errors swallowed —
+        a 502 page can be HTML, but we still want to raise PalaceError with
+        whatever status info we have."""
         try:
-            return resp.json()
+            payload = resp.json()
         except Exception:
             return {}
+        return payload if isinstance(payload, dict) else {}
+
+    @staticmethod
+    def _parse_json_or_raise(resp: httpx.Response) -> dict:
+        """Parse a 2xx response body. Raise PalaceError if the body is malformed
+        — a successful HTTP status with an unparseable body is a server bug,
+        not a transport issue, and we should fail loudly rather than return {}
+        and have downstream Pydantic raise a confusing 'missing required field'
+        error."""
+        try:
+            return resp.json()
+        except Exception as e:
+            raise PalaceError(
+                f"Server returned {resp.status_code} but body was not valid JSON: {e}",
+                status_code=resp.status_code,
+            ) from e
 
     @staticmethod
     def _error_message(payload: dict, fallback: str) -> str:

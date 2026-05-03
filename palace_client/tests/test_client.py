@@ -375,3 +375,29 @@ async def test_async_context_manager_owns_client():
         assert h == {"status": "ok"}
     # The injected client should still be usable (PalaceClient didn't close it).
     await httpx_client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_2xx_with_malformed_json_raises_palace_error():
+    """Spec: a 200 with garbage body is a server bug. Fail loudly."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=b"not json at all")
+
+    client = make_client(handler)
+    with pytest.raises(PalaceError) as exc_info:
+        await client.health()
+    assert exc_info.value.status_code == 200
+    assert "not valid JSON" in exc_info.value.message
+
+
+@pytest.mark.asyncio
+async def test_4xx_with_html_body_still_raises_palace_error():
+    """Error bodies are best-effort — a 502 HTML page should still surface
+    as PalaceError with status_code 502."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(502, content=b"<html><body>Bad Gateway</body></html>")
+
+    client = make_client(handler)
+    with pytest.raises(PalaceError) as exc_info:
+        await client.get("any-id")
+    assert exc_info.value.status_code == 502
