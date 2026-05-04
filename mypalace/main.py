@@ -58,8 +58,19 @@ async def _ensure_default_tenant() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup: create tables and init vector collections."""
+    """Startup: validate config, create tables, init vector collections."""
     configure_logging()
+
+    # Phase 8 slice 1: validate env-var config BEFORE anything else.
+    # ConfigError propagates and kills startup with a clean message
+    # rather than crashing on the first request.
+    import logging as _logging
+
+    from mypalace.health.config_validator import validate_config
+    _log = _logging.getLogger("mypalace.startup")
+    for warning in validate_config():
+        _log.warning(warning)
+
     configure_tracing(app)
     await init_db()
     await _ensure_default_tenant()
@@ -99,7 +110,25 @@ app.add_middleware(ObservabilityMiddleware)
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "palace-memory"}
+    return {"status": "ok", "service": "mypalace"}
+
+
+@app.get("/health/deep")
+async def health_deep():
+    """Phase 8 slice 1: ping every configured backend; return per-backend
+    detail. Returns 200 with overall=ok if every configured backend
+    answered, 503 with overall=degraded otherwise."""
+    from fastapi.responses import JSONResponse
+
+    from mypalace.health.checks import check_all_backends, to_dict
+
+    overall_ok, results = await check_all_backends()
+    body = {
+        "status": "ok" if overall_ok else "degraded",
+        "service": "mypalace",
+        "backends": [to_dict(r) for r in results],
+    }
+    return JSONResponse(content=body, status_code=200 if overall_ok else 503)
 
 
 @app.get("/metrics", include_in_schema=False)
