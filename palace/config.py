@@ -54,5 +54,9 @@ class Settings(BaseSettings):
     cache_ttl_search_seconds: int = Field(default=60, validation_alias="PALACE_CACHE_TTL_SEARCH")
     cache_ttl_get_seconds: int = Field(default=300, validation_alias="PALACE_CACHE_TTL_GET")
 
+    # gRPC (slice 5) — port unset = HTTP-only.
+    grpc_port: int | None = Field(default=None, validation_alias="PALACE_GRPC_PORT")
+    grpc_host: str = Field(default="0.0.0.0", validation_alias="PALACE_GRPC_HOST")
+
 
 settings = Settings()

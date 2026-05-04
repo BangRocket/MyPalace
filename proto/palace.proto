@@ -1,0 +1,97 @@
+// Palace Memory Service — gRPC schema (phase 3 slice 5)
+//
+// Scope: MemoryService only. Other surfaces (sessions, episodes, arcs,
+// dynamics, intentions, retrieval, ingestion) ride HTTP for now and will
+// land here in phase 4.
+//
+// Regenerate stubs:
+//   python -m grpc_tools.protoc -I=proto --python_out=palace/grpc/_generated \
+//     --grpc_python_out=palace/grpc/_generated proto/palace.proto
+
+syntax = "proto3";
+package palace.v1;
+
+// -- Messages ---------------------------------------------------------
+
+message Memory {
+  string id = 1;
+  string user_id = 2;
+  string agent_id = 3;
+  string content = 4;
+  string memory_type = 5;
+  string source = 6;
+  float importance = 7;
+  string created_at = 8;
+  string updated_at = 9;
+  string accessed_at = 10;
+  int32 access_count = 11;
+  string metadata_json = 12;  // JSON-encoded; empty string = null
+}
+
+message ScoredMemory {
+  Memory memory = 1;
+  float score = 2;
+}
+
+// -- Requests / Responses --------------------------------------------
+
+message CreateMemoryRequest {
+  string user_id = 1;
+  string content = 2;
+  string memory_type = 3;
+  string agent_id = 4;
+  string source = 5;
+  float importance = 6;
+  string metadata_json = 7;
+}
+
+message GetMemoryRequest {
+  string memory_id = 1;
+}
+
+message DeleteMemoryRequest {
+  string memory_id = 1;
+}
+
+message DeleteResponse {
+  bool deleted = 1;
+}
+
+message MemoryResponse {
+  Memory memory = 1;
+}
+
+message SearchMemoriesRequest {
+  string query = 1;
+  string user_id = 2;
+  string agent_id = 3;
+  string memory_type = 4;
+  int32 limit = 5;
+  float min_score = 6;
+}
+
+message SearchMemoriesResponse {
+  repeated ScoredMemory results = 1;
+}
+
+message ListMemoriesRequest {
+  string user_id = 1;
+  string agent_id = 2;
+  string memory_type = 3;
+  int32 limit = 4;
+  int32 offset = 5;
+}
+
+message ListMemoriesResponse {
+  repeated Memory memories = 1;
+}
+
+// -- Service ----------------------------------------------------------
+
+service MemoryService {
+  rpc CreateMemory(CreateMemoryRequest) returns (MemoryResponse);
+  rpc GetMemory(GetMemoryRequest) returns (MemoryResponse);
+  rpc DeleteMemory(DeleteMemoryRequest) returns (DeleteResponse);
+  rpc SearchMemories(SearchMemoriesRequest) returns (SearchMemoriesResponse);
+  rpc ListMemories(ListMemoriesRequest) returns (ListMemoriesResponse);
+}

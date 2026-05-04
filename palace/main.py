@@ -44,8 +44,17 @@ async def lifespan(app: FastAPI):
     await memory_service.init(tenant_id=settings.default_tenant_id)
     await episode_service.init(tenant_id=settings.default_tenant_id)
     await key_service.bootstrap_if_needed(settings.bootstrap_admin_key)
+
+    # Optional gRPC server alongside FastAPI (slice 5).
+    grpc_server = None
+    if settings.grpc_port is not None:
+        from palace.grpc.server import serve as serve_grpc
+        grpc_server = await serve_grpc(settings.grpc_port)
+
     yield
-    # Shutdown
+
+    if grpc_server is not None:
+        await grpc_server.stop(grace=2.0)
 
 
 app = FastAPI(
