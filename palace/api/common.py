@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
-    from palace.models import Memory
+    from palace.models import Intention, Memory
 
 T = TypeVar("T")
 
@@ -351,3 +352,75 @@ class ScoreBreakdownOut(BaseModel):
     fsrs_score: float
     retrievability: float
     storage_strength: float
+
+
+# ---------------------------------------------------------------------------
+# Slice 4: intentions
+# ---------------------------------------------------------------------------
+
+class SetIntentionRequest(BaseModel):
+    user_id: str
+    content: str
+    trigger_conditions: dict[str, Any]
+    agent_id: str = "clara"
+    expires_at: datetime | None = None
+    source_memory_id: str | None = None
+    priority: int = 0
+    fire_once: bool = True
+
+
+class CheckIntentionsRequest(BaseModel):
+    user_id: str
+    message: str
+    context: dict[str, Any] | None = None
+    agent_id: str = "clara"
+
+
+class FormatIntentionsRequest(BaseModel):
+    intentions: list[dict[str, Any]]
+    max: int = 3
+
+
+class IntentionOut(BaseModel):
+    id: str
+    user_id: str
+    agent_id: str
+    content: str
+    source_memory_id: str | None = None
+    trigger_conditions: dict[str, Any]
+    priority: int
+    fired: bool
+    fire_once: bool
+    created_at: str | None = None
+    expires_at: str | None = None
+    fired_at: str | None = None
+
+    @classmethod
+    def from_intention(cls, i: Intention) -> IntentionOut:
+        return cls(
+            id=i.id,
+            user_id=i.user_id,
+            agent_id=i.agent_id,
+            content=i.content,
+            source_memory_id=i.source_memory_id,
+            trigger_conditions=i.trigger_conditions,
+            priority=i.priority,
+            fired=i.fired,
+            fire_once=i.fire_once,
+            created_at=i.created_at.isoformat() if i.created_at else None,
+            expires_at=i.expires_at.isoformat() if i.expires_at else None,
+            fired_at=i.fired_at.isoformat() if i.fired_at else None,
+        )
+
+
+class FiredIntentionOut(BaseModel):
+    id: str
+    content: str
+    trigger_type: str
+    priority: int
+    match_details: dict[str, Any]
+    source_memory_id: str | None = None
+
+
+class IntentionFormatOut(BaseModel):
+    text: str

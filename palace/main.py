@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from palace.api import arcs, context, episodes, jobs, memories, sessions
 from palace.api import dynamics as dynamics_api
+from palace.api import intentions as intentions_api
 from palace.api import maintenance as maintenance_api
 from palace.database import init_db
 from palace.episode_service import episode_service
@@ -46,4 +47,6 @@ app.include_router(arcs.synthesis_router, prefix="/v1/synthesis", tags=["arcs"])
 app.include_router(arcs.users_arcs_router, prefix="/v1/users", tags=["arcs"])
 app.include_router(jobs.router, prefix="/v1/jobs", tags=["jobs"])
 app.include_router(dynamics_api.router, prefix="/v1/memories", tags=["dynamics"])
+app.include_router(intentions_api.router, prefix="/v1/intentions", tags=["intentions"])
+app.include_router(intentions_api.users_router, prefix="/v1/users", tags=["intentions"])
 app.include_router(maintenance_api.router, prefix="/v1/maintenance", tags=["maintenance"])
