@@ -163,6 +163,40 @@ Cache failures degrade to misses — Palace stays correct, just slower.
 
 ---
 
+## gRPC transport (phase 3 slice 5)
+
+Optional second transport alongside REST. **Scope this release: MemoryService only** — Create / Get / Delete / Search / List. Other surfaces (sessions, episodes, arcs, etc.) ride HTTP via `PalaceClient`. Full mirror is a phase 4 follow-up.
+
+```bash
+export PALACE_GRPC_PORT=50051
+.venv/bin/uvicorn palace.main:app --port 8000
+# → starts FastAPI on :8000 AND gRPC on :50051
+```
+
+Auth uses the same X-Palace-Key, sent as gRPC metadata `x-palace-key`. Scope rules are identical to HTTP.
+
+```python
+from palace_client.grpc import PalaceGrpcClient
+
+async with PalaceGrpcClient("localhost:50051", api_key="pk_live_...") as client:
+    mem = await client.create(user_id="u1", content="hello via gRPC")
+    results = await client.search(query="hello", limit=5)
+```
+
+### Regenerating stubs
+
+```bash
+python -m grpc_tools.protoc -I=proto \
+    --python_out=palace/grpc/_generated \
+    --grpc_python_out=palace/grpc/_generated \
+    proto/palace.proto
+# Then re-apply the local import fix in palace_pb2_grpc.py:
+#   sed -i '' 's/^import palace_pb2/from palace.grpc._generated import palace_pb2/' \
+#     palace/grpc/_generated/palace_pb2_grpc.py
+```
+
+---
+
 ## Quick start
 
 ```bash

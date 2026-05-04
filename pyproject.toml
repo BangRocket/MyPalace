@@ -22,6 +22,9 @@ dependencies = [
     "bcrypt>=4.1",
     "falkordb>=1.0",
     "redis>=5.0",
+    "grpcio>=1.60",
+    "grpcio-tools>=1.60",
+    "protobuf>=4.25",
 ]
 
 [project.optional-dependencies]
@@ -45,6 +48,8 @@ ignore = ["UP046"]  # Generic[T] is the canonical Pydantic v2 idiom
 
 [tool.ruff.lint.per-file-ignores]
 "palace_client/palace_client/exceptions.py" = ["N818"]  # PalaceNotFound, PalaceTransport are deliberate public API names
+"palace/grpc/_generated/*.py" = ["ALL"]  # protoc-generated stubs; do not lint
+"palace/grpc/memory_servicer.py" = ["N802"]  # gRPC servicer methods must match proto (PascalCase)
 
 [tool.setuptools.packages.find]
 include = ["palace*"]
