@@ -4,6 +4,51 @@ All notable changes to Palace are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and Palace adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] — 2026-05-04
+
+Surface completion + ops polish. Three slices since 0.3.
+
+### Added — phase 5
+
+- **Worker-queue routing (slice 1)** — new `PALACE_WORKER_QUEUE_ENABLED`
+  env flag. When set, the async-mode `/v1/reflection/session` and
+  `/v1/synthesis/narratives` routes enqueue jobs onto the Postgres queue
+  instead of running them in-process via `asyncio.create_task`. The
+  in-process path stays the default so single-process deployments keep
+  working without a worker process.
+- **Episode/intention/arc event publishers (slice 1)** —
+  `episode_service.reflect_session` publishes one `episode.created` per
+  written episode; `intentions.service.check` publishes
+  `intention.fired` per match (after commit, so subscribers see
+  authoritative state); `arc_service.synthesize_narratives` publishes
+  `arc.synthesized` per new/updated arc. WebSocket subscribers from
+  phase 4 slice 5 now receive the full event stream.
+- **gRPC mirror of remaining surfaces (slice 2)** — 22 new RPCs across 8
+  services: `SessionService`, `EpisodeService`, `ArcService`,
+  `IntentionService`, `DynamicsService`, `RetrievalService`,
+  `IngestionService`, `JobService`. All servicers delegate to the same
+  singleton services backing HTTP. Auth interceptor `RPC_SCOPE` map
+  extended with the same scope rules as HTTP. `PalaceGrpcClient` mirrors
+  every new RPC.
+- **Cross-tenant analytics (slice 3)** — `GET /v1/admin/stats?tenant_id=<id>`
+  returns a per-tenant snapshot (row counts, 7-day activity rollup,
+  top-10 users by access, FSRS health). `tenant_id=ALL` returns one
+  entry per tenant — but only for cross-tenant admin keys.
+
+### Notes
+
+- gRPC `LayeredContext`, intention `trigger_conditions`, and
+  supersession metadata are encoded as JSON strings in proto3 to avoid a
+  schema explosion across deeply-nested dict-of-lists shapes.
+- Async-mode gRPC endpoints (`ReflectSession`, `SynthesizeNarratives`)
+  use proto3 `oneof` (pending vs episodes/arcs); request field `mode`
+  carries `"sync"|"async"` instead of HTTP's query param + 200/202
+  split.
+- Per-tenant Postgres schemas and an admin web UI are deliberately
+  deferred — operators who need stronger isolation should run separate
+  Palace instances per tenant; a web UI is a different skill and a
+  separate phase if requested.
+
 ## [0.3.0] — 2026-05-04
 
 Operational maturity release. Six slices since 0.2.

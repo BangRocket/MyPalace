@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from palace.api import admin, arcs, context, episodes, jobs, memories, sessions, tenants
+from palace.api import admin, arcs, context, episodes, jobs, memories, sessions, stats, tenants
 from palace.api import dynamics as dynamics_api
 from palace.api import events as events_api
 from palace.api import graph as graph_api
@@ -94,6 +94,7 @@ async def metrics():
 
 app.include_router(admin.router, prefix="/v1/admin", tags=["admin"])
 app.include_router(tenants.router, prefix="/v1/admin", tags=["admin"])
+app.include_router(stats.router, prefix="/v1/admin", tags=["admin"])
 app.include_router(memories.router, prefix="/v1/memories", tags=["memories"])
 app.include_router(memories.users_router, prefix="/v1/users", tags=["memories"])
 app.include_router(sessions.router, prefix="/v1/sessions", tags=["sessions"])

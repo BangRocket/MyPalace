@@ -26,9 +26,7 @@ if _version_not_supported:
 
 
 class MemoryServiceStub(object):
-    """-- Service ----------------------------------------------------------
-
-    """
+    """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
         """Constructor.
@@ -64,9 +62,7 @@ class MemoryServiceStub(object):
 
 
 class MemoryServiceServicer(object):
-    """-- Service ----------------------------------------------------------
-
-    """
+    """Missing associated documentation comment in .proto file."""
 
     def CreateMemory(self, request, context):
         """Missing associated documentation comment in .proto file."""
@@ -135,9 +131,7 @@ def add_MemoryServiceServicer_to_server(servicer, server):
 
  # This class is part of an EXPERIMENTAL API.
 class MemoryService(object):
-    """-- Service ----------------------------------------------------------
-
-    """
+    """Missing associated documentation comment in .proto file."""
 
     @staticmethod
     def CreateMemory(request,
@@ -264,6 +258,1227 @@ class MemoryService(object):
             '/palace.v1.MemoryService/ListMemories',
             palace__pb2.ListMemoriesRequest.SerializeToString,
             palace__pb2.ListMemoriesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+
+class SessionServiceStub(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.CreateSession = channel.unary_unary(
+                '/palace.v1.SessionService/CreateSession',
+                request_serializer=palace__pb2.CreateSessionRequest.SerializeToString,
+                response_deserializer=palace__pb2.SessionResponse.FromString,
+                _registered_method=True)
+        self.GetSession = channel.unary_unary(
+                '/palace.v1.SessionService/GetSession',
+                request_serializer=palace__pb2.GetSessionRequest.SerializeToString,
+                response_deserializer=palace__pb2.SessionWithMessagesResponse.FromString,
+                _registered_method=True)
+        self.AddMessage = channel.unary_unary(
+                '/palace.v1.SessionService/AddMessage',
+                request_serializer=palace__pb2.AddMessageRequest.SerializeToString,
+                response_deserializer=palace__pb2.MessageResponse.FromString,
+                _registered_method=True)
+        self.UpdateSession = channel.unary_unary(
+                '/palace.v1.SessionService/UpdateSession',
+                request_serializer=palace__pb2.UpdateSessionRequest.SerializeToString,
+                response_deserializer=palace__pb2.SessionResponse.FromString,
+                _registered_method=True)
+        self.DeleteSession = channel.unary_unary(
+                '/palace.v1.SessionService/DeleteSession',
+                request_serializer=palace__pb2.DeleteSessionRequest.SerializeToString,
+                response_deserializer=palace__pb2.DeleteResponse.FromString,
+                _registered_method=True)
+
+
+class SessionServiceServicer(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def CreateSession(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetSession(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def AddMessage(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateSession(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteSession(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_SessionServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'CreateSession': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateSession,
+                    request_deserializer=palace__pb2.CreateSessionRequest.FromString,
+                    response_serializer=palace__pb2.SessionResponse.SerializeToString,
+            ),
+            'GetSession': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetSession,
+                    request_deserializer=palace__pb2.GetSessionRequest.FromString,
+                    response_serializer=palace__pb2.SessionWithMessagesResponse.SerializeToString,
+            ),
+            'AddMessage': grpc.unary_unary_rpc_method_handler(
+                    servicer.AddMessage,
+                    request_deserializer=palace__pb2.AddMessageRequest.FromString,
+                    response_serializer=palace__pb2.MessageResponse.SerializeToString,
+            ),
+            'UpdateSession': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateSession,
+                    request_deserializer=palace__pb2.UpdateSessionRequest.FromString,
+                    response_serializer=palace__pb2.SessionResponse.SerializeToString,
+            ),
+            'DeleteSession': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteSession,
+                    request_deserializer=palace__pb2.DeleteSessionRequest.FromString,
+                    response_serializer=palace__pb2.DeleteResponse.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'palace.v1.SessionService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('palace.v1.SessionService', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class SessionService(object):
+    """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def CreateSession(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/palace.v1.SessionService/CreateSession',
+            palace__pb2.CreateSessionRequest.SerializeToString,
+            palace__pb2.SessionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetSession(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/palace.v1.SessionService/GetSession',
+            palace__pb2.GetSessionRequest.SerializeToString,
+            palace__pb2.SessionWithMessagesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def AddMessage(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/palace.v1.SessionService/AddMessage',
+            palace__pb2.AddMessageRequest.SerializeToString,
+            palace__pb2.MessageResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateSession(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/palace.v1.SessionService/UpdateSession',
+            palace__pb2.UpdateSessionRequest.SerializeToString,
+            palace__pb2.SessionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteSession(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/palace.v1.SessionService/DeleteSession',
+            palace__pb2.DeleteSessionRequest.SerializeToString,
+            palace__pb2.DeleteResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+
+class EpisodeServiceStub(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.ReflectSession = channel.unary_unary(
+                '/palace.v1.EpisodeService/ReflectSession',
+                request_serializer=palace__pb2.ReflectSessionRequest.SerializeToString,
+                response_deserializer=palace__pb2.ReflectSessionResponse.FromString,
+                _registered_method=True)
+        self.SearchEpisodes = channel.unary_unary(
+                '/palace.v1.EpisodeService/SearchEpisodes',
+                request_serializer=palace__pb2.SearchEpisodesRequest.SerializeToString,
+                response_deserializer=palace__pb2.EpisodesResponse.FromString,
+                _registered_method=True)
+        self.GetRecentEpisodes = channel.unary_unary(
+                '/palace.v1.EpisodeService/GetRecentEpisodes',
+                request_serializer=palace__pb2.GetRecentEpisodesRequest.SerializeToString,
+                response_deserializer=palace__pb2.EpisodesResponse.FromString,
+                _registered_method=True)
+
+
+class EpisodeServiceServicer(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def ReflectSession(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SearchEpisodes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetRecentEpisodes(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_EpisodeServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'ReflectSession': grpc.unary_unary_rpc_method_handler(
+                    servicer.ReflectSession,
+                    request_deserializer=palace__pb2.ReflectSessionRequest.FromString,
+                    response_serializer=palace__pb2.ReflectSessionResponse.SerializeToString,
+            ),
+            'SearchEpisodes': grpc.unary_unary_rpc_method_handler(
+                    servicer.SearchEpisodes,
+                    request_deserializer=palace__pb2.SearchEpisodesRequest.FromString,
+                    response_serializer=palace__pb2.EpisodesResponse.SerializeToString,
+            ),
+            'GetRecentEpisodes': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetRecentEpisodes,
+                    request_deserializer=palace__pb2.GetRecentEpisodesRequest.FromString,
+                    response_serializer=palace__pb2.EpisodesResponse.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'palace.v1.EpisodeService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('palace.v1.EpisodeService', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class EpisodeService(object):
+    """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def ReflectSession(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/palace.v1.EpisodeService/ReflectSession',
+            palace__pb2.ReflectSessionRequest.SerializeToString,
+            palace__pb2.ReflectSessionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SearchEpisodes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/palace.v1.EpisodeService/SearchEpisodes',
+            palace__pb2.SearchEpisodesRequest.SerializeToString,
+            palace__pb2.EpisodesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetRecentEpisodes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/palace.v1.EpisodeService/GetRecentEpisodes',
+            palace__pb2.GetRecentEpisodesRequest.SerializeToString,
+            palace__pb2.EpisodesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+
+class ArcServiceStub(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.SynthesizeNarratives = channel.unary_unary(
+                '/palace.v1.ArcService/SynthesizeNarratives',
+                request_serializer=palace__pb2.SynthesizeNarrativesRequest.SerializeToString,
+                response_deserializer=palace__pb2.SynthesizeNarrativesResponse.FromString,
+                _registered_method=True)
+        self.GetActiveArcs = channel.unary_unary(
+                '/palace.v1.ArcService/GetActiveArcs',
+                request_serializer=palace__pb2.GetActiveArcsRequest.SerializeToString,
+                response_deserializer=palace__pb2.ArcsResponse.FromString,
+                _registered_method=True)
+
+
+class ArcServiceServicer(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def SynthesizeNarratives(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetActiveArcs(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_ArcServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'SynthesizeNarratives': grpc.unary_unary_rpc_method_handler(
+                    servicer.SynthesizeNarratives,
+                    request_deserializer=palace__pb2.SynthesizeNarrativesRequest.FromString,
+                    response_serializer=palace__pb2.SynthesizeNarrativesResponse.SerializeToString,
+            ),
+            'GetActiveArcs': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetActiveArcs,
+                    request_deserializer=palace__pb2.GetActiveArcsRequest.FromString,
+                    response_serializer=palace__pb2.ArcsResponse.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'palace.v1.ArcService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('palace.v1.ArcService', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class ArcService(object):
+    """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def SynthesizeNarratives(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/palace.v1.ArcService/SynthesizeNarratives',
+            palace__pb2.SynthesizeNarrativesRequest.SerializeToString,
+            palace__pb2.SynthesizeNarrativesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetActiveArcs(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/palace.v1.ArcService/GetActiveArcs',
+            palace__pb2.GetActiveArcsRequest.SerializeToString,
+            palace__pb2.ArcsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+
+class IntentionServiceStub(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.SetIntention = channel.unary_unary(
+                '/palace.v1.IntentionService/SetIntention',
+                request_serializer=palace__pb2.SetIntentionRequest.SerializeToString,
+                response_deserializer=palace__pb2.IntentionResponse.FromString,
+                _registered_method=True)
+        self.CheckIntentions = channel.unary_unary(
+                '/palace.v1.IntentionService/CheckIntentions',
+                request_serializer=palace__pb2.CheckIntentionsRequest.SerializeToString,
+                response_deserializer=palace__pb2.FiredIntentionsResponse.FromString,
+                _registered_method=True)
+        self.FormatIntentions = channel.unary_unary(
+                '/palace.v1.IntentionService/FormatIntentions',
+                request_serializer=palace__pb2.FormatIntentionsRequest.SerializeToString,
+                response_deserializer=palace__pb2.FormattedIntentionsResponse.FromString,
+                _registered_method=True)
+        self.ListIntentions = channel.unary_unary(
+                '/palace.v1.IntentionService/ListIntentions',
+                request_serializer=palace__pb2.ListIntentionsRequest.SerializeToString,
+                response_deserializer=palace__pb2.IntentionsResponse.FromString,
+                _registered_method=True)
+        self.DeleteIntention = channel.unary_unary(
+                '/palace.v1.IntentionService/DeleteIntention',
+                request_serializer=palace__pb2.DeleteIntentionRequest.SerializeToString,
+                response_deserializer=palace__pb2.DeleteResponse.FromString,
+                _registered_method=True)
+
+
+class IntentionServiceServicer(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def SetIntention(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CheckIntentions(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def FormatIntentions(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListIntentions(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteIntention(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_IntentionServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'SetIntention': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetIntention,
+                    request_deserializer=palace__pb2.SetIntentionRequest.FromString,
+                    response_serializer=palace__pb2.IntentionResponse.SerializeToString,
+            ),
+            'CheckIntentions': grpc.unary_unary_rpc_method_handler(
+                    servicer.CheckIntentions,
+                    request_deserializer=palace__pb2.CheckIntentionsRequest.FromString,
+                    response_serializer=palace__pb2.FiredIntentionsResponse.SerializeToString,
+            ),
+            'FormatIntentions': grpc.unary_unary_rpc_method_handler(
+                    servicer.FormatIntentions,
+                    request_deserializer=palace__pb2.FormatIntentionsRequest.FromString,
+                    response_serializer=palace__pb2.FormattedIntentionsResponse.SerializeToString,
+            ),
+            'ListIntentions': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListIntentions,
+                    request_deserializer=palace__pb2.ListIntentionsRequest.FromString,
+                    response_serializer=palace__pb2.IntentionsResponse.SerializeToString,
+            ),
+            'DeleteIntention': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteIntention,
+                    request_deserializer=palace__pb2.DeleteIntentionRequest.FromString,
+                    response_serializer=palace__pb2.DeleteResponse.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'palace.v1.IntentionService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('palace.v1.IntentionService', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class IntentionService(object):
+    """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def SetIntention(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/palace.v1.IntentionService/SetIntention',
+            palace__pb2.SetIntentionRequest.SerializeToString,
+            palace__pb2.IntentionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CheckIntentions(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/palace.v1.IntentionService/CheckIntentions',
+            palace__pb2.CheckIntentionsRequest.SerializeToString,
+            palace__pb2.FiredIntentionsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def FormatIntentions(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/palace.v1.IntentionService/FormatIntentions',
+            palace__pb2.FormatIntentionsRequest.SerializeToString,
+            palace__pb2.FormattedIntentionsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListIntentions(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/palace.v1.IntentionService/ListIntentions',
+            palace__pb2.ListIntentionsRequest.SerializeToString,
+            palace__pb2.IntentionsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteIntention(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/palace.v1.IntentionService/DeleteIntention',
+            palace__pb2.DeleteIntentionRequest.SerializeToString,
+            palace__pb2.DeleteResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+
+class DynamicsServiceStub(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.PromoteMemory = channel.unary_unary(
+                '/palace.v1.DynamicsService/PromoteMemory',
+                request_serializer=palace__pb2.PromoteMemoryRequest.SerializeToString,
+                response_deserializer=palace__pb2.DynamicsResponse.FromString,
+                _registered_method=True)
+        self.DemoteMemory = channel.unary_unary(
+                '/palace.v1.DynamicsService/DemoteMemory',
+                request_serializer=palace__pb2.DemoteMemoryRequest.SerializeToString,
+                response_deserializer=palace__pb2.DynamicsResponse.FromString,
+                _registered_method=True)
+        self.GetDynamics = channel.unary_unary(
+                '/palace.v1.DynamicsService/GetDynamics',
+                request_serializer=palace__pb2.GetDynamicsRequest.SerializeToString,
+                response_deserializer=palace__pb2.DynamicsResponse.FromString,
+                _registered_method=True)
+        self.ScoreMemory = channel.unary_unary(
+                '/palace.v1.DynamicsService/ScoreMemory',
+                request_serializer=palace__pb2.ScoreMemoryRequest.SerializeToString,
+                response_deserializer=palace__pb2.ScoreBreakdownResponse.FromString,
+                _registered_method=True)
+
+
+class DynamicsServiceServicer(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def PromoteMemory(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DemoteMemory(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetDynamics(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ScoreMemory(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_DynamicsServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'PromoteMemory': grpc.unary_unary_rpc_method_handler(
+                    servicer.PromoteMemory,
+                    request_deserializer=palace__pb2.PromoteMemoryRequest.FromString,
+                    response_serializer=palace__pb2.DynamicsResponse.SerializeToString,
+            ),
+            'DemoteMemory': grpc.unary_unary_rpc_method_handler(
+                    servicer.DemoteMemory,
+                    request_deserializer=palace__pb2.DemoteMemoryRequest.FromString,
+                    response_serializer=palace__pb2.DynamicsResponse.SerializeToString,
+            ),
+            'GetDynamics': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetDynamics,
+                    request_deserializer=palace__pb2.GetDynamicsRequest.FromString,
+                    response_serializer=palace__pb2.DynamicsResponse.SerializeToString,
+            ),
+            'ScoreMemory': grpc.unary_unary_rpc_method_handler(
+                    servicer.ScoreMemory,
+                    request_deserializer=palace__pb2.ScoreMemoryRequest.FromString,
+                    response_serializer=palace__pb2.ScoreBreakdownResponse.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'palace.v1.DynamicsService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('palace.v1.DynamicsService', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class DynamicsService(object):
+    """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def PromoteMemory(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/palace.v1.DynamicsService/PromoteMemory',
+            palace__pb2.PromoteMemoryRequest.SerializeToString,
+            palace__pb2.DynamicsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DemoteMemory(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/palace.v1.DynamicsService/DemoteMemory',
+            palace__pb2.DemoteMemoryRequest.SerializeToString,
+            palace__pb2.DynamicsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetDynamics(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/palace.v1.DynamicsService/GetDynamics',
+            palace__pb2.GetDynamicsRequest.SerializeToString,
+            palace__pb2.DynamicsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ScoreMemory(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/palace.v1.DynamicsService/ScoreMemory',
+            palace__pb2.ScoreMemoryRequest.SerializeToString,
+            palace__pb2.ScoreBreakdownResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+
+class RetrievalServiceStub(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.AssembleLayered = channel.unary_unary(
+                '/palace.v1.RetrievalService/AssembleLayered',
+                request_serializer=palace__pb2.AssembleLayeredRequest.SerializeToString,
+                response_deserializer=palace__pb2.LayeredContextResponse.FromString,
+                _registered_method=True)
+
+
+class RetrievalServiceServicer(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def AssembleLayered(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_RetrievalServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'AssembleLayered': grpc.unary_unary_rpc_method_handler(
+                    servicer.AssembleLayered,
+                    request_deserializer=palace__pb2.AssembleLayeredRequest.FromString,
+                    response_serializer=palace__pb2.LayeredContextResponse.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'palace.v1.RetrievalService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('palace.v1.RetrievalService', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class RetrievalService(object):
+    """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def AssembleLayered(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/palace.v1.RetrievalService/AssembleLayered',
+            palace__pb2.AssembleLayeredRequest.SerializeToString,
+            palace__pb2.LayeredContextResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+
+class IngestionServiceStub(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.SupersedeMemory = channel.unary_unary(
+                '/palace.v1.IngestionService/SupersedeMemory',
+                request_serializer=palace__pb2.SupersedeMemoryRequest.SerializeToString,
+                response_deserializer=palace__pb2.SupersessionResponse.FromString,
+                _registered_method=True)
+        self.GetSupersessions = channel.unary_unary(
+                '/palace.v1.IngestionService/GetSupersessions',
+                request_serializer=palace__pb2.GetSupersessionsRequest.SerializeToString,
+                response_deserializer=palace__pb2.SupersessionsResponse.FromString,
+                _registered_method=True)
+
+
+class IngestionServiceServicer(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def SupersedeMemory(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetSupersessions(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_IngestionServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'SupersedeMemory': grpc.unary_unary_rpc_method_handler(
+                    servicer.SupersedeMemory,
+                    request_deserializer=palace__pb2.SupersedeMemoryRequest.FromString,
+                    response_serializer=palace__pb2.SupersessionResponse.SerializeToString,
+            ),
+            'GetSupersessions': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetSupersessions,
+                    request_deserializer=palace__pb2.GetSupersessionsRequest.FromString,
+                    response_serializer=palace__pb2.SupersessionsResponse.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'palace.v1.IngestionService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('palace.v1.IngestionService', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class IngestionService(object):
+    """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def SupersedeMemory(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/palace.v1.IngestionService/SupersedeMemory',
+            palace__pb2.SupersedeMemoryRequest.SerializeToString,
+            palace__pb2.SupersessionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetSupersessions(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/palace.v1.IngestionService/GetSupersessions',
+            palace__pb2.GetSupersessionsRequest.SerializeToString,
+            palace__pb2.SupersessionsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+
+class JobServiceStub(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.GetJob = channel.unary_unary(
+                '/palace.v1.JobService/GetJob',
+                request_serializer=palace__pb2.GetJobRequest.SerializeToString,
+                response_deserializer=palace__pb2.JobResponse.FromString,
+                _registered_method=True)
+
+
+class JobServiceServicer(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def GetJob(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_JobServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'GetJob': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetJob,
+                    request_deserializer=palace__pb2.GetJobRequest.FromString,
+                    response_serializer=palace__pb2.JobResponse.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'palace.v1.JobService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('palace.v1.JobService', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class JobService(object):
+    """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def GetJob(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/palace.v1.JobService/GetJob',
+            palace__pb2.GetJobRequest.SerializeToString,
+            palace__pb2.JobResponse.FromString,
             options,
             channel_credentials,
             insecure,

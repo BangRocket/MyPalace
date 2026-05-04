@@ -12,12 +12,46 @@ from palace.auth.key_service import key_service
 from palace.config import settings
 
 # Method name → required scope. Keep in sync with palace.auth.scopes.
+# Rule (mirrors HTTP scope map): list/get/search/check/format/score-of-context →
+# read; everything mutating → write; admin/maintenance → admin.
 RPC_SCOPE: dict[str, str] = {
+    # MemoryService (phase 3 slice 5)
     "/palace.v1.MemoryService/CreateMemory":  "write",
     "/palace.v1.MemoryService/GetMemory":     "read",
     "/palace.v1.MemoryService/DeleteMemory":  "write",
     "/palace.v1.MemoryService/SearchMemories": "read",
     "/palace.v1.MemoryService/ListMemories":  "read",
+    # SessionService
+    "/palace.v1.SessionService/CreateSession": "write",
+    "/palace.v1.SessionService/GetSession":    "read",
+    "/palace.v1.SessionService/AddMessage":    "write",
+    "/palace.v1.SessionService/UpdateSession": "write",
+    "/palace.v1.SessionService/DeleteSession": "write",
+    # EpisodeService
+    "/palace.v1.EpisodeService/ReflectSession":    "write",
+    "/palace.v1.EpisodeService/SearchEpisodes":    "read",
+    "/palace.v1.EpisodeService/GetRecentEpisodes": "read",
+    # ArcService
+    "/palace.v1.ArcService/SynthesizeNarratives": "write",
+    "/palace.v1.ArcService/GetActiveArcs":        "read",
+    # IntentionService
+    "/palace.v1.IntentionService/SetIntention":     "write",
+    "/palace.v1.IntentionService/CheckIntentions":  "read",
+    "/palace.v1.IntentionService/FormatIntentions": "read",
+    "/palace.v1.IntentionService/ListIntentions":   "read",
+    "/palace.v1.IntentionService/DeleteIntention":  "write",
+    # DynamicsService
+    "/palace.v1.DynamicsService/PromoteMemory": "write",
+    "/palace.v1.DynamicsService/DemoteMemory":  "write",
+    "/palace.v1.DynamicsService/GetDynamics":   "read",
+    "/palace.v1.DynamicsService/ScoreMemory":   "write",
+    # RetrievalService
+    "/palace.v1.RetrievalService/AssembleLayered": "read",
+    # IngestionService
+    "/palace.v1.IngestionService/SupersedeMemory":  "write",
+    "/palace.v1.IngestionService/GetSupersessions": "read",
+    # JobService
+    "/palace.v1.JobService/GetJob": "read",
 }
 
 

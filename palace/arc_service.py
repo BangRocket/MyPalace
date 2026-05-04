@@ -153,6 +153,18 @@ class ArcService:
                     **fields,
                 )
                 results.append(arc)
+
+        # Phase 5 slice 1: publish arc.synthesized for each new/updated arc.
+        # getattr defaults make this safe against partially-constructed mocks
+        # in existing tests — the event is enrichment, not source of truth.
+        from palace.events.broker import broker
+        for arc in results:
+            await broker.publish("arc.synthesized", tenant_id, {
+                "arc_id": getattr(arc, "id", None),
+                "user_id": getattr(arc, "user_id", user_id),
+                "title": getattr(arc, "title", ""),
+                "status": getattr(arc, "status", "active"),
+            })
         return results
 
 

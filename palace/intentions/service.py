@@ -126,7 +126,15 @@ class IntentionService:
             await db.commit()
 
             fired.sort(key=lambda x: x["priority"], reverse=True)
-            return fired
+
+        # Phase 5 slice 1: publish intention.fired per match (after commit so
+        # subscribers see authoritative DB state).
+        if fired:
+            from palace.events.broker import broker
+            for f in fired:
+                await broker.publish("intention.fired", tenant_id, f)
+
+        return fired
 
     def format_for_prompt(
         self,

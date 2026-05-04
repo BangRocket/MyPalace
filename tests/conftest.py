@@ -183,6 +183,7 @@ def client(
         patch("palace.api.memories.smart_ingestion_service", mock_ingestion_service),
         patch("palace.api.admin.key_service", mock_key_service),
         patch("palace.auth.key_service.key_service", mock_key_service),
+        patch("palace.auth.middleware.key_service", mock_key_service),
         patch("palace.main.key_service", mock_key_service),
         patch("palace.memory_service.memory_service", mock_memory_service),
         patch("palace.episode_service.episode_service", mock_episode_service),

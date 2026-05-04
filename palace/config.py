@@ -79,6 +79,9 @@ class Settings(BaseSettings):
     worker_max_attempts: int = Field(
         default=3, validation_alias="PALACE_WORKER_MAX_ATTEMPTS",
     )
+    worker_queue_enabled: bool = Field(
+        default=False, validation_alias="PALACE_WORKER_QUEUE_ENABLED",
+    )
 
     # Rate limits (phase 4 slice 4) — enabled = require Redis.
     rate_limit_enabled: bool = Field(
