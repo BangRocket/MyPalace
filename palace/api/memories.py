@@ -44,6 +44,7 @@ async def create_memory(
         importance=req.importance,
         metadata=req.metadata,
         tenant_id=tenant_id,
+        ttl_seconds=req.ttl_seconds,
     )
     took = int((time.time() - start) * 1000)
     return ApiResponse(data=MemoryOut.from_memory(memory), meta=Meta(count=1, took_ms=took))

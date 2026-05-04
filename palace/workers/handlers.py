@@ -47,6 +47,17 @@ async def _synthesis_handler(payload: dict, tenant_id: str) -> Any:
     )
 
 
+async def _cleanup_handler(payload: dict, tenant_id: str) -> Any:
+    """Phase 6 slice 3: delete memories whose TTL has elapsed."""
+    from palace.memory_service import memory_service
+    deleted = await memory_service.cleanup_expired(
+        tenant_id=tenant_id,
+        batch_size=payload.get("batch_size", 500),
+    )
+    return {"tenant_id": tenant_id, "deleted": deleted}
+
+
 # Built-in handlers wired at import time.
 register_handler("reflection", _reflection_handler)
 register_handler("synthesis", _synthesis_handler)
+register_handler("cleanup", _cleanup_handler)

@@ -1,12 +1,21 @@
 """Memory CRUD and semantic search service."""
 
-from sqlalchemy import and_, desc, select
+from datetime import timedelta
+
+from sqlalchemy import and_, desc, or_, select
 from sqlalchemy import delete as sa_delete
 
 from palace.database import async_session
 from palace.embeddings import EmbeddingProvider, get_embedder
 from palace.models import DEFAULT_TENANT_ID, Memory, utcnow
 from palace.vector import vector_store
+
+
+def _not_expired_clause():
+    """Filter expression: memory either has no TTL, or hasn't expired yet.
+    Used in search + list paths so dead rows aren't returned even before
+    the cleanup worker has run."""
+    return or_(Memory.expires_at.is_(None), Memory.expires_at > utcnow())
 
 
 class MemoryService:
@@ -36,8 +45,19 @@ class MemoryService:
         importance: float = 1.0,
         metadata: dict | None = None,
         tenant_id: str = DEFAULT_TENANT_ID,
+        ttl_seconds: int | None = None,
     ) -> Memory:
-        """Create a memory: embed, store in PG, store vector in Qdrant."""
+        """Create a memory: embed, store in PG, store vector in Qdrant.
+
+        ``ttl_seconds`` (phase 6 slice 3): when set, the memory is
+        auto-expired after that many seconds. The cleanup worker handler
+        garbage-collects expired rows + their vectors. Search + list
+        already exclude expired rows even before cleanup runs.
+        """
+        expires_at = (
+            utcnow() + timedelta(seconds=ttl_seconds)
+            if ttl_seconds is not None else None
+        )
         async with async_session() as db:
             memory = Memory(
                 tenant_id=tenant_id,
@@ -50,6 +70,7 @@ class MemoryService:
                 metadata_json=metadata,
                 created_at=utcnow(),
                 updated_at=utcnow(),
+                expires_at=expires_at,
             )
             db.add(memory)
             await db.commit()
@@ -84,6 +105,44 @@ class MemoryService:
             "agent_id": agent_id, "memory_type": memory_type,
         })
         return memory
+
+    async def cleanup_expired(
+        self,
+        tenant_id: str = DEFAULT_TENANT_ID,
+        batch_size: int = 500,
+    ) -> int:
+        """Delete memories where ``expires_at <= now()`` for ``tenant_id``.
+        Removes from PG AND from Qdrant. Returns count deleted.
+
+        Designed for the worker `cleanup` handler — single-tenant per call,
+        bounded batch so a backlog doesn't lock the table.
+        """
+        async with async_session() as db:
+            stmt = (
+                sa_delete(Memory)
+                .where(
+                    Memory.tenant_id == tenant_id,
+                    Memory.expires_at.is_not(None),
+                    Memory.expires_at <= utcnow(),
+                )
+                .returning(Memory.id)
+            )
+            result = await db.execute(stmt)
+            ids = [row[0] for row in result.all()]
+            await db.commit()
+
+        if not ids:
+            return 0
+
+        # Cap each cleanup pass to batch_size — operators can run more often
+        # if they need a faster drain.
+        ids = ids[:batch_size]
+        for i in range(0, len(ids), 500):
+            chunk = ids[i:i + 500]
+            await vector_store.delete(chunk, tenant_id=tenant_id)
+
+        await self._bust_cache(tenant_id)
+        return len(ids)
 
     @staticmethod
     async def _bust_cache(tenant_id: str) -> None:
@@ -324,6 +383,7 @@ class MemoryService:
                 select(Memory).where(
                     Memory.id.in_(memory_ids),
                     Memory.tenant_id == tenant_id,
+                    _not_expired_clause(),
                 ),
             )
             memories = result.scalars().all()
@@ -349,6 +409,7 @@ class MemoryService:
                 .where(
                     Memory.user_id == user_id,
                     Memory.tenant_id == tenant_id,
+                    _not_expired_clause(),
                 )
                 .order_by(desc(Memory.created_at))
                 .limit(limit),
@@ -368,7 +429,7 @@ class MemoryService:
     ) -> list[Memory]:
         """List memories with filters. Metadata matching uses JSONB
         containment (`@>`)."""
-        clauses = [Memory.tenant_id == tenant_id]
+        clauses = [Memory.tenant_id == tenant_id, _not_expired_clause()]
         if user_id is not None:
             clauses.append(Memory.user_id == user_id)
         if agent_id is not None:
