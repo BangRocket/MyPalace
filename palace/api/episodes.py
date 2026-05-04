@@ -17,8 +17,10 @@ from palace.api.common import (
     SearchEpisodesRequest,
 )
 from palace.auth.context import AuthContext, get_auth_context
+from palace.config import settings
 from palace.episode_service import episode_service
 from palace.job_service import job_service
+from palace.workers.queue import enqueue as enqueue_job
 
 router = APIRouter()              # /v1/episodes/...
 reflection_router = APIRouter()   # /v1/reflection/...
@@ -49,22 +51,37 @@ async def reflect_session(
             meta=Meta(count=len(episodes), took_ms=took),
         )
 
-    # async mode
-    async def coro():
-        return await episode_service.reflect_session(
-            messages=messages,
+    # async mode — route through the worker queue when configured, otherwise
+    # the in-process asyncio.create_task path. Both end up writing the same
+    # ReflectionJob row; only the executor differs.
+    if settings.worker_queue_enabled:
+        job = await enqueue_job(
+            kind="reflection",
             user_id=req.user_id,
-            agent_id=req.agent_id,
-            session_id=req.session_id,
+            payload={
+                "messages": messages,
+                "user_id": req.user_id,
+                "agent_id": req.agent_id,
+                "session_id": req.session_id,
+            },
             tenant_id=tenant_id,
         )
+    else:
+        async def coro():
+            return await episode_service.reflect_session(
+                messages=messages,
+                user_id=req.user_id,
+                agent_id=req.agent_id,
+                session_id=req.session_id,
+                tenant_id=tenant_id,
+            )
 
-    job = await job_service.run_async(
-        kind="reflection",
-        user_id=req.user_id,
-        coro_factory=coro,
-        tenant_id=tenant_id,
-    )
+        job = await job_service.run_async(
+            kind="reflection",
+            user_id=req.user_id,
+            coro_factory=coro,
+            tenant_id=tenant_id,
+        )
     took = int((time.time() - start) * 1000)
     response = ApiResponse(
         data=JobPendingOut(job_id=job.id),

@@ -119,6 +119,17 @@ class EpisodeService:
             )
             episodes.append(ep)
 
+        # Phase 5 slice 1: publish episode.created per written episode.
+        from palace.events.broker import broker
+        for ep in episodes:
+            await broker.publish("episode.created", tenant_id, {
+                "episode_id": ep["id"],
+                "user_id": ep["user_id"],
+                "summary": ep["summary"],
+                "significance": ep["significance"],
+                "session_id": ep.get("session_id"),
+            })
+
         return episodes
 
     async def search(

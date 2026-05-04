@@ -17,7 +17,9 @@ from palace.api.common import (
 )
 from palace.arc_service import arc_service
 from palace.auth.context import AuthContext, get_auth_context
+from palace.config import settings
 from palace.job_service import job_service
+from palace.workers.queue import enqueue as enqueue_job
 
 synthesis_router = APIRouter()           # /v1/synthesis/...
 users_arcs_router = APIRouter()          # /v1/users/{user_id}/arcs/...
@@ -45,20 +47,32 @@ async def synthesize_narratives(
             meta=Meta(count=len(arcs), took_ms=took),
         )
 
-    async def coro():
-        return await arc_service.synthesize_narratives(
+    if settings.worker_queue_enabled:
+        job = await enqueue_job(
+            kind="synthesis",
             user_id=req.user_id,
-            agent_id=req.agent_id,
-            lookback_episodes=req.lookback_episodes,
+            payload={
+                "user_id": req.user_id,
+                "agent_id": req.agent_id,
+                "lookback_episodes": req.lookback_episodes,
+            },
             tenant_id=tenant_id,
         )
+    else:
+        async def coro():
+            return await arc_service.synthesize_narratives(
+                user_id=req.user_id,
+                agent_id=req.agent_id,
+                lookback_episodes=req.lookback_episodes,
+                tenant_id=tenant_id,
+            )
 
-    job = await job_service.run_async(
-        kind="synthesis",
-        user_id=req.user_id,
-        coro_factory=coro,
-        tenant_id=tenant_id,
-    )
+        job = await job_service.run_async(
+            kind="synthesis",
+            user_id=req.user_id,
+            coro_factory=coro,
+            tenant_id=tenant_id,
+        )
     took = int((time.time() - start) * 1000)
     response = ApiResponse(
         data=JobPendingOut(job_id=job.id),
