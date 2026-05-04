@@ -385,6 +385,21 @@ docker run -p 8000:8000 \
   bangrocket/mypalace:latest
 ```
 
+### Production (single-host docker-compose)
+
+For a real deployment with all five backends + a worker, use the
+production compose file:
+
+```bash
+cp .env.example .env
+$EDITOR .env       # set PALACE_BOOTSTRAP_ADMIN_KEY + POSTGRES_PASSWORD
+docker compose -f docker-compose.prod.yml up -d
+curl http://localhost:8000/health/deep | jq
+```
+
+Full setup, scaling, observability, backup, and upgrade instructions
+are in **[`docs/deployment.md`](docs/deployment.md)**.
+
 ## Quick start (development)
 
 ```bash
