@@ -11,8 +11,10 @@ from palace_client.models import (
     Job,
     JobPending,
     Memory,
+    MemoryDynamics,
     Message,
     NarrativeArc,
+    ScoreBreakdown,
     ScoredMemory,
     Session,
     SessionWithMessages,
@@ -373,6 +375,68 @@ class PalaceClient:
     async def get_job(self, job_id: str) -> "Job":
         envelope = await self._request("GET", f"/v1/jobs/{job_id}")
         return Job.model_validate(self._data(envelope))
+
+    # ---- dynamics (slice 3) ----
+
+    async def promote_memory(
+        self,
+        memory_id: str,
+        user_id: str,
+        grade: int = 3,
+        signal_type: str = "used_in_response",
+    ) -> MemoryDynamics:
+        body = {
+            "user_id": user_id,
+            "grade": grade,
+            "signal_type": signal_type,
+        }
+        envelope = await self._request(
+            "POST", f"/v1/memories/{memory_id}/promote", json=body,
+        )
+        return MemoryDynamics.model_validate(self._data(envelope))
+
+    async def demote_memory(
+        self,
+        memory_id: str,
+        user_id: str,
+        reason: str = "user_correction",
+    ) -> MemoryDynamics:
+        body = {"user_id": user_id, "reason": reason}
+        envelope = await self._request(
+            "POST", f"/v1/memories/{memory_id}/demote", json=body,
+        )
+        return MemoryDynamics.model_validate(self._data(envelope))
+
+    async def get_dynamics(
+        self,
+        memory_id: str,
+        user_id: str,
+    ) -> MemoryDynamics:
+        envelope = await self._request(
+            "GET", f"/v1/memories/{memory_id}/dynamics",
+            params={"user_id": user_id},
+        )
+        return MemoryDynamics.model_validate(self._data(envelope))
+
+    async def score_memory(
+        self,
+        memory_id: str,
+        user_id: str,
+        semantic_score: float,
+    ) -> ScoreBreakdown:
+        body = {"user_id": user_id, "semantic_score": semantic_score}
+        envelope = await self._request(
+            "POST", f"/v1/memories/{memory_id}/score", json=body,
+        )
+        return ScoreBreakdown.model_validate(self._data(envelope))
+
+    async def prune_access_logs(self, retention_days: int = 90) -> int:
+        envelope = await self._request(
+            "POST", "/v1/maintenance/prune-access-logs",
+            params={"retention_days": retention_days},
+        )
+        data = self._data(envelope) or {}
+        return int(data.get("deleted", 0))
 
     # ---- health ----
 

@@ -287,33 +287,70 @@ class RoutedMemoryManager:
         )
 
     # ---- FSRS dynamics (slice 3) ----
+    # promote_memory, demote_memory, get_memory_dynamics, calculate_memory_score
+    # and prune_old_access_logs all have remote endpoints in slice 3.
+    # ensure_memory_dynamics stays embedded — promote/score auto-create the
+    # row server-side, so callers rarely need it directly. Slice-3 design D4:
+    # get_last_retrieved_memory_ids stays embedded (caller-side cache; the
+    # HTTP service is stateless between requests).
 
-    def get_memory_dynamics(self, memory_id, user_id):
-        return _EmbeddedMM.get_instance().get_memory_dynamics(memory_id, user_id)
+    async def get_memory_dynamics(self, memory_id, user_id):
+        if USE_PALACE_SERVICE:
+            return await _remote().get_dynamics(memory_id, user_id=user_id)
+        return await _maybe_await(
+            _EmbeddedMM.get_instance().get_memory_dynamics(memory_id, user_id),
+        )
 
     def ensure_memory_dynamics(self, memory_id, user_id, is_key):
+        # No remote endpoint — promote/score auto-create the row server-side.
         return _EmbeddedMM.get_instance().ensure_memory_dynamics(
             memory_id, user_id, is_key,
         )
 
-    def promote_memory(self, memory_id, user_id, grade, signal_type):
-        return _EmbeddedMM.get_instance().promote_memory(
-            memory_id, user_id, grade, signal_type,
+    async def promote_memory(self, memory_id, user_id, grade=3, signal_type="used_in_response"):
+        if USE_PALACE_SERVICE:
+            return await _remote().promote_memory(
+                memory_id, user_id=user_id, grade=grade, signal_type=signal_type,
+            )
+        return await _maybe_await(
+            _EmbeddedMM.get_instance().promote_memory(
+                memory_id, user_id, grade, signal_type,
+            ),
         )
 
-    def demote_memory(self, memory_id, user_id, reason):
-        return _EmbeddedMM.get_instance().demote_memory(memory_id, user_id, reason)
+    async def demote_memory(self, memory_id, user_id, reason="user_correction"):
+        if USE_PALACE_SERVICE:
+            return await _remote().demote_memory(
+                memory_id, user_id=user_id, reason=reason,
+            )
+        return await _maybe_await(
+            _EmbeddedMM.get_instance().demote_memory(memory_id, user_id, reason),
+        )
 
-    def calculate_memory_score(self, memory_id, user_id, semantic_score):
-        return _EmbeddedMM.get_instance().calculate_memory_score(
-            memory_id, user_id, semantic_score,
+    async def calculate_memory_score(self, memory_id, user_id, semantic_score):
+        if USE_PALACE_SERVICE:
+            breakdown = await _remote().score_memory(
+                memory_id, user_id=user_id, semantic_score=semantic_score,
+            )
+            return breakdown.composite_score
+        return await _maybe_await(
+            _EmbeddedMM.get_instance().calculate_memory_score(
+                memory_id, user_id, semantic_score,
+            ),
         )
 
     def get_last_retrieved_memory_ids(self, user_id):
+        # Stays embedded (slice-3 design D4) — caller-side cache; the HTTP
+        # service is stateless across requests/workers.
         return _EmbeddedMM.get_instance().get_last_retrieved_memory_ids(user_id)
 
-    def prune_old_access_logs(self, db, retention_days):
-        return _EmbeddedMM.get_instance().prune_old_access_logs(db, retention_days)
+    async def prune_old_access_logs(self, db, retention_days=90):
+        if USE_PALACE_SERVICE:
+            # `db` is unused remotely (server owns its own session).
+            return await _remote().prune_access_logs(retention_days=retention_days)
+        return await _maybe_await(
+            _EmbeddedMM.get_instance().prune_old_access_logs(db, retention_days),
+        )
 
     # ---- Intentions (slice 4) ----
 

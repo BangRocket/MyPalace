@@ -288,3 +288,66 @@ class JobOut(BaseModel):
 class JobPendingOut(BaseModel):
     job_id: str
     status: str = "pending"
+
+
+# ---------------------------------------------------------------------------
+# Slice 3: FSRS dynamics
+# ---------------------------------------------------------------------------
+
+class PromoteMemoryRequest(BaseModel):
+    user_id: str
+    grade: int = 3  # GOOD; valid 1-4
+    signal_type: str = "used_in_response"
+
+
+class DemoteMemoryRequest(BaseModel):
+    user_id: str
+    reason: str = "user_correction"
+
+
+class ScoreMemoryRequest(BaseModel):
+    user_id: str
+    semantic_score: float
+
+
+class MemoryDynamicsOut(BaseModel):
+    memory_id: str
+    user_id: str
+    stability: float
+    difficulty: float
+    retrieval_strength: float
+    storage_strength: float
+    is_key: bool
+    importance_weight: float
+    category: str | None = None
+    tags: dict[str, Any] | None = None
+    last_accessed_at: str | None = None
+    access_count: int
+    created_at: str | None = None
+    updated_at: str | None = None
+
+    @classmethod
+    def from_dynamics(cls, d) -> MemoryDynamicsOut:
+        return cls(
+            memory_id=d.memory_id,
+            user_id=d.user_id,
+            stability=d.stability,
+            difficulty=d.difficulty,
+            retrieval_strength=d.retrieval_strength,
+            storage_strength=d.storage_strength,
+            is_key=d.is_key,
+            importance_weight=d.importance_weight,
+            category=d.category,
+            tags=d.tags,
+            last_accessed_at=d.last_accessed_at.isoformat() if d.last_accessed_at else None,
+            access_count=d.access_count,
+            created_at=d.created_at.isoformat() if d.created_at else None,
+            updated_at=d.updated_at.isoformat() if d.updated_at else None,
+        )
+
+
+class ScoreBreakdownOut(BaseModel):
+    composite_score: float
+    fsrs_score: float
+    retrievability: float
+    storage_strength: float

@@ -140,6 +140,13 @@ async def palace_app(palace_settings: dict[str, str]):
     importlib.reload(api_memories)
     importlib.reload(api_sessions)
     importlib.reload(api_context)
+    # Slice 3: dynamics + maintenance routers close over dynamics_service.
+    from palace.dynamics import service as dynamics_service_mod
+    importlib.reload(dynamics_service_mod)
+    from palace.api import dynamics as api_dynamics
+    from palace.api import maintenance as api_maintenance
+    importlib.reload(api_dynamics)
+    importlib.reload(api_maintenance)
     from palace import main as palace_main
     importlib.reload(palace_main)
 
@@ -167,6 +174,8 @@ async def _truncate_tables(palace_app):
     from palace.database import async_session
     from palace.models import (
         Memory,
+        MemoryAccessLog,
+        MemoryDynamics,
         Message,
         NarrativeArc,
         ReflectionJob,
@@ -175,6 +184,10 @@ async def _truncate_tables(palace_app):
     from palace.vector import episode_vector_store, vector_store
 
     async with async_session() as db:
+        # Access logs first — they FK to memory_dynamics with CASCADE, but
+        # being explicit keeps the order obvious.
+        await db.execute(delete(MemoryAccessLog))
+        await db.execute(delete(MemoryDynamics))
         await db.execute(delete(Message))
         await db.execute(delete(SessionModel))
         await db.execute(delete(Memory))

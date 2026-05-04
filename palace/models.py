@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from sqlalchemy import Column, DateTime
+from sqlalchemy import Column, DateTime, ForeignKey, Index
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 
@@ -101,3 +101,59 @@ class ReflectionJob(SQLModel, table=True):
         sa_column=Column(JSONB, nullable=True),
     )
     error: str | None = None
+
+
+class MemoryDynamics(SQLModel, table=True):
+    """FSRS-6 scheduling state for a memory (slice 3)."""
+
+    __tablename__ = "memory_dynamics"
+    __table_args__ = (
+        Index("ix_memory_dynamics_user_accessed", "user_id", "last_accessed_at"),
+    )
+
+    memory_id: str = Field(primary_key=True)
+    user_id: str = Field(index=True)
+    stability: float = Field(default=1.0)
+    difficulty: float = Field(default=5.0)
+    retrieval_strength: float = Field(default=1.0)
+    storage_strength: float = Field(default=0.5)
+    is_key: bool = Field(default=False)
+    importance_weight: float = Field(default=1.0)
+    category: str | None = Field(default=None, max_length=50)
+    tags: dict | None = Field(
+        default=None,
+        sa_column=Column(JSONB, nullable=True),
+    )
+    last_accessed_at: datetime | None = Field(
+        default=None, sa_column=_ts_column(nullable=True),
+    )
+    access_count: int = Field(default=0)
+    created_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
+    updated_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
+
+
+class MemoryAccessLog(SQLModel, table=True):
+    """Audit trail of memory accesses with FSRS grade (slice 3)."""
+
+    __tablename__ = "memory_access_logs"
+    __table_args__ = (
+        Index("ix_memory_access_logs_user_accessed", "user_id", "accessed_at"),
+    )
+
+    id: str = Field(primary_key=True, default_factory=lambda: str(uuid4()))
+    memory_id: str = Field(
+        sa_column=Column(
+            ForeignKey("memory_dynamics.memory_id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        ),
+    )
+    user_id: str = Field(index=True)
+    grade: int
+    signal_type: str
+    retrievability_at_access: float
+    context: dict | None = Field(
+        default=None,
+        sa_column=Column(JSONB, nullable=True),
+    )
+    accessed_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())

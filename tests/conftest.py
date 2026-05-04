@@ -70,6 +70,23 @@ def mock_job_service():
 
 
 @pytest.fixture
+def mock_dynamics_service():
+    mock = MagicMock()
+    mock.get_dynamics = AsyncMock(return_value=None)
+    mock.ensure_dynamics = AsyncMock()
+    mock.promote = AsyncMock()
+    mock.demote = AsyncMock()
+    mock.score = AsyncMock(return_value={
+        "composite_score": 0.0,
+        "fsrs_score": 0.0,
+        "retrievability": 1.0,
+        "storage_strength": 0.5,
+    })
+    mock.prune_access_logs = AsyncMock(return_value=0)
+    return mock
+
+
+@pytest.fixture
 def client(
     mock_memory_service,
     mock_session_service,
@@ -77,6 +94,7 @@ def client(
     mock_episode_service,
     mock_arc_service,
     mock_job_service,
+    mock_dynamics_service,
 ):
     with (
         patch("palace.api.memories.memory_service", mock_memory_service),
@@ -87,6 +105,8 @@ def client(
         patch("palace.api.arcs.arc_service", mock_arc_service),
         patch("palace.api.arcs.job_service", mock_job_service),
         patch("palace.api.jobs.job_service", mock_job_service),
+        patch("palace.api.dynamics.dynamics_service", mock_dynamics_service),
+        patch("palace.api.maintenance.dynamics_service", mock_dynamics_service),
         patch("palace.memory_service.memory_service", mock_memory_service),
         patch("palace.episode_service.episode_service", mock_episode_service),
         patch("palace.database.init_db", AsyncMock()),
