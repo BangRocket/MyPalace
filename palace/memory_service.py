@@ -5,7 +5,7 @@ from sqlalchemy import delete as sa_delete
 
 from palace.database import async_session
 from palace.embeddings import EmbeddingProvider, get_embedder
-from palace.models import Memory, utcnow
+from palace.models import DEFAULT_TENANT_ID, Memory, utcnow
 from palace.vector import vector_store
 
 
@@ -21,9 +21,10 @@ class MemoryService:
             self._embedder = get_embedder()
         return self._embedder
 
-    async def init(self) -> None:
-        """Initialize vector collection. Call on startup."""
-        await vector_store.ensure_collection(self.embedder.dim)
+    async def init(self, tenant_id: str = DEFAULT_TENANT_ID) -> None:
+        """Initialize vector collection for ``tenant_id``. Per-tenant
+        collections are also created lazily on first upsert."""
+        await vector_store.ensure_collection(self.embedder.dim, tenant_id=tenant_id)
 
     async def create(
         self,
@@ -34,10 +35,12 @@ class MemoryService:
         source: str | None = None,
         importance: float = 1.0,
         metadata: dict | None = None,
+        tenant_id: str = DEFAULT_TENANT_ID,
     ) -> Memory:
         """Create a memory: embed, store in PG, store vector in Qdrant."""
         async with async_session() as db:
             memory = Memory(
+                tenant_id=tenant_id,
                 user_id=user_id,
                 content=content,
                 memory_type=memory_type,
@@ -58,6 +61,7 @@ class MemoryService:
             memory.id,
             vectors[0],
             {"user_id": user_id, "agent_id": agent_id, "memory_type": memory_type},
+            tenant_id=tenant_id,
         )
         return memory
 
@@ -70,6 +74,7 @@ class MemoryService:
         metadata: dict | None = None,
         source: str | None = None,
         infer: bool = False,
+        tenant_id: str = DEFAULT_TENANT_ID,
     ) -> dict:
         """Batch-create memories.
 
@@ -93,6 +98,7 @@ class MemoryService:
                 messages=messages,
                 user_id=user_id,
                 agent_id=agent_id,
+                tenant_id=tenant_id,
             )
             written, supersessions, skipped = await smart_ingestion_service.dedup_and_write(
                 candidates=candidates,
@@ -101,6 +107,7 @@ class MemoryService:
                 memory_type=memory_type,
                 source=source,
                 base_metadata=base_metadata,
+                tenant_id=tenant_id,
             )
             return {
                 "memories": written,
@@ -121,14 +128,24 @@ class MemoryService:
                 source=source,
                 importance=1.0,
                 metadata=merged or None,
+                tenant_id=tenant_id,
             )
             results.append(mem)
         return {"memories": results, "supersessions": [], "skipped": []}
 
-    async def get(self, memory_id: str) -> Memory | None:
+    async def get(
+        self,
+        memory_id: str,
+        tenant_id: str = DEFAULT_TENANT_ID,
+    ) -> Memory | None:
         """Fetch a memory by ID and bump its access counter."""
         async with async_session() as db:
-            result = await db.execute(select(Memory).where(Memory.id == memory_id))
+            result = await db.execute(
+                select(Memory).where(
+                    Memory.id == memory_id,
+                    Memory.tenant_id == tenant_id,
+                ),
+            )
             memory = result.scalar_one_or_none()
             if memory:
                 memory.access_count += 1
@@ -143,10 +160,16 @@ class MemoryService:
         memory_type: str | None = None,
         importance: float | None = None,
         metadata: dict | None = None,
+        tenant_id: str = DEFAULT_TENANT_ID,
     ) -> Memory | None:
         """Update a memory. Re-embeds if content changes."""
         async with async_session() as db:
-            result = await db.execute(select(Memory).where(Memory.id == memory_id))
+            result = await db.execute(
+                select(Memory).where(
+                    Memory.id == memory_id,
+                    Memory.tenant_id == tenant_id,
+                ),
+            )
             memory = result.scalar_one_or_none()
             if not memory:
                 return None
@@ -162,6 +185,7 @@ class MemoryService:
                         "agent_id": memory.agent_id,
                         "memory_type": memory.memory_type,
                     },
+                    tenant_id=tenant_id,
                 )
             if memory_type is not None:
                 memory.memory_type = memory_type
@@ -173,17 +197,26 @@ class MemoryService:
             await db.commit()
             return memory
 
-    async def delete(self, memory_id: str) -> bool:
+    async def delete(
+        self,
+        memory_id: str,
+        tenant_id: str = DEFAULT_TENANT_ID,
+    ) -> bool:
         """Delete a memory from both PG and Qdrant."""
         async with async_session() as db:
-            result = await db.execute(select(Memory).where(Memory.id == memory_id))
+            result = await db.execute(
+                select(Memory).where(
+                    Memory.id == memory_id,
+                    Memory.tenant_id == tenant_id,
+                ),
+            )
             memory = result.scalar_one_or_none()
             if not memory:
                 return False
             await db.delete(memory)
             await db.commit()
 
-        await vector_store.delete(memory_id)
+        await vector_store.delete(memory_id, tenant_id=tenant_id)
         return True
 
     async def delete_for_user(
@@ -191,10 +224,14 @@ class MemoryService:
         user_id: str,
         agent_id: str | None = None,
         run_id: str | None = None,
+        tenant_id: str = DEFAULT_TENANT_ID,
     ) -> int:
         """Delete all memories for a user (optionally filtered by agent/run).
         Removes from postgres AND from Qdrant. Returns count deleted."""
-        clauses = [Memory.user_id == user_id]
+        clauses = [
+            Memory.tenant_id == tenant_id,
+            Memory.user_id == user_id,
+        ]
         if agent_id is not None:
             clauses.append(Memory.agent_id == agent_id)
         if run_id is not None:
@@ -210,7 +247,7 @@ class MemoryService:
         for i in range(0, len(ids), 500):
             chunk = ids[i:i + 500]
             if chunk:
-                await vector_store.delete(chunk)
+                await vector_store.delete(chunk, tenant_id=tenant_id)
         return len(ids)
 
     async def search(
@@ -221,6 +258,7 @@ class MemoryService:
         memory_type: str | None = None,
         limit: int = 10,
         min_score: float = 0.0,
+        tenant_id: str = DEFAULT_TENANT_ID,
     ) -> list[tuple[Memory, float]]:
         """Semantic search: embed query, search Qdrant, fetch PG records."""
         vectors = await self.embedder.embed([query])
@@ -231,6 +269,7 @@ class MemoryService:
             agent_id=agent_id,
             memory_type=memory_type,
             min_score=min_score,
+            tenant_id=tenant_id,
         )
         if not results:
             return []
@@ -239,7 +278,12 @@ class MemoryService:
         scores = {r[0]: r[1] for r in results}
 
         async with async_session() as db:
-            result = await db.execute(select(Memory).where(Memory.id.in_(memory_ids)))
+            result = await db.execute(
+                select(Memory).where(
+                    Memory.id.in_(memory_ids),
+                    Memory.tenant_id == tenant_id,
+                ),
+            )
             memories = result.scalars().all()
 
             for m in memories:
@@ -250,12 +294,20 @@ class MemoryService:
         memory_map = {m.id: m for m in memories}
         return [(memory_map[mid], scores[mid]) for mid in memory_ids if mid in memory_map]
 
-    async def list_for_user(self, user_id: str, limit: int = 50) -> list[Memory]:
+    async def list_for_user(
+        self,
+        user_id: str,
+        limit: int = 50,
+        tenant_id: str = DEFAULT_TENANT_ID,
+    ) -> list[Memory]:
         """List a user's memories by recency."""
         async with async_session() as db:
             result = await db.execute(
                 select(Memory)
-                .where(Memory.user_id == user_id)
+                .where(
+                    Memory.user_id == user_id,
+                    Memory.tenant_id == tenant_id,
+                )
                 .order_by(desc(Memory.created_at))
                 .limit(limit),
             )
@@ -270,10 +322,11 @@ class MemoryService:
         metadata: dict | None = None,
         limit: int = 50,
         offset: int = 0,
+        tenant_id: str = DEFAULT_TENANT_ID,
     ) -> list[Memory]:
         """List memories with filters. Metadata matching uses JSONB
         containment (`@>`)."""
-        clauses = []
+        clauses = [Memory.tenant_id == tenant_id]
         if user_id is not None:
             clauses.append(Memory.user_id == user_id)
         if agent_id is not None:
@@ -285,10 +338,7 @@ class MemoryService:
         if metadata:
             clauses.append(Memory.metadata_json.op("@>")(metadata))
 
-        stmt = (
-            select(Memory)
-            .where(and_(*clauses)) if clauses else select(Memory)
-        )
+        stmt = select(Memory).where(and_(*clauses))
         stmt = stmt.order_by(desc(Memory.created_at)).limit(limit).offset(offset)
 
         async with async_session() as db:

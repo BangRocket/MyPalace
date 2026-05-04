@@ -93,7 +93,7 @@ async def test_assemble_with_fsrs_reranks_l2_by_composite():
     # semantic order: m_low first; FSRS should flip them.
     semantic_results = [(m_low, 0.5), (m_high, 0.4)]
 
-    async def _score(memory_id, user_id, semantic_score):
+    async def _score(memory_id, user_id, semantic_score, tenant_id="test"):
         if memory_id == "m-high":
             return {
                 "composite_score": 0.9, "fsrs_score": 0.95,

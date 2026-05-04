@@ -23,6 +23,7 @@ from palace.arc_service import arc_service
 from palace.dynamics.service import dynamics_service
 from palace.episode_service import episode_service
 from palace.memory_service import memory_service
+from palace.models import DEFAULT_TENANT_ID
 from palace.session_service import session_service
 
 
@@ -89,6 +90,7 @@ class LayeredRetrievalService:
         memory_limit: int = 10,
         episode_limit: int = 5,
         min_episode_significance: float = 0.3,
+        tenant_id: str = DEFAULT_TENANT_ID,
     ) -> dict[str, Any]:
         """Parallel-fetch L1 + L2 sources, FSRS-rerank L2 memories, then
         char-budget each layer."""
@@ -99,22 +101,27 @@ class LayeredRetrievalService:
             user_id=user_id,
             agent_id=agent_id,
             limit=memory_limit,
+            tenant_id=tenant_id,
         )
         l1_recent_eps_task = episode_service.get_recent(
-            user_id=user_id, limit=episode_limit,
+            user_id=user_id, limit=episode_limit, tenant_id=tenant_id,
         )
-        l1_arcs_task = arc_service.get_active(user_id=user_id, limit=5)
+        l1_arcs_task = arc_service.get_active(
+            user_id=user_id, limit=5, tenant_id=tenant_id,
+        )
         l2_mem_task = memory_service.search(
             query=query,
             user_id=user_id,
             agent_id=agent_id,
             limit=memory_limit * 2,
+            tenant_id=tenant_id,
         )
         l2_eps_task = episode_service.search(
             query=query,
             user_id=user_id,
             limit=episode_limit,
             min_significance=min_episode_significance,
+            tenant_id=tenant_id,
         )
 
         (
@@ -141,7 +148,10 @@ class LayeredRetrievalService:
             scored: list[dict[str, Any]] = []
             for m, semantic_score in l2_mem_results:
                 breakdown = await dynamics_service.score(
-                    memory_id=m.id, user_id=user_id, semantic_score=semantic_score,
+                    memory_id=m.id,
+                    user_id=user_id,
+                    semantic_score=semantic_score,
+                    tenant_id=tenant_id,
                 )
                 entry = _memory_to_dict(m, semantic_score)
                 entry["composite_score"] = round(breakdown["composite_score"], 4)
@@ -160,7 +170,7 @@ class LayeredRetrievalService:
         recent_messages: list[dict[str, Any]] | None = None
         summary: str | None = None
         if session_id:
-            session_data = await session_service.get(session_id)
+            session_data = await session_service.get(session_id, tenant_id=tenant_id)
             if session_data:
                 msgs = session_data.get("messages", [])
                 if len(msgs) > max_recent_messages:

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import time
-from typing import Literal
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 
 from palace.api.common import (
@@ -16,6 +16,7 @@ from palace.api.common import (
     ReflectSessionRequest,
     SearchEpisodesRequest,
 )
+from palace.auth.context import AuthContext, get_auth_context
 from palace.episode_service import episode_service
 from palace.job_service import job_service
 
@@ -27,8 +28,10 @@ users_episodes_router = APIRouter()  # /v1/users/{user_id}/episodes/...
 @reflection_router.post("/session")
 async def reflect_session(
     req: ReflectSessionRequest,
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
     mode: Literal["sync", "async"] = Query(default="async"),
 ):
+    tenant_id = auth.resolve_tenant()
     start = time.time()
     messages = [m.model_dump() for m in req.messages]
 
@@ -38,6 +41,7 @@ async def reflect_session(
             user_id=req.user_id,
             agent_id=req.agent_id,
             session_id=req.session_id,
+            tenant_id=tenant_id,
         )
         took = int((time.time() - start) * 1000)
         return ApiResponse(
@@ -52,9 +56,15 @@ async def reflect_session(
             user_id=req.user_id,
             agent_id=req.agent_id,
             session_id=req.session_id,
+            tenant_id=tenant_id,
         )
 
-    job = await job_service.run_async(kind="reflection", user_id=req.user_id, coro_factory=coro)
+    job = await job_service.run_async(
+        kind="reflection",
+        user_id=req.user_id,
+        coro_factory=coro,
+        tenant_id=tenant_id,
+    )
     took = int((time.time() - start) * 1000)
     response = ApiResponse(
         data=JobPendingOut(job_id=job.id),
@@ -65,13 +75,18 @@ async def reflect_session(
 
 
 @router.post("/search", response_model=ApiResponse[list[EpisodeOut]])
-async def search_episodes(req: SearchEpisodesRequest):
+async def search_episodes(
+    req: SearchEpisodesRequest,
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
+):
+    tenant_id = auth.resolve_tenant()
     start = time.time()
     results = await episode_service.search(
         query=req.query,
         user_id=req.user_id,
         limit=req.limit,
         min_significance=req.min_significance,
+        tenant_id=tenant_id,
     )
     took = int((time.time() - start) * 1000)
     return ApiResponse(
@@ -84,9 +99,16 @@ async def search_episodes(req: SearchEpisodesRequest):
     "/{user_id}/episodes/recent",
     response_model=ApiResponse[list[EpisodeOut]],
 )
-async def recent_episodes(user_id: str, limit: int = 5):
+async def recent_episodes(
+    user_id: str,
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
+    limit: int = 5,
+):
+    tenant_id = auth.resolve_tenant()
     start = time.time()
-    items = await episode_service.get_recent(user_id=user_id, limit=limit)
+    items = await episode_service.get_recent(
+        user_id=user_id, limit=limit, tenant_id=tenant_id,
+    )
     took = int((time.time() - start) * 1000)
     return ApiResponse(
         data=[EpisodeOut(**i) for i in items],

@@ -128,6 +128,7 @@ def test_promote_route_calls_service_and_returns_dynamics(client, mock_dynamics_
     assert data["access_count"] == 1
     mock_dynamics_service.promote.assert_awaited_once_with(
         memory_id="m1", user_id="u1", grade=3, signal_type="used_in_response",
+        tenant_id="test",
     )
 
 
@@ -141,6 +142,7 @@ def test_demote_route_calls_service(client, mock_dynamics_service):
     assert resp.json()["data"]["access_count"] == 2
     mock_dynamics_service.demote.assert_awaited_once_with(
         memory_id="m1", user_id="u1", reason="user_correction",
+        tenant_id="test",
     )
 
 
@@ -174,6 +176,7 @@ def test_score_route_returns_breakdown(client, mock_dynamics_service):
     assert data["fsrs_score"] == pytest.approx(0.65)
     mock_dynamics_service.score.assert_awaited_once_with(
         memory_id="m1", user_id="u1", semantic_score=0.87,
+        tenant_id="test",
     )
 
 
@@ -182,7 +185,9 @@ def test_prune_access_logs_route_returns_count(client, mock_dynamics_service):
     resp = client.post("/v1/maintenance/prune-access-logs?retention_days=30")
     assert resp.status_code == 200
     assert resp.json()["data"]["deleted"] == 7
-    mock_dynamics_service.prune_access_logs.assert_awaited_once_with(retention_days=30)
+    mock_dynamics_service.prune_access_logs.assert_awaited_once_with(
+        retention_days=30, tenant_id="test",
+    )
 
 
 def test_promote_route_rejects_invalid_grade(client, mock_dynamics_service):

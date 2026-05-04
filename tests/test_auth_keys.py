@@ -15,12 +15,14 @@ def _row(
     label: str = "test",
     scopes: list[str] | None = None,
     revoked: bool = False,
+    tenant_id: str | None = "default",
 ) -> ApiKey:
     row = MagicMock(spec=ApiKey)
     row.id = key_id
     row.key_prefix = "abcd1234"
     row.label = label
     row.scopes = scopes or ["read"]
+    row.tenant_id = tenant_id
     row.created_at = datetime(2026, 1, 1, tzinfo=UTC)
     row.last_used_at = None
     row.revoked_at = datetime(2026, 1, 2, tzinfo=UTC) if revoked else None
@@ -45,7 +47,7 @@ class TestCreateKey:
         assert data["label"] == "new-key"
         assert data["scopes"] == ["read", "write"]
         mock_key_service.create_key.assert_awaited_once_with(
-            label="new-key", scopes=["read", "write"],
+            label="new-key", scopes=["read", "write"], tenant_id="test",
         )
 
     def test_create_key_invalid_scope_returns_422(self, client, mock_key_service):
