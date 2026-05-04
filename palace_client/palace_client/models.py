@@ -139,3 +139,33 @@ class ScoreBreakdown(BaseModel):
     fsrs_score: float
     retrievability: float
     storage_strength: float
+
+
+class Intention(BaseModel):
+    """Intention/reminder row (slice 4)."""
+
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    user_id: str
+    agent_id: str
+    content: str
+    source_memory_id: str | None = None
+    trigger_conditions: dict[str, Any]
+    priority: int = 0
+    fired: bool = False
+    fire_once: bool = True
+    created_at: datetime | None = None
+    expires_at: datetime | None = None
+    fired_at: datetime | None = None
+
+
+class FiredIntention(BaseModel):
+    """A single fired-intention payload returned by /v1/intentions/check."""
+
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    content: str
+    trigger_type: str
+    priority: int = 0
+    match_details: dict[str, Any] = Field(default_factory=dict)
+    source_memory_id: str | None = None

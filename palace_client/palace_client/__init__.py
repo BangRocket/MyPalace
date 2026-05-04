@@ -5,6 +5,8 @@ from palace_client.exceptions import PalaceError, PalaceNotFound, PalaceTranspor
 from palace_client.models import (
     Context,
     Episode,
+    FiredIntention,
+    Intention,
     Job,
     JobPending,
     Memory,
@@ -34,4 +36,6 @@ __all__ = [
     "JobPending",
     "MemoryDynamics",
     "ScoreBreakdown",
+    "Intention",
+    "FiredIntention",
 ]

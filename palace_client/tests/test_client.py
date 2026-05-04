@@ -690,3 +690,156 @@ async def test_prune_access_logs():
     assert "/v1/maintenance/prune-access-logs" in captured["url"]
     assert captured["params"] == {"retention_days": "30"}
     assert deleted == 5
+
+
+# ---- intentions (slice 4) ----
+
+def fake_intention(id: str = "i1", **overrides) -> dict:
+    base = {
+        "id": id,
+        "user_id": "u1",
+        "agent_id": "clara",
+        "content": "Remind me about the meeting",
+        "source_memory_id": None,
+        "trigger_conditions": {"type": "keyword", "keywords": ["meeting"]},
+        "priority": 0,
+        "fired": False,
+        "fire_once": True,
+        "created_at": "2026-05-03T19:33:40.210487+00:00",
+        "expires_at": None,
+        "fired_at": None,
+    }
+    base.update(overrides)
+    return base
+
+
+@pytest.mark.asyncio
+async def test_set_intention():
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(200, json=make_envelope(fake_intention()))
+
+    client = make_client(handler)
+    from palace_client import Intention
+    intention = await client.set_intention(
+        user_id="u1",
+        content="Remind me about the meeting",
+        trigger_conditions={"type": "keyword", "keywords": ["meeting"]},
+        priority=5,
+    )
+    assert "/v1/intentions" in captured["url"]
+    assert captured["body"]["user_id"] == "u1"
+    assert captured["body"]["priority"] == 5
+    assert captured["body"]["fire_once"] is True
+    assert isinstance(intention, Intention)
+    assert intention.id == "i1"
+
+
+@pytest.mark.asyncio
+async def test_check_intentions():
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["body"] = json.loads(request.content)
+        fired = [{
+            "id": "i1",
+            "content": "Remind about meeting",
+            "trigger_type": "keyword",
+            "priority": 5,
+            "match_details": {"matched_keywords": ["meeting"]},
+            "source_memory_id": None,
+        }]
+        return httpx.Response(200, json=make_envelope(fired, count=1))
+
+    client = make_client(handler)
+    from palace_client import FiredIntention
+    fired_list = await client.check_intentions(
+        user_id="u1",
+        message="When is the meeting?",
+        context={"channel_name": "general"},
+    )
+    assert "/v1/intentions/check" in captured["url"]
+    assert captured["body"]["context"] == {"channel_name": "general"}
+    assert len(fired_list) == 1
+    assert isinstance(fired_list[0], FiredIntention)
+    assert fired_list[0].trigger_type == "keyword"
+
+
+@pytest.mark.asyncio
+async def test_format_intentions():
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(200, json=make_envelope({"text": "## Reminders\n- a"}))
+
+    client = make_client(handler)
+    text = await client.format_intentions(
+        intentions=[{"id": "i1", "content": "a", "trigger_type": "keyword",
+                     "priority": 0, "match_details": {}, "source_memory_id": None}],
+        max=3,
+    )
+    assert "/v1/intentions/format" in captured["url"]
+    assert captured["body"]["max"] == 3
+    assert text == "## Reminders\n- a"
+
+
+@pytest.mark.asyncio
+async def test_list_intentions():
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["params"] = dict(request.url.params)
+        return httpx.Response(200, json=make_envelope([fake_intention()], count=1))
+
+    client = make_client(handler)
+    intentions = await client.list_intentions(user_id="u1", fired="false", limit=20)
+    assert "/v1/users/u1/intentions" in captured["url"]
+    assert captured["params"] == {"fired": "false", "limit": "20"}
+    assert len(intentions) == 1
+
+
+@pytest.mark.asyncio
+async def test_delete_intention():
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["method"] = request.method
+        return httpx.Response(200, json=make_envelope({"deleted": True}))
+
+    client = make_client(handler)
+    result = await client.delete_intention("i1")
+    assert captured["method"] == "DELETE"
+    assert "/v1/intentions/i1" in captured["url"]
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_delete_intention_404_raises_not_found():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"detail": "Intention not found"})
+
+    client = make_client(handler)
+    with pytest.raises(PalaceNotFound):
+        await client.delete_intention("missing")
+
+
+@pytest.mark.asyncio
+async def test_cleanup_expired_intentions():
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        return httpx.Response(200, json=make_envelope({"deleted": 3}, count=3))
+
+    client = make_client(handler)
+    deleted = await client.cleanup_expired_intentions()
+    assert "/v1/maintenance/cleanup-intentions" in captured["url"]
+    assert deleted == 3
