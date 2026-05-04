@@ -1,5 +1,9 @@
 # Palace Memory Service
 
+[![PyPI version](https://img.shields.io/pypi/v/palace-memory)](https://pypi.org/project/palace-memory/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+
 A standalone, lightweight memory service for AI assistants. Stores facts, preferences, and conversation history; serves them back via semantic search and LLM-ready context blocks.
 
 Extracted from [mypalclara](https://github.com/BangRocket/mypalclara)'s Palace memory system as an independent microservice with no `mypalclara` dependency.
@@ -197,7 +201,34 @@ python -m grpc_tools.protoc -I=proto \
 
 ---
 
-## Quick start
+## Install
+
+### From PyPI (server)
+
+```bash
+pip install palace-memory
+```
+
+### From PyPI (client only — for AI apps that talk to a remote Palace)
+
+```bash
+pip install palace-client
+# Optional gRPC transport:
+pip install "palace-client[grpc]"
+```
+
+### Docker
+
+```bash
+docker pull bangrocket/palace:latest
+docker run -p 8000:8000 \
+  -e PALACE_DATABASE_URL=postgresql+asyncpg://palace:palace@host/palace \
+  -e QDRANT_URL=http://host:6333 \
+  -e PALACE_BOOTSTRAP_ADMIN_KEY=pk_live_$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32) \
+  bangrocket/palace:latest
+```
+
+## Quick start (development)
 
 ```bash
 # 1. Start postgres + qdrant (docker or podman)

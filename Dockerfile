@@ -1,16 +1,24 @@
 FROM python:3.12-slim
 
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
 WORKDIR /app
 
+# System deps for asyncpg, grpc, bcrypt
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
+        build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml .
-RUN pip install --no-cache-dir -e ".[dev]"
+COPY pyproject.toml README.md ./
+COPY palace ./palace
+COPY proto ./proto
 
-COPY palace/ ./palace/
+RUN pip install --upgrade pip && pip install .
 
-EXPOSE 8000
+EXPOSE 8000 50051
 
+# Default: HTTP only on :8000.
+# Set PALACE_GRPC_PORT=50051 to also start the gRPC server alongside.
 CMD ["uvicorn", "palace.main:app", "--host", "0.0.0.0", "--port", "8000"]
