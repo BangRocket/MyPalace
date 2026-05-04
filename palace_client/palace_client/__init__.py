@@ -9,14 +9,17 @@ from palace_client.models import (
     Intention,
     Job,
     JobPending,
+    LayeredContext,
     Memory,
     MemoryDynamics,
+    MemoryWithScore,
     Message,
     NarrativeArc,
     ScoreBreakdown,
     ScoredMemory,
     Session,
     SessionWithMessages,
+    Supersession,
 )
 
 __all__ = [
@@ -38,4 +41,7 @@ __all__ = [
     "ScoreBreakdown",
     "Intention",
     "FiredIntention",
+    "LayeredContext",
+    "MemoryWithScore",
+    "Supersession",
 ]

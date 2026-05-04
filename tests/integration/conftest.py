@@ -152,6 +152,14 @@ async def palace_app(palace_settings: dict[str, str]):
     importlib.reload(api_dynamics)
     importlib.reload(api_intentions)
     importlib.reload(api_maintenance)
+    # Slice 5: layered retrieval + smart ingestion routers close over services.
+    from palace.retrieval import ingestion as ingestion_mod
+    from palace.retrieval import layered as layered_mod
+    importlib.reload(layered_mod)
+    importlib.reload(ingestion_mod)
+    from palace.api import retrieval as api_retrieval
+    importlib.reload(api_retrieval)
+    importlib.reload(api_memories)  # picks up the new smart_ingestion_service
     from palace import main as palace_main
     importlib.reload(palace_main)
 
@@ -182,6 +190,7 @@ async def _truncate_tables(palace_app):
         Memory,
         MemoryAccessLog,
         MemoryDynamics,
+        MemorySupersession,
         Message,
         NarrativeArc,
         ReflectionJob,
@@ -194,6 +203,7 @@ async def _truncate_tables(palace_app):
         # being explicit keeps the order obvious.
         await db.execute(delete(MemoryAccessLog))
         await db.execute(delete(MemoryDynamics))
+        await db.execute(delete(MemorySupersession))
         await db.execute(delete(Intention))
         await db.execute(delete(Message))
         await db.execute(delete(SessionModel))
