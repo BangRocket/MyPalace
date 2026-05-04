@@ -91,6 +91,9 @@ class LayeredRetrievalService:
         episode_limit: int = 5,
         min_episode_significance: float = 0.3,
         tenant_id: str = DEFAULT_TENANT_ID,
+        include_graph: bool = False,
+        graph_depth: int = 1,
+        graph_max_neighbors: int = 50,
     ) -> dict[str, Any]:
         """Parallel-fetch L1 + L2 sources, FSRS-rerank L2 memories, then
         char-budget each layer."""
@@ -178,6 +181,16 @@ class LayeredRetrievalService:
                 recent_messages = msgs
                 summary = session_data.get("summary")
 
+        # Phase 4 slice 6: optionally enrich with graph neighbors of L2 mems.
+        l3_graph: dict[str, Any] | None = None
+        if include_graph:
+            l3_graph = await self._fetch_graph_context(
+                memory_ids=[m["id"] for m in l2_kept if m.get("id")],
+                tenant_id=tenant_id,
+                depth=max(1, min(graph_depth, 2)),
+                max_neighbors=max(1, min(graph_max_neighbors, 200)),
+            )
+
         return {
             "l1_user_profile": {
                 "memories": l1_kept,
@@ -188,9 +201,51 @@ class LayeredRetrievalService:
                 "memories": l2_kept,
                 "episodes": l2_eps,
             },
+            "l3_graph_context": l3_graph,
             "recent_messages": recent_messages,
             "summary": summary,
             "char_counts": {"l1": l1_chars, "l2": l2_chars},
+        }
+
+    async def _fetch_graph_context(
+        self,
+        memory_ids: list[str],
+        tenant_id: str,
+        depth: int,
+        max_neighbors: int,
+    ) -> dict[str, Any] | None:
+        """Walk the graph from each L2 memory id, dedupe nodes/edges, cap.
+
+        Returns ``None`` if the graph layer is disabled (so the API surface
+        is "feature off" rather than "empty result"). Returns an empty dict
+        if the graph is on but the L2 set has no recorded neighbors.
+        """
+        from palace.graph.service import graph_service
+        if not graph_service.enabled or not memory_ids:
+            return None
+
+        seen_nodes: dict[str, dict[str, Any]] = {}
+        all_edges: list[dict[str, Any]] = []
+        for mid in memory_ids:
+            if len(seen_nodes) >= max_neighbors:
+                break
+            try:
+                neighborhood = await graph_service.neighbors(
+                    node_id=mid, depth=depth, tenant_id=tenant_id,
+                )
+            except Exception:
+                continue  # graph errors are enrichment-best-effort
+            for node in neighborhood.get("nodes", []):
+                nid = node.get("id")
+                if nid and nid not in seen_nodes and nid not in memory_ids:
+                    # Skip nodes we already returned in L2.
+                    seen_nodes[nid] = node
+                    if len(seen_nodes) >= max_neighbors:
+                        break
+            all_edges.extend(neighborhood.get("edges", []))
+        return {
+            "related_memories": list(seen_nodes.values()),
+            "edges": all_edges,
         }
 
 

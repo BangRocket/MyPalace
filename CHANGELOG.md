@@ -4,6 +4,52 @@ All notable changes to Palace are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and Palace adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] — 2026-05-04
+
+Operational maturity release. Six slices since 0.2.
+
+### Added — phase 4 (operational maturity)
+
+- **Alembic migrations (slice 1)** — `alembic/` directory wired with
+  async env.py reading `PALACE_DATABASE_URL`. Baseline migration captures
+  the entire post-phase-3 schema; 0002 adds composite `(tenant_id, user_id)`
+  indexes for hot read paths. `init_db()` auto-stamps fresh DBs at the
+  latest revision so future `alembic upgrade head` calls have a known
+  starting point. Pre-Alembic upgrades run `alembic stamp` once.
+- **Observability (slice 2)** — Prometheus `/metrics` endpoint (always
+  on, public, low-cardinality route normalization). Optional OpenTelemetry
+  via `[otel]` extra + `PALACE_OTLP_ENDPOINT` (auto-instruments FastAPI +
+  httpx). Structlog with `pretty` (dev) and `json` (prod) formats; every
+  request gets a `request_id` (read from header or generated) bound to
+  log contextvars and echoed in the response.
+- **Background workers (slice 3)** — Postgres-backed job queue using
+  `SELECT ... FOR UPDATE SKIP LOCKED`. New columns: `leased_until`,
+  `attempts`, `payload_json`. Built-in handlers: `reflection`, `synthesis`.
+  Custom handlers via `register_handler`. `python -m palace.workers.runner`
+  starts the worker; multiple workers safely share the queue.
+- **Per-user rate limits (slice 4)** — Optional Redis sliding-window
+  limiter scoped to (tenant, key, user). Separate buckets for `default`
+  (120/min) and `search`/`context` (60/min). New `unlimited` scope opts
+  out for trusted server-to-server keys. 429 response includes
+  `Retry-After` header. Fails open if Redis is unreachable.
+- **WebSocket subscriptions (slice 5)** — `/v1/events?api_key=...&topics=...`.
+  Per-tenant Redis pub/sub channels (in-process fallback when Redis
+  unset). At-most-once delivery; slow subscribers drop events. Memory
+  create/update/delete/supersede publish events; episode/intention/arc
+  publishers wire in slice 6.
+- **Graph → retrieval (slice 6)** — `LayeredContextRequest` grows
+  `include_graph: bool = False`. When true and the graph layer is
+  configured, `/v1/context/layered` returns an additional
+  `l3_graph_context` slot with 1-hop neighbors of the L2 memories
+  (deduped, capped at `graph_max_neighbors=50`). Defaults preserve
+  backwards compatibility — existing callers see the old shape.
+
+### Notes
+
+- gRPC mirror of remaining surfaces (sessions, episodes, etc.) and
+  cross-tenant analytics are deliberately deferred — neither has a
+  concrete consumer yet.
+
 ## [0.2.0] — 2026-05-04
 
 First production-readiness release. Five major feature slices since 0.1.
