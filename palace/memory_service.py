@@ -75,7 +75,18 @@ class MemoryService:
             importance=importance,
             tenant_id=tenant_id,
         ))
+
+        # Phase 3 slice 4: bust cached search/context entries for this tenant.
+        await self._bust_cache(tenant_id)
         return memory
+
+    @staticmethod
+    async def _bust_cache(tenant_id: str) -> None:
+        from palace.cache.client import cache as _cache
+        if not _cache.enabled:
+            return
+        for ns in ("memories_search", "context_layered"):
+            await _cache.invalidate_tenant_namespace(tenant_id, ns)
 
     async def create_batch(
         self,
@@ -207,7 +218,8 @@ class MemoryService:
                 memory.metadata_json = metadata
             memory.updated_at = utcnow()
             await db.commit()
-            return memory
+        await self._bust_cache(tenant_id)
+        return memory
 
     async def delete(
         self,
@@ -229,6 +241,7 @@ class MemoryService:
             await db.commit()
 
         await vector_store.delete(memory_id, tenant_id=tenant_id)
+        await self._bust_cache(tenant_id)
         return True
 
     async def delete_for_user(
@@ -260,6 +273,7 @@ class MemoryService:
             chunk = ids[i:i + 500]
             if chunk:
                 await vector_store.delete(chunk, tenant_id=tenant_id)
+        await self._bust_cache(tenant_id)
         return len(ids)
 
     async def search(
