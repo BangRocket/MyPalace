@@ -4,6 +4,51 @@ All notable changes to Palace are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and Palace adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] — 2026-05-04
+
+Operations + DR + lifecycle features. Four slices since 0.4.
+
+### Added — phase 6
+
+- **Release pipeline fixes (slice 1)** — `build-and-publish` job's
+  permissions block now declares `contents: read` (the prior version
+  set only `id-token: write`, which stripped checkout's read access and
+  caused "Repository not found" failures on every tag). Docker job is
+  conditional on `vars.PUBLISH_DOCKER == 'true'` and bridges
+  `secrets.DOCKERHUB_USERNAME` cleanly. `github-release` no longer
+  hard-depends on docker. README gains a "Releasing" section
+  documenting PyPI trusted-publishing setup, optional Docker Hub
+  configuration, and the tag/re-tag dance.
+- **Bulk import/export (slice 2)** — `GET /v1/admin/export?tenant_id=<id>`
+  streams a NDJSON dump of all tenant data (memories, sessions,
+  narrative_arcs, intentions, memory_dynamics, memory_supersessions —
+  in FK-safe order). `POST /v1/admin/import?tenant_id=<id>` ingests the
+  same shape. Idempotent via `db.merge()`; target tenant_id always
+  wins over any tenant_id in the dump. Vector data deliberately
+  excluded — re-embed on import keeps dumps portable across embedding
+  models. `api_keys` excluded. Disaster recovery + tenant migration
+  use cases.
+- **Memory TTL (slice 3)** — `Memory.expires_at` column (alembic 0004
+  with a partial index). `CreateMemoryRequest.ttl_seconds` field
+  computes `expires_at = now + ttl`. Search/list/get filter expired
+  rows immediately (`WHERE expires_at IS NULL OR expires_at > now()`)
+  even before the cleanup worker has run. New `cleanup` worker handler
+  garbage-collects expired rows + their Qdrant vectors per-tenant in
+  bounded batches.
+- **Embedding migration (slice 4)** — `POST /v1/admin/reembed` enqueues
+  a `reembed` worker job that walks every memory in a tenant and
+  re-embeds it under a named (provider, model). New `make_embedder`
+  factory builds an arbitrary embedder without touching the global
+  default. Handles dim changes (writes alongside existing vectors;
+  operators drop the old collection out-of-band when ready to cut over).
+  Pairs with bulk import: `POST /v1/admin/import?reembed=false` for
+  large imports, then trigger reembed for the bulk embed work.
+
+### Notes
+
+- gRPC mirror of the new admin endpoints (export, import, reembed) is
+  deliberately deferred — these are operator tools used over HTTP.
+
 ## [0.4.0] — 2026-05-04
 
 Surface completion + ops polish. Three slices since 0.3.
