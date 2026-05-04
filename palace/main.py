@@ -14,6 +14,7 @@ from palace.api import (
     jobs,
     memories,
     portability,
+    reembed,
     sessions,
     stats,
     tenants,
@@ -107,6 +108,7 @@ app.include_router(admin.router, prefix="/v1/admin", tags=["admin"])
 app.include_router(tenants.router, prefix="/v1/admin", tags=["admin"])
 app.include_router(stats.router, prefix="/v1/admin", tags=["admin"])
 app.include_router(portability.router, prefix="/v1/admin", tags=["admin"])
+app.include_router(reembed.router, prefix="/v1/admin", tags=["admin"])
 app.include_router(memories.router, prefix="/v1/memories", tags=["memories"])
 app.include_router(memories.users_router, prefix="/v1/users", tags=["memories"])
 app.include_router(sessions.router, prefix="/v1/sessions", tags=["sessions"])

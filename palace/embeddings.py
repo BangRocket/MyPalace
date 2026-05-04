@@ -56,3 +56,16 @@ def get_embedder() -> EmbeddingProvider:
     if settings.embedding_provider == "openai":
         return OpenAIProvider(settings.embedding_model, settings.openai_api_key)
     return HuggingFaceProvider(settings.embedding_model, settings.hf_token)
+
+
+def make_embedder(
+    provider: str, model: str, token: str | None = None,
+) -> EmbeddingProvider:
+    """Build an embedder for an arbitrary (provider, model) without
+    touching the global default. Used by the reembed worker handler in
+    phase 6 slice 4."""
+    if provider == "openai":
+        return OpenAIProvider(model, token or "")
+    if provider == "huggingface":
+        return HuggingFaceProvider(model, token)
+    raise ValueError(f"unknown embedding provider: {provider!r}")
