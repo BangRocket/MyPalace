@@ -143,6 +143,26 @@ Depth is capped at 3 hops; edge_type filter is optional. No raw Cypher passthrou
 
 ---
 
+## Cache (phase 3 slice 4)
+
+Optional Redis read-through cache for `/v1/context/layered` and `/v1/memories/search`. Keys are hashed `(tenant_id, namespace, params)`; TTL defaults to 60s. On memory create/update/delete, all matching tenant cache entries are invalidated.
+
+```bash
+# FalkorDB and the cache can share the same Redis instance:
+export PALACE_REDIS_URL=redis://localhost:6379
+# Optional knobs:
+export PALACE_CACHE_TTL_SEARCH=60   # seconds
+export PALACE_CACHE_TTL_GET=300
+# Disable without unsetting URL (e.g. tests):
+export PALACE_CACHE_DISABLED=true
+```
+
+Without `PALACE_REDIS_URL`, every read goes straight to Postgres + Qdrant.
+
+Cache failures degrade to misses — Palace stays correct, just slower.
+
+---
+
 ## Quick start
 
 ```bash

@@ -19,6 +19,8 @@ from palace.api.common import (
     UpdateMemoryRequest,
 )
 from palace.auth.context import AuthContext, get_auth_context
+from palace.cache.decorator import cached_call
+from palace.config import settings
 from palace.memory_service import memory_service
 from palace.retrieval.ingestion import smart_ingestion_service
 
@@ -109,27 +111,45 @@ async def search_memories(
 ):
     tenant_id = auth.resolve_tenant()
     start = time.time()
-    results = await memory_service.search(
-        query=req.query,
-        user_id=req.user_id,
-        agent_id=req.agent_id,
-        memory_type=req.memory_type,
-        limit=req.limit,
-        min_score=req.min_score,
-        tenant_id=tenant_id,
+
+    async def _load() -> list[dict]:
+        results = await memory_service.search(
+            query=req.query,
+            user_id=req.user_id,
+            agent_id=req.agent_id,
+            memory_type=req.memory_type,
+            limit=req.limit,
+            min_score=req.min_score,
+            tenant_id=tenant_id,
+        )
+        return [
+            {
+                "id": m.id,
+                "content": m.content,
+                "memory_type": m.memory_type,
+                "importance": m.importance,
+                "score": round(score, 4),
+                "created_at": m.created_at.isoformat() if m.created_at else None,
+            }
+            for m, score in results
+        ]
+
+    cached_data = await cached_call(
+        namespace="memories_search",
+        key_parts={
+            "tenant_id": tenant_id,
+            "query": req.query,
+            "user_id": req.user_id,
+            "agent_id": req.agent_id,
+            "memory_type": req.memory_type,
+            "limit": req.limit,
+            "min_score": req.min_score,
+        },
+        ttl=settings.cache_ttl_search_seconds,
+        loader=_load,
     )
     took = int((time.time() - start) * 1000)
-    memories = [
-        SearchedMemoryOut(
-            id=m.id,
-            content=m.content,
-            memory_type=m.memory_type,
-            importance=m.importance,
-            score=round(score, 4),
-            created_at=m.created_at.isoformat() if m.created_at else None,
-        )
-        for m, score in results
-    ]
+    memories = [SearchedMemoryOut(**d) for d in cached_data]
     return ApiResponse(data=memories, meta=Meta(count=len(memories), took_ms=took))
 
 

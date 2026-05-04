@@ -15,6 +15,8 @@ from palace.api.common import (
     Meta,
 )
 from palace.auth.context import AuthContext, get_auth_context
+from palace.cache.decorator import cached_call
+from palace.config import settings
 from palace.retrieval.layered import layered_retrieval_service
 
 router = APIRouter()
@@ -27,19 +29,41 @@ async def assemble_layered_context(
 ):
     tenant_id = auth.resolve_tenant()
     start = time.time()
-    result = await layered_retrieval_service.assemble(
-        user_id=req.user_id,
-        query=req.query,
-        agent_id=req.agent_id,
-        session_id=req.session_id,
-        max_l1_chars=req.max_l1_chars,
-        max_l2_chars=req.max_l2_chars,
-        max_recent_messages=req.max_recent_messages,
-        use_fsrs=req.use_fsrs,
-        memory_limit=req.memory_limit,
-        episode_limit=req.episode_limit,
-        min_episode_significance=req.min_episode_significance,
-        tenant_id=tenant_id,
+
+    async def _load():
+        return await layered_retrieval_service.assemble(
+            user_id=req.user_id,
+            query=req.query,
+            agent_id=req.agent_id,
+            session_id=req.session_id,
+            max_l1_chars=req.max_l1_chars,
+            max_l2_chars=req.max_l2_chars,
+            max_recent_messages=req.max_recent_messages,
+            use_fsrs=req.use_fsrs,
+            memory_limit=req.memory_limit,
+            episode_limit=req.episode_limit,
+            min_episode_significance=req.min_episode_significance,
+            tenant_id=tenant_id,
+        )
+
+    result = await cached_call(
+        namespace="context_layered",
+        key_parts={
+            "tenant_id": tenant_id,
+            "user_id": req.user_id,
+            "query": req.query,
+            "agent_id": req.agent_id,
+            "session_id": req.session_id,
+            "max_l1_chars": req.max_l1_chars,
+            "max_l2_chars": req.max_l2_chars,
+            "max_recent_messages": req.max_recent_messages,
+            "use_fsrs": req.use_fsrs,
+            "memory_limit": req.memory_limit,
+            "episode_limit": req.episode_limit,
+            "min_episode_significance": req.min_episode_significance,
+        },
+        ttl=settings.cache_ttl_search_seconds,
+        loader=_load,
     )
     took = int((time.time() - start) * 1000)
     out = LayeredContextOut(

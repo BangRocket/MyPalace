@@ -175,8 +175,12 @@ class GraphService:
     # ------------------------------------------------------------------
 
     def schedule(self, coro: Any) -> asyncio.Task | None:
-        """Schedule a graph write fire-and-forget. Returns None if disabled."""
+        """Schedule a graph write fire-and-forget. Returns None if disabled.
+        Closes the unawaited coroutine on the disabled path to avoid
+        RuntimeWarning."""
         if not self.enabled:
+            if hasattr(coro, "close"):
+                coro.close()
             return None
 
         async def _wrap():

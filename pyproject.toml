@@ -21,6 +21,7 @@ dependencies = [
     "structlog>=24.4",
     "bcrypt>=4.1",
     "falkordb>=1.0",
+    "redis>=5.0",
 ]
 
 [project.optional-dependencies]
