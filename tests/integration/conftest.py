@@ -191,11 +191,13 @@ async def _truncate_tables(palace_app):
     from palace.database import async_session
     from palace.models import (
         ApiKey,
+        AuditLog,
         Intention,
         Memory,
         MemoryAccessLog,
         MemoryDynamics,
         MemorySupersession,
+        MemoryVersion,
         Message,
         NarrativeArc,
         ReflectionJob,
@@ -217,6 +219,8 @@ async def _truncate_tables(palace_app):
         await db.execute(delete(NarrativeArc))
         await db.execute(delete(ReflectionJob))
         await db.execute(delete(ApiKey))
+        await db.execute(delete(AuditLog))
+        await db.execute(delete(MemoryVersion))
         # Tenants table: only delete non-default rows so per-tenant collection
         # creation in tests doesn't have to re-bootstrap the row each time.
         await db.execute(delete(Tenant).where(Tenant.id != "test"))

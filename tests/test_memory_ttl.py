@@ -91,11 +91,21 @@ class TestCreateServiceComputesExpiresAt:
 
         class FakeDb:
             def add(self, obj):
-                captured["row"] = obj
+                # Phase 7 slice 2 also writes MemoryVersion rows through the
+                # same patched session — capture only the Memory row.
+                from palace.models import Memory as _Memory
+                if isinstance(obj, _Memory):
+                    captured["row"] = obj
             async def commit(self):
                 pass
             async def refresh(self, obj):
                 obj.id = "m-1"
+            async def execute(self, *a, **kw):
+                # _next_version_number does a SELECT; return None so it
+                # falls back to version 1.
+                result = MagicMock()
+                result.scalar_one_or_none.return_value = None
+                return result
 
         cm = MagicMock()
         cm.__aenter__ = AsyncMock(return_value=FakeDb())
@@ -139,11 +149,21 @@ class TestCreateServiceComputesExpiresAt:
 
         class FakeDb:
             def add(self, obj):
-                captured["row"] = obj
+                # Phase 7 slice 2 also writes MemoryVersion rows through the
+                # same patched session — capture only the Memory row.
+                from palace.models import Memory as _Memory
+                if isinstance(obj, _Memory):
+                    captured["row"] = obj
             async def commit(self):
                 pass
             async def refresh(self, obj):
                 obj.id = "m-1"
+            async def execute(self, *a, **kw):
+                # _next_version_number does a SELECT; return None so it
+                # falls back to version 1.
+                result = MagicMock()
+                result.scalar_one_or_none.return_value = None
+                return result
 
         cm = MagicMock()
         cm.__aenter__ = AsyncMock(return_value=FakeDb())

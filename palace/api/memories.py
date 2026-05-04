@@ -110,8 +110,54 @@ async def search_memories(
     req: SearchMemoriesRequest,
     auth: Annotated[AuthContext, Depends(get_auth_context)],
 ):
-    tenant_id = auth.resolve_tenant()
+    """Semantic search.
+
+    ``tenant_id`` overrides:
+      - None / omitted: tenant-bound key uses its tenant; cross-tenant
+        admin uses settings.default_tenant_id
+      - "<tenant_id>": tenant-bound key must match its binding (or 403);
+        cross-tenant admin can target any tenant
+      - "ALL": cross-tenant admin only — searches every tenant's
+        collection and tags each result with its tenant_id (phase 7
+        slice 3)
+    """
     start = time.time()
+
+    # Cross-tenant fanout path
+    if req.tenant_id == "ALL":
+        if auth.tenant_id is not None:
+            raise HTTPException(
+                status_code=403,
+                detail="cross-tenant search requires a cross-tenant admin key",
+            )
+        results = await memory_service.search_all_tenants(
+            query=req.query,
+            user_id=req.user_id,
+            agent_id=req.agent_id,
+            memory_type=req.memory_type,
+            limit=req.limit,
+            min_score=req.min_score,
+        )
+        took = int((time.time() - start) * 1000)
+        memories = [
+            SearchedMemoryOut(
+                id=m.id,
+                content=m.content,
+                memory_type=m.memory_type,
+                importance=m.importance,
+                score=round(score, 4),
+                created_at=m.created_at.isoformat() if m.created_at else None,
+                tenant_id=t_id,
+            )
+            for m, score, t_id in results
+        ]
+        return ApiResponse(
+            data=memories,
+            meta=Meta(count=len(memories), took_ms=took),
+        )
+
+    # Single-tenant path
+    tenant_id = auth.resolve_tenant(request_tenant=req.tenant_id)
 
     async def _load() -> list[dict]:
         results = await memory_service.search(
@@ -242,6 +288,50 @@ async def get_memory_supersessions(
     tenant_id = auth.resolve_tenant()
     rows = await smart_ingestion_service.get_supersessions(memory_id, tenant_id=tenant_id)
     data = [SupersessionOut(**r) for r in rows]
+    return ApiResponse(data=data, meta=Meta(count=len(data)))
+
+
+@router.get("/{memory_id}/history", response_model=ApiResponse[list[dict]])
+async def get_memory_history(
+    memory_id: str,
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
+):
+    """Phase 7 slice 2: chronological version trail for a memory.
+
+    Returns every snapshot recorded by create / update / supersede,
+    oldest-first. Tenant-scoped — returns empty for memories outside
+    the requesting key's tenant.
+    """
+    from sqlalchemy import asc, select
+
+    from palace.database import async_session
+    from palace.models import MemoryVersion
+
+    tenant_id = auth.resolve_tenant()
+    async with async_session() as db:
+        result = await db.execute(
+            select(MemoryVersion)
+            .where(
+                MemoryVersion.memory_id == memory_id,
+                MemoryVersion.tenant_id == tenant_id,
+            )
+            .order_by(asc(MemoryVersion.created_at)),
+        )
+        rows = list(result.scalars().all())
+
+    data = [
+        {
+            "id": r.id,
+            "memory_id": r.memory_id,
+            "version_number": r.version_number,
+            "content": r.content,
+            "metadata": r.metadata_json,
+            "change_kind": r.change_kind,
+            "actor_key_id": r.actor_key_id,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
     return ApiResponse(data=data, meta=Meta(count=len(data)))
 
 

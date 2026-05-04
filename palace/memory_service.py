@@ -18,6 +18,71 @@ def _not_expired_clause():
     return or_(Memory.expires_at.is_(None), Memory.expires_at > utcnow())
 
 
+async def _record_version(
+    *,
+    memory_id: str,
+    tenant_id: str,
+    user_id: str,
+    version_number: int,
+    content: str,
+    metadata: dict | None,
+    change_kind: str,
+    actor_key_id: str | None = None,
+) -> None:
+    """Phase 7 slice 2: append-only snapshot to memory_versions.
+
+    Best-effort: failures log + swallow so the primary write path stays
+    correct even if the version table has issues. Version history is
+    forensics, not source-of-truth.
+    """
+    import logging
+    log = logging.getLogger("palace.memory.versions")
+    try:
+        from palace.models import MemoryVersion
+        async with async_session() as db:
+            row = MemoryVersion(
+                memory_id=memory_id,
+                tenant_id=tenant_id,
+                user_id=user_id,
+                version_number=version_number,
+                content=content,
+                metadata_json=metadata,
+                change_kind=change_kind,
+                actor_key_id=actor_key_id,
+            )
+            db.add(row)
+            await db.commit()
+    except Exception:
+        log.warning(
+            "memory version snapshot failed (memory_id=%s)",
+            memory_id, exc_info=True,
+        )
+
+
+async def _next_version_number(memory_id: str) -> int:
+    """Compute the next version_number for a memory. New memories start
+    at 1; updates increment from the current max. Best-effort — returns
+    a fallback that's monotonic but may collide if multiple writers race
+    (acceptable for forensics-only data)."""
+    import logging
+
+    from sqlalchemy import func
+
+    from palace.models import MemoryVersion
+    log = logging.getLogger("palace.memory.versions")
+    try:
+        async with async_session() as db:
+            result = await db.execute(
+                select(func.max(MemoryVersion.version_number))
+                .where(MemoryVersion.memory_id == memory_id),
+            )
+            current = result.scalar_one_or_none() or 0
+            return int(current) + 1
+    except Exception:
+        log.warning("version number lookup failed (memory_id=%s)", memory_id, exc_info=True)
+        return 1
+
+
 class MemoryService:
     """Business logic for memory storage and retrieval."""
 
@@ -99,6 +164,16 @@ class MemoryService:
 
         # Phase 3 slice 4: bust cached search/context entries for this tenant.
         await self._bust_cache(tenant_id)
+        # Phase 7 slice 2: snapshot version 1.
+        await _record_version(
+            memory_id=memory.id,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            version_number=1,
+            content=content,
+            metadata=metadata,
+            change_kind="created",
+        )
         # Phase 4 slice 5: publish memory.created event.
         await self._publish_event("memory.created", tenant_id, {
             "memory_id": memory.id, "user_id": user_id,
@@ -288,6 +363,17 @@ class MemoryService:
             memory.updated_at = utcnow()
             await db.commit()
         await self._bust_cache(tenant_id)
+        # Phase 7 slice 2: snapshot the new content as a new version row.
+        version_n = await _next_version_number(memory_id)
+        await _record_version(
+            memory_id=memory_id,
+            tenant_id=tenant_id,
+            user_id=memory.user_id,
+            version_number=version_n,
+            content=memory.content,
+            metadata=memory.metadata_json,
+            change_kind="updated",
+        )
         await self._publish_event("memory.updated", tenant_id, {
             "memory_id": memory_id, "user_id": memory.user_id,
         })
@@ -395,6 +481,78 @@ class MemoryService:
 
         memory_map = {m.id: m for m in memories}
         return [(memory_map[mid], scores[mid]) for mid in memory_ids if mid in memory_map]
+
+    async def search_all_tenants(
+        self,
+        query: str,
+        user_id: str | None = None,
+        agent_id: str | None = None,
+        memory_type: str | None = None,
+        limit: int = 10,
+        min_score: float = 0.0,
+    ) -> list[tuple[Memory, float, str]]:
+        """Phase 7 slice 3: search every tenant's collection, merge by score.
+
+        Returns ``[(memory, score, tenant_id), ...]`` sorted by descending
+        score and capped at ``limit``. Used only by cross-tenant admin keys
+        via /v1/memories/search?tenant_id=ALL.
+
+        Embedding happens once; per-tenant Qdrant searches happen in
+        parallel. Empty per-tenant lists are skipped.
+        """
+        from palace.models import Tenant
+
+        # One embedding pass shared across all tenants.
+        vectors = await self.embedder.embed([query])
+        vec = vectors[0]
+
+        async with async_session() as db:
+            tenants_result = await db.execute(select(Tenant.id))
+            tenant_ids = [row[0] for row in tenants_result.all()]
+        if not tenant_ids:
+            return []
+
+        # Parallel per-tenant vector search; tag with tenant id.
+        import asyncio as _asyncio
+
+        async def _one(t_id: str) -> list[tuple[str, float, str]]:
+            try:
+                rows = await vector_store.search(
+                    vec,
+                    limit=limit,
+                    user_id=user_id,
+                    agent_id=agent_id,
+                    memory_type=memory_type,
+                    min_score=min_score,
+                    tenant_id=t_id,
+                )
+                return [(rid, score, t_id) for rid, score in rows]
+            except Exception:
+                # Per-tenant search failures shouldn't poison the rest.
+                return []
+
+        per_tenant = await _asyncio.gather(*(_one(t) for t in tenant_ids))
+        flat: list[tuple[str, float, str]] = [r for sub in per_tenant for r in sub]
+        flat.sort(key=lambda r: r[1], reverse=True)
+        flat = flat[:limit]
+        if not flat:
+            return []
+
+        memory_ids = [r[0] for r in flat]
+        async with async_session() as db:
+            mem_result = await db.execute(
+                select(Memory).where(
+                    Memory.id.in_(memory_ids),
+                    _not_expired_clause(),
+                ),
+            )
+            memories = mem_result.scalars().all()
+        mem_map = {m.id: m for m in memories}
+        return [
+            (mem_map[mid], score, t_id)
+            for mid, score, t_id in flat
+            if mid in mem_map
+        ]
 
     async def list_for_user(
         self,
