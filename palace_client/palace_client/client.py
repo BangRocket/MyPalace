@@ -44,7 +44,7 @@ class PalaceClient:
         else:
             headers = {}
             if api_key:
-                headers["Authorization"] = f"Bearer {api_key}"
+                headers["X-Palace-Key"] = api_key
             self._client = httpx.AsyncClient(
                 base_url=self._base_url, timeout=timeout, headers=headers,
             )

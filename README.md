@@ -1,5 +1,9 @@
 # Palace Memory Service
 
+[![PyPI version](https://img.shields.io/pypi/v/palace-memory)](https://pypi.org/project/palace-memory/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+
 A standalone, lightweight memory service for AI assistants. Stores facts, preferences, and conversation history; serves them back via semantic search and LLM-ready context blocks.
 
 Extracted from [mypalclara](https://github.com/BangRocket/mypalclara)'s Palace memory system as an independent microservice with no `mypalclara` dependency.
@@ -16,11 +20,215 @@ Extracted from [mypalclara](https://github.com/BangRocket/mypalclara)'s Palace m
 
 ### What it does *not* do (v1, by design)
 
-No graph memory, no FSRS spaced-repetition, no reflection workers, no gRPC, no multi-tenancy, no auth. See `docs/SPEC.md` for the v1 scope and `docs/plan.md` for the long-range vision.
+No graph memory, no FSRS spaced-repetition, no reflection workers, no gRPC, no multi-tenancy. See `docs/SPEC.md` for the v1 scope and `docs/plan.md` for the long-range vision.
+
+Phase 2 added: episodes + reflection, narrative arcs, FSRS-6 dynamics, intentions, layered context, smart ingestion, supersede.
+
+Phase 3 in progress: API-key auth (slice 1, done) → multi-tenancy → graph (FalkorDB) → Redis cache → gRPC → PyPI publish.
 
 ---
 
-## Quick start
+## Auth (phase 3 slice 1)
+
+Every `/v1/*` endpoint requires a valid API key in the `X-Palace-Key` header. `/health`, `/docs`, `/redoc`, `/openapi.json` remain public.
+
+**Three scopes:**
+- `read` — `GET /v1/*`, `POST /v1/memories/search`, `/list`, `/episodes/search`, `/intentions/check`, `/intentions/format`, `/context/*`
+- `write` — everything else under `/v1/*`
+- `admin` — `/v1/admin/*` and `/v1/maintenance/*`
+
+Scopes are explicit: `admin` does **not** auto-grant `write` or `read`. When you mint a key, list every scope it should have.
+
+### Bootstrap an admin key
+
+Set `PALACE_BOOTSTRAP_ADMIN_KEY` to a value of the form `pk_live_<32 alphanumeric chars>`. On lifespan startup, if no admin key exists, Palace inserts a row with `read+write+admin` scopes. Idempotent.
+
+```bash
+export PALACE_BOOTSTRAP_ADMIN_KEY=pk_live_$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32)
+echo "$PALACE_BOOTSTRAP_ADMIN_KEY"   # save this — Palace doesn't log it
+```
+
+### Mint additional keys
+
+```bash
+curl -X POST http://localhost:8000/v1/admin/keys \
+  -H "X-Palace-Key: $PALACE_BOOTSTRAP_ADMIN_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"label": "mypalclara-prod", "scopes": ["read", "write"]}'
+# response: {"data": {"key_id": "...", "plaintext_key": "pk_live_...", ...}}
+```
+
+The plaintext is returned **once**. Palace stores only a bcrypt hash plus an 8-char prefix index for lookup.
+
+### Disable auth (development / tests only)
+
+```bash
+export PALACE_AUTH_DISABLED=true
+```
+
+The mock test suite sets this automatically; live integration tests opt back in per-test.
+
+---
+
+## Multi-tenancy (phase 3 slice 2)
+
+Every row in every user-data table carries a `tenant_id`. API keys are bound to a tenant on creation; the middleware sets `request.state.auth.tenant_id` from the key, and every service query filters by it. Qdrant collections are per-tenant: `palace_memories_<tenant_id>`, `palace_episodes_<tenant_id>`.
+
+A `default` tenant is created on first boot (`PALACE_DEFAULT_TENANT_ID` to override). Single-tenant deployments work zero-config.
+
+### Tenant ID format
+
+`^[a-z0-9_]{1,32}$` — lowercase alphanumeric + underscore, max 32 chars. Anything else → 400.
+
+### Mint a tenant-bound key
+
+```bash
+# Create a tenant
+curl -X POST http://localhost:8000/v1/admin/tenants \
+  -H "X-Palace-Key: $ADMIN_KEY" \
+  -d '{"id": "acme", "label": "Acme Corp"}'
+
+# Issue a key bound to that tenant
+curl -X POST http://localhost:8000/v1/admin/keys \
+  -H "X-Palace-Key: $ADMIN_KEY" \
+  -d '{"label": "acme-prod", "scopes": ["read","write"], "tenant_id": "acme"}'
+```
+
+### Cross-tenant admin keys
+
+For migrations or support, mint a key with `cross_tenant: true`:
+
+```bash
+curl -X POST http://localhost:8000/v1/admin/keys \
+  -H "X-Palace-Key: $ADMIN_KEY" \
+  -d '{"label": "support", "scopes": ["read","write","admin"], "cross_tenant": true}'
+```
+
+The bootstrap admin key (from `PALACE_BOOTSTRAP_ADMIN_KEY`) is a cross-tenant key by default.
+
+### Migration story
+
+There is no Alembic yet — `init_db()` creates the schema on startup. Slice 6 (publish) introduces Alembic with one consolidated phase-3 migration. If you have a pre-phase-3 Palace deployment with data, contact the maintainers.
+
+---
+
+## Graph layer (phase 3 slice 3)
+
+Optional FalkorDB integration. When `PALACE_FALKORDB_URL` is set, every memory / episode / arc create writes a node into the per-tenant graph (`palace_<tenant_id>`), and every supersession writes a `SUPERSEDES` edge. Writes are fire-and-forget — graph failures never break the primary write.
+
+```bash
+# FalkorDB ships as a Redis module:
+podman run -d --name palace-falkor -p 6379:6379 docker.io/falkordb/falkordb:latest
+export PALACE_FALKORDB_URL=redis://localhost:6379
+```
+
+Without the env var, the graph layer is a no-op and `/v1/graph/*` returns 503.
+
+### Schema
+
+```
+(:Memory {id, user_id, agent_id, content, memory_type, importance})
+(:Episode {id, user_id, summary, significance, timestamp})
+(:Arc {id, user_id, title, status})
+
+(Memory)-[:SUPERSEDES]->(Memory)
+(Episode)-[:PARTICIPATES_IN]->(Arc)
+```
+
+### Querying neighbors
+
+```bash
+curl "http://localhost:8000/v1/graph/neighbors?node_id=<memory_id>&depth=2&edge_type=SUPERSEDES" \
+  -H "X-Palace-Key: $KEY"
+# → {"data": {"nodes": [...], "edges": [...]}, "meta": {...}}
+```
+
+Depth is capped at 3 hops; edge_type filter is optional. No raw Cypher passthrough — the only graph API surface is `/v1/graph/neighbors`.
+
+---
+
+## Cache (phase 3 slice 4)
+
+Optional Redis read-through cache for `/v1/context/layered` and `/v1/memories/search`. Keys are hashed `(tenant_id, namespace, params)`; TTL defaults to 60s. On memory create/update/delete, all matching tenant cache entries are invalidated.
+
+```bash
+# FalkorDB and the cache can share the same Redis instance:
+export PALACE_REDIS_URL=redis://localhost:6379
+# Optional knobs:
+export PALACE_CACHE_TTL_SEARCH=60   # seconds
+export PALACE_CACHE_TTL_GET=300
+# Disable without unsetting URL (e.g. tests):
+export PALACE_CACHE_DISABLED=true
+```
+
+Without `PALACE_REDIS_URL`, every read goes straight to Postgres + Qdrant.
+
+Cache failures degrade to misses — Palace stays correct, just slower.
+
+---
+
+## gRPC transport (phase 3 slice 5)
+
+Optional second transport alongside REST. **Scope this release: MemoryService only** — Create / Get / Delete / Search / List. Other surfaces (sessions, episodes, arcs, etc.) ride HTTP via `PalaceClient`. Full mirror is a phase 4 follow-up.
+
+```bash
+export PALACE_GRPC_PORT=50051
+.venv/bin/uvicorn palace.main:app --port 8000
+# → starts FastAPI on :8000 AND gRPC on :50051
+```
+
+Auth uses the same X-Palace-Key, sent as gRPC metadata `x-palace-key`. Scope rules are identical to HTTP.
+
+```python
+from palace_client.grpc import PalaceGrpcClient
+
+async with PalaceGrpcClient("localhost:50051", api_key="pk_live_...") as client:
+    mem = await client.create(user_id="u1", content="hello via gRPC")
+    results = await client.search(query="hello", limit=5)
+```
+
+### Regenerating stubs
+
+```bash
+python -m grpc_tools.protoc -I=proto \
+    --python_out=palace/grpc/_generated \
+    --grpc_python_out=palace/grpc/_generated \
+    proto/palace.proto
+# Then re-apply the local import fix in palace_pb2_grpc.py:
+#   sed -i '' 's/^import palace_pb2/from palace.grpc._generated import palace_pb2/' \
+#     palace/grpc/_generated/palace_pb2_grpc.py
+```
+
+---
+
+## Install
+
+### From PyPI (server)
+
+```bash
+pip install palace-memory
+```
+
+### From PyPI (client only — for AI apps that talk to a remote Palace)
+
+```bash
+pip install palace-client
+# Optional gRPC transport:
+pip install "palace-client[grpc]"
+```
+
+### Docker
+
+```bash
+docker pull bangrocket/palace:latest
+docker run -p 8000:8000 \
+  -e PALACE_DATABASE_URL=postgresql+asyncpg://palace:palace@host/palace \
+  -e QDRANT_URL=http://host:6333 \
+  -e PALACE_BOOTSTRAP_ADMIN_KEY=pk_live_$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32) \
+  bangrocket/palace:latest
+```
+
+## Quick start (development)
 
 ```bash
 # 1. Start postgres + qdrant (docker or podman)

@@ -9,8 +9,9 @@ Two routers exported:
 from __future__ import annotations
 
 import time
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from palace.api.common import (
     ApiResponse,
@@ -22,6 +23,7 @@ from palace.api.common import (
     Meta,
     SetIntentionRequest,
 )
+from palace.auth.context import AuthContext, get_auth_context
 from palace.intentions.service import intention_service
 
 router = APIRouter()
@@ -29,7 +31,11 @@ users_router = APIRouter()
 
 
 @router.post("", response_model=ApiResponse[IntentionOut])
-async def set_intention(req: SetIntentionRequest):
+async def set_intention(
+    req: SetIntentionRequest,
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
+):
+    tenant_id = auth.resolve_tenant()
     start = time.time()
     intention = await intention_service.set(
         user_id=req.user_id,
@@ -40,6 +46,7 @@ async def set_intention(req: SetIntentionRequest):
         source_memory_id=req.source_memory_id,
         priority=req.priority,
         fire_once=req.fire_once,
+        tenant_id=tenant_id,
     )
     took = int((time.time() - start) * 1000)
     return ApiResponse(
@@ -49,13 +56,18 @@ async def set_intention(req: SetIntentionRequest):
 
 
 @router.post("/check", response_model=ApiResponse[list[FiredIntentionOut]])
-async def check_intentions(req: CheckIntentionsRequest):
+async def check_intentions(
+    req: CheckIntentionsRequest,
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
+):
+    tenant_id = auth.resolve_tenant()
     start = time.time()
     fired = await intention_service.check(
         user_id=req.user_id,
         message=req.message,
         context=req.context,
         agent_id=req.agent_id,
+        tenant_id=tenant_id,
     )
     took = int((time.time() - start) * 1000)
     data = [FiredIntentionOut(**f) for f in fired]
@@ -72,8 +84,12 @@ async def format_intentions(req: FormatIntentionsRequest):
 
 
 @router.delete("/{intention_id}", response_model=ApiResponse[dict])
-async def delete_intention(intention_id: str):
-    ok = await intention_service.delete(intention_id)
+async def delete_intention(
+    intention_id: str,
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
+):
+    tenant_id = auth.resolve_tenant()
+    ok = await intention_service.delete(intention_id, tenant_id=tenant_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Intention not found")
     return ApiResponse(data={"deleted": True}, meta=Meta(count=1))
@@ -85,15 +101,18 @@ async def delete_intention(intention_id: str):
 )
 async def list_user_intentions(
     user_id: str,
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
     fired: str = "all",
     limit: int = 50,
 ):
     if fired not in ("true", "false", "all"):
         raise HTTPException(status_code=400, detail="fired must be true|false|all")
+    tenant_id = auth.resolve_tenant()
     intentions = await intention_service.list_for_user(
         user_id=user_id,
         fired_filter=fired,
         limit=limit,
+        tenant_id=tenant_id,
     )
     data = [IntentionOut.from_intention(i) for i in intentions]
     return ApiResponse(data=data, meta=Meta(count=len(data)))

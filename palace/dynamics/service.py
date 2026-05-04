@@ -23,7 +23,7 @@ from palace.dynamics.fsrs import (
     retrievability,
     review,
 )
-from palace.models import MemoryAccessLog, MemoryDynamics, utcnow
+from palace.models import DEFAULT_TENANT_ID, MemoryAccessLog, MemoryDynamics, utcnow
 
 # Composite score weights — kept in module so tests can pin them.
 SEMANTIC_WEIGHT = 0.6
@@ -51,12 +51,14 @@ class DynamicsService:
         self,
         memory_id: str,
         user_id: str,
+        tenant_id: str = DEFAULT_TENANT_ID,
     ) -> MemoryDynamics | None:
         async with async_session() as db:
             result = await db.execute(
                 select(MemoryDynamics).where(
                     MemoryDynamics.memory_id == memory_id,
                     MemoryDynamics.user_id == user_id,
+                    MemoryDynamics.tenant_id == tenant_id,
                 ),
             )
             return result.scalar_one_or_none()
@@ -66,17 +68,20 @@ class DynamicsService:
         memory_id: str,
         user_id: str,
         is_key: bool = False,
+        tenant_id: str = DEFAULT_TENANT_ID,
     ) -> MemoryDynamics:
         async with async_session() as db:
             result = await db.execute(
                 select(MemoryDynamics).where(
                     MemoryDynamics.memory_id == memory_id,
                     MemoryDynamics.user_id == user_id,
+                    MemoryDynamics.tenant_id == tenant_id,
                 ),
             )
             dynamics = result.scalar_one_or_none()
             if dynamics is None:
                 dynamics = MemoryDynamics(
+                    tenant_id=tenant_id,
                     memory_id=memory_id,
                     user_id=user_id,
                     is_key=is_key,
@@ -92,6 +97,7 @@ class DynamicsService:
         user_id: str,
         grade: int = 3,
         signal_type: str = "used_in_response",
+        tenant_id: str = DEFAULT_TENANT_ID,
     ) -> MemoryDynamics:
         """Apply an FSRS review to a memory. Auto-creates the dynamics row if
         missing. Logs an access record."""
@@ -100,12 +106,17 @@ class DynamicsService:
                 select(MemoryDynamics).where(
                     MemoryDynamics.memory_id == memory_id,
                     MemoryDynamics.user_id == user_id,
+                    MemoryDynamics.tenant_id == tenant_id,
                 ),
             )
             dynamics = result.scalar_one_or_none()
 
             if dynamics is None:
-                dynamics = MemoryDynamics(memory_id=memory_id, user_id=user_id)
+                dynamics = MemoryDynamics(
+                    tenant_id=tenant_id,
+                    memory_id=memory_id,
+                    user_id=user_id,
+                )
                 db.add(dynamics)
                 await db.flush()
 
@@ -139,6 +150,7 @@ class DynamicsService:
             dynamics.updated_at = utcnow()
 
             access_log = MemoryAccessLog(
+                tenant_id=tenant_id,
                 memory_id=memory_id,
                 user_id=user_id,
                 grade=grade,
@@ -155,6 +167,7 @@ class DynamicsService:
         memory_id: str,
         user_id: str,
         reason: str = "user_correction",
+        tenant_id: str = DEFAULT_TENANT_ID,
     ) -> MemoryDynamics:
         """Mark memory as failed recall — equivalent to promote(grade=AGAIN)."""
         return await self.promote(
@@ -162,6 +175,7 @@ class DynamicsService:
             user_id=user_id,
             grade=Grade.AGAIN.value,
             signal_type=reason,
+            tenant_id=tenant_id,
         )
 
     async def score(
@@ -169,13 +183,14 @@ class DynamicsService:
         memory_id: str,
         user_id: str,
         semantic_score: float,
+        tenant_id: str = DEFAULT_TENANT_ID,
     ) -> dict:
         """Composite ranking score combining semantic similarity with FSRS state.
 
         Auto-creates the dynamics row if missing (so first-score gets defaults
         rather than collapsing to pure semantic).
         """
-        dynamics = await self.ensure_dynamics(memory_id, user_id)
+        dynamics = await self.ensure_dynamics(memory_id, user_id, tenant_id=tenant_id)
 
         last_review_naive = _to_naive(dynamics.last_accessed_at)
         now_naive = _now_naive()
@@ -200,12 +215,17 @@ class DynamicsService:
             "storage_strength": dynamics.storage_strength,
         }
 
-    async def prune_access_logs(self, retention_days: int = 90) -> int:
+    async def prune_access_logs(
+        self,
+        retention_days: int = 90,
+        tenant_id: str = DEFAULT_TENANT_ID,
+    ) -> int:
         """Delete access log rows older than retention_days. Returns count."""
         cutoff = datetime.now(UTC) - timedelta(days=retention_days)
         async with async_session() as db:
             stmt = delete(MemoryAccessLog).where(
                 MemoryAccessLog.accessed_at < cutoff,
+                MemoryAccessLog.tenant_id == tenant_id,
             )
             result = await db.execute(stmt)
             await db.commit()

@@ -221,7 +221,7 @@ def test_list_user_intentions_route(client, mock_intention_service):
     assert resp.status_code == 200
     assert resp.json()["meta"]["count"] == 1
     mock_intention_service.list_for_user.assert_awaited_once_with(
-        user_id="u1", fired_filter="false", limit=10,
+        user_id="u1", fired_filter="false", limit=10, tenant_id="test",
     )
 
 

@@ -3,25 +3,58 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from palace.api import arcs, context, episodes, jobs, memories, sessions
+from palace.api import admin, arcs, context, episodes, jobs, memories, sessions, tenants
 from palace.api import dynamics as dynamics_api
+from palace.api import graph as graph_api
 from palace.api import intentions as intentions_api
 from palace.api import maintenance as maintenance_api
 from palace.api import retrieval as retrieval_api
-from palace.database import init_db
+from palace.auth.key_service import key_service
+from palace.auth.middleware import AuthMiddleware
+from palace.config import settings
+from palace.database import async_session, init_db
 from palace.episode_service import episode_service
 from palace.memory_service import memory_service
+from palace.models import Tenant
+
+
+async def _ensure_default_tenant() -> None:
+    """Idempotent INSERT of the default tenant row."""
+    async with async_session() as db:
+        existing = await db.execute(
+            select(Tenant).where(Tenant.id == settings.default_tenant_id),
+        )
+        if existing.scalar_one_or_none() is None:
+            stmt = pg_insert(Tenant).values(
+                id=settings.default_tenant_id,
+                label="Default Tenant",
+            ).on_conflict_do_nothing(index_elements=["id"])
+            await db.execute(stmt)
+            await db.commit()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup: create tables and init vector collections."""
     await init_db()
-    await memory_service.init()
-    await episode_service.init()
+    await _ensure_default_tenant()
+    await memory_service.init(tenant_id=settings.default_tenant_id)
+    await episode_service.init(tenant_id=settings.default_tenant_id)
+    await key_service.bootstrap_if_needed(settings.bootstrap_admin_key)
+
+    # Optional gRPC server alongside FastAPI (slice 5).
+    grpc_server = None
+    if settings.grpc_port is not None:
+        from palace.grpc.server import serve as serve_grpc
+        grpc_server = await serve_grpc(settings.grpc_port)
+
     yield
-    # Shutdown
+
+    if grpc_server is not None:
+        await grpc_server.stop(grace=2.0)
 
 
 app = FastAPI(
@@ -31,12 +64,16 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(AuthMiddleware)
+
 
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "palace-memory"}
 
 
+app.include_router(admin.router, prefix="/v1/admin", tags=["admin"])
+app.include_router(tenants.router, prefix="/v1/admin", tags=["admin"])
 app.include_router(memories.router, prefix="/v1/memories", tags=["memories"])
 app.include_router(memories.users_router, prefix="/v1/users", tags=["memories"])
 app.include_router(sessions.router, prefix="/v1/sessions", tags=["sessions"])
@@ -52,3 +89,4 @@ app.include_router(intentions_api.router, prefix="/v1/intentions", tags=["intent
 app.include_router(intentions_api.users_router, prefix="/v1/users", tags=["intentions"])
 app.include_router(maintenance_api.router, prefix="/v1/maintenance", tags=["maintenance"])
 app.include_router(retrieval_api.router, prefix="/v1/context", tags=["retrieval"])
+app.include_router(graph_api.router, prefix="/v1/graph", tags=["graph"])

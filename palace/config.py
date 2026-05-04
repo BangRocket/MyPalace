@@ -28,5 +28,35 @@ class Settings(BaseSettings):
     llm_model: str = "openai/gpt-4o-mini"
     log_level: str = "INFO"
 
+    # Auth (slice 1)
+    auth_disabled: bool = Field(default=False, validation_alias="PALACE_AUTH_DISABLED")
+    bootstrap_admin_key: str | None = Field(
+        default=None, validation_alias="PALACE_BOOTSTRAP_ADMIN_KEY",
+    )
+
+    # Multi-tenancy (slice 2)
+    default_tenant_id: str = Field(
+        default="default", validation_alias="PALACE_DEFAULT_TENANT_ID",
+    )
+
+    # Graph (slice 3) — FalkorDB. Unset = no-op.
+    falkordb_url: str | None = Field(
+        default=None, validation_alias="PALACE_FALKORDB_URL",
+    )
+
+    # Cache (slice 4) — Redis. Unset = no-op.
+    redis_url: str | None = Field(
+        default=None, validation_alias="PALACE_REDIS_URL",
+    )
+    cache_disabled: bool = Field(
+        default=False, validation_alias="PALACE_CACHE_DISABLED",
+    )
+    cache_ttl_search_seconds: int = Field(default=60, validation_alias="PALACE_CACHE_TTL_SEARCH")
+    cache_ttl_get_seconds: int = Field(default=300, validation_alias="PALACE_CACHE_TTL_GET")
+
+    # gRPC (slice 5) — port unset = HTTP-only.
+    grpc_port: int | None = Field(default=None, validation_alias="PALACE_GRPC_PORT")
+    grpc_host: str = Field(default="0.0.0.0", validation_alias="PALACE_GRPC_HOST")
+
 
 settings = Settings()

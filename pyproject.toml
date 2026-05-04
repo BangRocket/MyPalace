@@ -1,8 +1,20 @@
 [project]
 name = "palace-memory"
-version = "0.1.0"
-description = "Standalone memory service for AI assistants"
+version = "0.2.0"
+description = "Standalone memory service for AI assistants — auth, multi-tenancy, graph, cache, gRPC"
 requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "BangRocket" }]
+readme = "README.md"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Framework :: FastAPI",
+]
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.34",
@@ -19,6 +31,12 @@ dependencies = [
     "numpy<2",         # torch 2.2.2 was built against numpy 1.x ABI
     "openai>=1.59",
     "structlog>=24.4",
+    "bcrypt>=4.1",
+    "falkordb>=1.0",
+    "redis>=5.0",
+    "grpcio>=1.60",
+    "grpcio-tools>=1.60",
+    "protobuf>=4.25",
 ]
 
 [project.optional-dependencies]
@@ -42,10 +60,24 @@ ignore = ["UP046"]  # Generic[T] is the canonical Pydantic v2 idiom
 
 [tool.ruff.lint.per-file-ignores]
 "palace_client/palace_client/exceptions.py" = ["N818"]  # PalaceNotFound, PalaceTransport are deliberate public API names
+"palace/grpc/_generated/*.py" = ["ALL"]  # protoc-generated stubs; do not lint
+"palace/grpc/memory_servicer.py" = ["N802"]  # gRPC servicer methods must match proto (PascalCase)
+
+[project.urls]
+Homepage = "https://github.com/BangRocket/palace-memory"
+Repository = "https://github.com/BangRocket/palace-memory"
+Issues = "https://github.com/BangRocket/palace-memory/issues"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["palace*"]
 exclude = ["palace_client*"]
+
+[tool.setuptools.package-data]
+"palace.grpc._generated" = ["*.py"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

@@ -32,7 +32,7 @@ from palace.dynamics.service import dynamics_service
 from palace.embeddings import EmbeddingProvider, get_embedder
 from palace.llm import llm
 from palace.memory_service import memory_service
-from palace.models import Memory, MemorySupersession, utcnow
+from palace.models import DEFAULT_TENANT_ID, Memory, MemorySupersession, utcnow
 from palace.prompts.ingestion import SMART_INGEST_PROMPT
 from palace.vector import vector_store
 
@@ -111,6 +111,7 @@ class SmartIngestionService:
         messages: list[dict[str, Any]],
         user_id: str,
         agent_id: str | None = None,
+        tenant_id: str = DEFAULT_TENANT_ID,
     ) -> list[dict[str, Any]]:
         """Call the LLM with the smart-ingest prompt; return a list of
         candidate memory dicts (each with ``content``/``category``/
@@ -199,6 +200,7 @@ class SmartIngestionService:
         memory_type: str = "semantic",
         source: str | None = None,
         base_metadata: dict[str, Any] | None = None,
+        tenant_id: str = DEFAULT_TENANT_ID,
     ) -> tuple[list[Memory], list[dict[str, Any]], list[dict[str, Any]]]:
         """For each candidate: search nearest existing memory, decide
         skip/update/supersede/write.
@@ -225,6 +227,7 @@ class SmartIngestionService:
                 limit=1,
                 user_id=user_id,
                 agent_id=agent_id,
+                tenant_id=tenant_id,
             )
 
             if results:
@@ -236,7 +239,7 @@ class SmartIngestionService:
 
                 if score > UPDATE_THRESHOLD:
                     # Look up old content to run contradiction check.
-                    existing = await memory_service.get(existing_id)
+                    existing = await memory_service.get(existing_id, tenant_id=tenant_id)
                     if existing is not None:
                         contradicts, conf, why = self._check_contradiction(
                             existing.content, content,
@@ -251,6 +254,7 @@ class SmartIngestionService:
                                 source=source,
                                 importance=importance,
                                 metadata=merged_meta or None,
+                                tenant_id=tenant_id,
                             )
                             await self._record_supersession(
                                 superseded_id=existing_id,
@@ -258,6 +262,7 @@ class SmartIngestionService:
                                 user_id=user_id,
                                 reason=f"contradiction:{why}",
                                 similarity_score=float(score),
+                                tenant_id=tenant_id,
                             )
                             written.append(new_mem)
                             supersessions.append({
@@ -283,6 +288,7 @@ class SmartIngestionService:
                 source=source,
                 importance=importance,
                 metadata=merged_meta or None,
+                tenant_id=tenant_id,
             )
             written.append(new_mem)
 
@@ -299,6 +305,7 @@ class SmartIngestionService:
         user_id: str,
         reason: str,
         similarity_score: float | None = None,
+        tenant_id: str = DEFAULT_TENANT_ID,
     ) -> MemorySupersession:
         """Insert a MemorySupersession row and demote the old memory's dynamics.
 
@@ -307,6 +314,7 @@ class SmartIngestionService:
         """
         async with async_session() as db:
             row = MemorySupersession(
+                tenant_id=tenant_id,
                 superseded_id=superseded_id,
                 new_id=new_id,
                 user_id=user_id,
@@ -323,7 +331,17 @@ class SmartIngestionService:
                 memory_id=superseded_id,
                 user_id=user_id,
                 reason="superseded",
+                tenant_id=tenant_id,
             )
+
+        # Phase 3 slice 3: fire-and-forget SUPERSEDES edge.
+        from palace.graph.service import graph_service
+        graph_service.schedule(graph_service.add_supersedes_edge(
+            new_memory_id=new_id,
+            old_memory_id=superseded_id,
+            tenant_id=tenant_id,
+            reason=reason,
+        ))
 
         return row
 
@@ -338,6 +356,7 @@ class SmartIngestionService:
         user_id: str,
         reason: str = "manual_correction",
         metadata: dict[str, Any] | None = None,
+        tenant_id: str = DEFAULT_TENANT_ID,
     ) -> dict[str, Any] | None:
         """Manually replace an old memory with a new one.
 
@@ -345,7 +364,7 @@ class SmartIngestionService:
         Returns ``{"superseded_id", "new_id", "reason"}`` or None if the
         old memory wasn't found.
         """
-        old = await memory_service.get(old_memory_id)
+        old = await memory_service.get(old_memory_id, tenant_id=tenant_id)
         if old is None:
             return None
 
@@ -357,6 +376,7 @@ class SmartIngestionService:
             source=old.source,
             importance=old.importance,
             metadata=metadata,
+            tenant_id=tenant_id,
         )
 
         await self._record_supersession(
@@ -365,6 +385,7 @@ class SmartIngestionService:
             user_id=user_id,
             reason=reason,
             similarity_score=None,
+            tenant_id=tenant_id,
         )
 
         return {
@@ -374,11 +395,14 @@ class SmartIngestionService:
         }
 
     async def get_supersessions(
-        self, memory_id: str,
+        self,
+        memory_id: str,
+        tenant_id: str = DEFAULT_TENANT_ID,
     ) -> list[dict[str, Any]]:
         """Return supersession history involving this memory_id (either side)."""
         async with async_session() as db:
             stmt = select(MemorySupersession).where(
+                MemorySupersession.tenant_id == tenant_id,
                 or_(
                     MemorySupersession.superseded_id == memory_id,
                     MemorySupersession.new_id == memory_id,
