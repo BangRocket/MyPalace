@@ -85,7 +85,7 @@ class TestPublicPaths:
     def test_health_no_auth_required(self, auth_client):
         r = auth_client.get("/health")
         assert r.status_code == 200
-        assert r.json() == {"status": "ok", "service": "palace-memory"}
+        assert r.json() == {"status": "ok", "service": "mypalace"}
 
     def test_openapi_no_auth_required(self, auth_client):
         r = auth_client.get("/openapi.json")
