@@ -240,6 +240,20 @@ LLM extraction uses `palace/llm.py`'s OpenAI-compatible chat-completion client (
 
 The `examples/mypalclara_router.py` reference now routes `episode_store`, `reflect_on_session`, and `run_narrative_synthesis` when `USE_PALACE_SERVICE=true`, falling back to embedded otherwise.
 
+### Slice 3 additions: FSRS dynamics
+
+Five more endpoints port mypalclara's FSRS-6 spaced-repetition memory dynamics (per-memory stability/difficulty/retrievability state, access logging, and composite ranking) to remote Palace:
+
+- `POST /v1/memories/{id}/promote` — apply an FSRS review (default `grade=3` / GOOD, `signal_type="used_in_response"`). Auto-creates the dynamics row on first call.
+- `POST /v1/memories/{id}/demote` — failure signal (equivalent to `promote(grade=1)`); default `reason="user_correction"`.
+- `GET  /v1/memories/{id}/dynamics?user_id=u1` — read the current FSRS state. 404 if no dynamics row.
+- `POST /v1/memories/{id}/score` — composite ranking breakdown given the caller's semantic score. Returns `{composite_score, fsrs_score, retrievability, storage_strength}`. Composite formula: `composite = 0.6 * semantic + 0.4 * fsrs_score`, where `fsrs_score = (0.7 * retrievability + 0.3 * storage_strength) * importance_weight`.
+- `POST /v1/maintenance/prune-access-logs?retention_days=90` — admin op; deletes old access log rows.
+
+The FSRS-6 math (`palace/dynamics/fsrs.py`) is ported character-for-character from mypalclara, with a deterministic regression net (`tests/test_dynamics.py`) pinning known input -> output values to catch porting drift.
+
+`MM.get_last_retrieved_memory_ids` stays embedded (slice-3 design D4): the HTTP service is stateless between requests, so an in-process cache wouldn't survive across worker processes. The mypalclara router caches retrieved IDs client-side instead.
+
 ## Integration tests
 
 Default `pytest` runs only the fast mock-based suite (~2s). Live
