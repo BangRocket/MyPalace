@@ -245,6 +245,50 @@ async def get_memory_supersessions(
     return ApiResponse(data=data, meta=Meta(count=len(data)))
 
 
+@router.get("/{memory_id}/history", response_model=ApiResponse[list[dict]])
+async def get_memory_history(
+    memory_id: str,
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
+):
+    """Phase 7 slice 2: chronological version trail for a memory.
+
+    Returns every snapshot recorded by create / update / supersede,
+    oldest-first. Tenant-scoped — returns empty for memories outside
+    the requesting key's tenant.
+    """
+    from sqlalchemy import asc, select
+
+    from palace.database import async_session
+    from palace.models import MemoryVersion
+
+    tenant_id = auth.resolve_tenant()
+    async with async_session() as db:
+        result = await db.execute(
+            select(MemoryVersion)
+            .where(
+                MemoryVersion.memory_id == memory_id,
+                MemoryVersion.tenant_id == tenant_id,
+            )
+            .order_by(asc(MemoryVersion.created_at)),
+        )
+        rows = list(result.scalars().all())
+
+    data = [
+        {
+            "id": r.id,
+            "memory_id": r.memory_id,
+            "version_number": r.version_number,
+            "content": r.content,
+            "metadata": r.metadata_json,
+            "change_kind": r.change_kind,
+            "actor_key_id": r.actor_key_id,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
+    return ApiResponse(data=data, meta=Meta(count=len(data)))
+
+
 @users_router.get("/{user_id}/memories", response_model=ApiResponse[list[MemoryOut]])
 async def list_user_memories(
     user_id: str,

@@ -235,6 +235,34 @@ class ApiKey(SQLModel, table=True):
     revoked_at: datetime | None = Field(default=None, sa_column=_ts_column(nullable=True))
 
 
+class MemoryVersion(SQLModel, table=True):
+    """Append-only history of memory content changes (phase 7 slice 2).
+
+    Recorded by memory_service on create / update / supersede. The initial
+    `created` row makes the trail complete from row 1 — no special-case
+    "memory exists but has no versions" state.
+    """
+
+    __tablename__ = "memory_versions"
+    __table_args__ = (
+        Index("ix_memory_versions_memory_created", "memory_id", "created_at"),
+    )
+
+    id: str = Field(primary_key=True, default_factory=lambda: str(uuid4()))
+    memory_id: str = Field(index=True)
+    tenant_id: str = Field(default=DEFAULT_TENANT_ID, index=True, max_length=32)
+    user_id: str = Field(index=True)
+    version_number: int = Field(default=1)
+    content: str
+    metadata_json: dict | None = Field(
+        default=None,
+        sa_column=Column(JSONB, nullable=True),
+    )
+    change_kind: str = Field(max_length=20)  # created | updated | superseded
+    actor_key_id: str | None = Field(default=None, max_length=100)
+    created_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
+
+
 class AuditLog(SQLModel, table=True):
     """Append-only audit trail of /v1/admin/* and /v1/maintenance/* calls
     (phase 7 slice 1). Recorded by AuditMiddleware, fire-and-forget, post-auth.
