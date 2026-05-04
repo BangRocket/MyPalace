@@ -132,6 +132,29 @@ class MemoryDynamics(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
 
 
+class Intention(SQLModel, table=True):
+    """Future trigger/reminder for proactive memory surfacing (slice 4)."""
+
+    __tablename__ = "intentions"
+    __table_args__ = (
+        Index("ix_intention_user_unfired", "user_id", "fired"),
+        Index("ix_intention_expires", "expires_at"),
+    )
+
+    id: str = Field(primary_key=True, default_factory=lambda: str(uuid4()))
+    user_id: str = Field(index=True)
+    agent_id: str = Field(default="clara")
+    content: str
+    source_memory_id: str | None = None
+    trigger_conditions: dict = Field(sa_column=Column(JSONB, nullable=False))
+    priority: int = Field(default=0)
+    fired: bool = Field(default=False)
+    fire_once: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
+    expires_at: datetime | None = Field(default=None, sa_column=_ts_column(nullable=True))
+    fired_at: datetime | None = Field(default=None, sa_column=_ts_column(nullable=True))
+
+
 class MemoryAccessLog(SQLModel, table=True):
     """Audit trail of memory accesses with FSRS grade (slice 3)."""
 
