@@ -20,6 +20,7 @@ dependencies = [
     "openai>=1.59",
     "structlog>=24.4",
     "bcrypt>=4.1",
+    "falkordb>=1.0",
 ]
 
 [project.optional-dependencies]
