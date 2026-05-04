@@ -19,6 +19,10 @@ from palace.database import async_session, init_db
 from palace.episode_service import episode_service
 from palace.memory_service import memory_service
 from palace.models import Tenant
+from palace.observability.logging import configure_logging
+from palace.observability.metrics import metrics_response
+from palace.observability.middleware import ObservabilityMiddleware
+from palace.observability.tracing import configure_tracing
 
 
 async def _ensure_default_tenant() -> None:
@@ -39,6 +43,8 @@ async def _ensure_default_tenant() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup: create tables and init vector collections."""
+    configure_logging()
+    configure_tracing(app)
     await init_db()
     await _ensure_default_tenant()
     await memory_service.init(tenant_id=settings.default_tenant_id)
@@ -64,12 +70,22 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Order matters: AuthMiddleware runs FIRST (added LAST in Starlette's
+# inside-out semantics) so it sees decorated requests; ObservabilityMiddleware
+# wraps it so 401 responses still get counted + request-id-tagged.
 app.add_middleware(AuthMiddleware)
+app.add_middleware(ObservabilityMiddleware)
 
 
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "palace-memory"}
+
+
+@app.get("/metrics", include_in_schema=False)
+async def metrics():
+    """Prometheus exposition endpoint. Public — k8s scrapers need it."""
+    return metrics_response()
 
 
 app.include_router(admin.router, prefix="/v1/admin", tags=["admin"])

@@ -174,19 +174,25 @@ class GraphService:
     # Fire-and-forget helper
     # ------------------------------------------------------------------
 
-    def schedule(self, coro: Any) -> asyncio.Task | None:
+    def schedule(self, coro: Any, kind: str = "write") -> asyncio.Task | None:
         """Schedule a graph write fire-and-forget. Returns None if disabled.
         Closes the unawaited coroutine on the disabled path to avoid
-        RuntimeWarning."""
+        RuntimeWarning. Increments per-kind counters; failures bump
+        ``palace_graph_failures_total``."""
+        from palace.observability.metrics import graph_failures, graph_writes
+
         if not self.enabled:
             if hasattr(coro, "close"):
                 coro.close()
             return None
 
+        graph_writes.labels(kind=kind).inc()
+
         async def _wrap():
             try:
                 await coro
             except Exception:
+                graph_failures.inc()
                 logger.exception("graph write task failed")
 
         return asyncio.create_task(_wrap())

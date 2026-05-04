@@ -6,6 +6,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from palace.cache.client import cache
+from palace.observability.metrics import cache_hits, cache_misses
 
 
 async def cached_call(
@@ -19,11 +20,16 @@ async def cached_call(
     1. Compute key from (namespace, key_parts).
     2. Try cache GET.
     3. On miss, call ``loader``, cache the result, return it.
+
+    Always increments the relevant Prometheus counter, even when the cache
+    is disabled (counted as a miss) so dashboards can spot misconfiguration.
     """
     key = cache.derive_key(namespace, key_parts)
     cached_value = await cache.get(key)
     if cached_value is not None:
+        cache_hits.labels(namespace=namespace).inc()
         return cached_value
+    cache_misses.labels(namespace=namespace).inc()
     fresh = await loader()
     # Pydantic models / nested objects need json-serializable form.
     await cache.set(key, _to_jsonable(fresh), ttl)
