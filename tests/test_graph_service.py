@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from palace.graph.client import FalkorClient
-from palace.graph.service import GraphService, _result_to_dict
+from mypalace.graph.client import FalkorClient
+from mypalace.graph.service import GraphService, _result_to_dict
 
 
 class TestEnabledGate:

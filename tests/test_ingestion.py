@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from palace.retrieval.ingestion import SmartIngestionService
+from mypalace.retrieval.ingestion import SmartIngestionService
 
 
 def _fake_memory(mid: str, content: str) -> SimpleNamespace:
@@ -105,8 +105,8 @@ async def test_dedup_skips_when_score_above_skip_threshold():
     embedder.embed = AsyncMock(return_value=[[0.0] * 4])
 
     with (
-        patch("palace.retrieval.ingestion.vector_store") as vs,
-        patch("palace.retrieval.ingestion.memory_service") as mem,
+        patch("mypalace.retrieval.ingestion.vector_store") as vs,
+        patch("mypalace.retrieval.ingestion.memory_service") as mem,
         patch.object(SmartIngestionService, "embedder", embedder),
     ):
         vs.search = AsyncMock(return_value=[("existing-id", 0.97)])
@@ -133,8 +133,8 @@ async def test_dedup_writes_when_no_neighbor():
     new_mem = _fake_memory("new-1", "fresh fact")
 
     with (
-        patch("palace.retrieval.ingestion.vector_store") as vs,
-        patch("palace.retrieval.ingestion.memory_service") as mem,
+        patch("mypalace.retrieval.ingestion.vector_store") as vs,
+        patch("mypalace.retrieval.ingestion.memory_service") as mem,
         patch.object(SmartIngestionService, "embedder", embedder),
     ):
         vs.search = AsyncMock(return_value=[])
@@ -162,10 +162,10 @@ async def test_dedup_supersedes_when_contradiction_detected():
     new_mem = _fake_memory("new-1", "Joshua does not enjoy coffee mornings")
 
     with (
-        patch("palace.retrieval.ingestion.vector_store") as vs,
-        patch("palace.retrieval.ingestion.memory_service") as mem,
-        patch("palace.retrieval.ingestion.async_session") as sess,
-        patch("palace.retrieval.ingestion.dynamics_service") as dyn,
+        patch("mypalace.retrieval.ingestion.vector_store") as vs,
+        patch("mypalace.retrieval.ingestion.memory_service") as mem,
+        patch("mypalace.retrieval.ingestion.async_session") as sess,
+        patch("mypalace.retrieval.ingestion.dynamics_service") as dyn,
         patch.object(SmartIngestionService, "embedder", embedder),
     ):
         vs.search = AsyncMock(return_value=[("old-1", 0.85)])
@@ -205,8 +205,8 @@ async def test_dedup_skips_similar_when_no_contradiction():
     existing = _fake_memory("old-1", "Joshua loves coffee")
 
     with (
-        patch("palace.retrieval.ingestion.vector_store") as vs,
-        patch("palace.retrieval.ingestion.memory_service") as mem,
+        patch("mypalace.retrieval.ingestion.vector_store") as vs,
+        patch("mypalace.retrieval.ingestion.memory_service") as mem,
         patch.object(SmartIngestionService, "embedder", embedder),
     ):
         vs.search = AsyncMock(return_value=[("old-1", 0.80)])

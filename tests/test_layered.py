@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from palace.retrieval.layered import LayeredRetrievalService
+from mypalace.retrieval.layered import LayeredRetrievalService
 
 
 def _fake_memory(mid: str, content: str = "fact") -> SimpleNamespace:
@@ -105,10 +105,10 @@ async def test_assemble_with_fsrs_reranks_l2_by_composite():
         }
 
     with (
-        patch("palace.retrieval.layered.memory_service") as mem_mock,
-        patch("palace.retrieval.layered.episode_service") as ep_mock,
-        patch("palace.retrieval.layered.arc_service") as arc_mock,
-        patch("palace.retrieval.layered.dynamics_service") as dyn_mock,
+        patch("mypalace.retrieval.layered.memory_service") as mem_mock,
+        patch("mypalace.retrieval.layered.episode_service") as ep_mock,
+        patch("mypalace.retrieval.layered.arc_service") as arc_mock,
+        patch("mypalace.retrieval.layered.dynamics_service") as dyn_mock,
     ):
         mem_mock.search = AsyncMock(side_effect=[
             semantic_results,  # L1
@@ -135,10 +135,10 @@ async def test_assemble_without_fsrs_keeps_semantic_order():
     semantic_results = [(m1, 0.9), (m2, 0.5)]
 
     with (
-        patch("palace.retrieval.layered.memory_service") as mem_mock,
-        patch("palace.retrieval.layered.episode_service") as ep_mock,
-        patch("palace.retrieval.layered.arc_service") as arc_mock,
-        patch("palace.retrieval.layered.dynamics_service") as dyn_mock,
+        patch("mypalace.retrieval.layered.memory_service") as mem_mock,
+        patch("mypalace.retrieval.layered.episode_service") as ep_mock,
+        patch("mypalace.retrieval.layered.arc_service") as arc_mock,
+        patch("mypalace.retrieval.layered.dynamics_service") as dyn_mock,
     ):
         mem_mock.search = AsyncMock(return_value=semantic_results)
         ep_mock.get_recent = AsyncMock(return_value=[])
@@ -160,10 +160,10 @@ async def test_assemble_pulls_recent_messages_when_session_provided():
     svc = LayeredRetrievalService()
 
     with (
-        patch("palace.retrieval.layered.memory_service") as mem_mock,
-        patch("palace.retrieval.layered.episode_service") as ep_mock,
-        patch("palace.retrieval.layered.arc_service") as arc_mock,
-        patch("palace.retrieval.layered.session_service") as sess_mock,
+        patch("mypalace.retrieval.layered.memory_service") as mem_mock,
+        patch("mypalace.retrieval.layered.episode_service") as ep_mock,
+        patch("mypalace.retrieval.layered.arc_service") as arc_mock,
+        patch("mypalace.retrieval.layered.session_service") as sess_mock,
     ):
         mem_mock.search = AsyncMock(return_value=[])
         ep_mock.get_recent = AsyncMock(return_value=[])
@@ -196,9 +196,9 @@ async def test_assemble_enforces_char_budget_on_l1():
     semantic_results = [(big, 0.9), (medium, 0.5)]
 
     with (
-        patch("palace.retrieval.layered.memory_service") as mem_mock,
-        patch("palace.retrieval.layered.episode_service") as ep_mock,
-        patch("palace.retrieval.layered.arc_service") as arc_mock,
+        patch("mypalace.retrieval.layered.memory_service") as mem_mock,
+        patch("mypalace.retrieval.layered.episode_service") as ep_mock,
+        patch("mypalace.retrieval.layered.arc_service") as arc_mock,
     ):
         mem_mock.search = AsyncMock(return_value=semantic_results)
         ep_mock.get_recent = AsyncMock(return_value=[])
@@ -225,9 +225,9 @@ async def test_assemble_reports_char_counts_in_response():
     m2 = _fake_memory("m2", "ghi")  # 3 chars
 
     with (
-        patch("palace.retrieval.layered.memory_service") as mem_mock,
-        patch("palace.retrieval.layered.episode_service") as ep_mock,
-        patch("palace.retrieval.layered.arc_service") as arc_mock,
+        patch("mypalace.retrieval.layered.memory_service") as mem_mock,
+        patch("mypalace.retrieval.layered.episode_service") as ep_mock,
+        patch("mypalace.retrieval.layered.arc_service") as arc_mock,
     ):
         mem_mock.search = AsyncMock(return_value=[(m1, 0.9), (m2, 0.5)])
         ep_mock.get_recent = AsyncMock(return_value=[])
@@ -249,9 +249,9 @@ async def test_assemble_includes_active_arcs():
     arc = _fake_arc("a-1")
 
     with (
-        patch("palace.retrieval.layered.memory_service") as mem_mock,
-        patch("palace.retrieval.layered.episode_service") as ep_mock,
-        patch("palace.retrieval.layered.arc_service") as arc_mock,
+        patch("mypalace.retrieval.layered.memory_service") as mem_mock,
+        patch("mypalace.retrieval.layered.episode_service") as ep_mock,
+        patch("mypalace.retrieval.layered.arc_service") as arc_mock,
     ):
         mem_mock.search = AsyncMock(return_value=[])
         ep_mock.get_recent = AsyncMock(return_value=[])

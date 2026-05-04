@@ -8,7 +8,7 @@ from unittest.mock import patch
 class TestNeighborsRoute:
     def test_503_when_graph_disabled(self, client):
         # mock_graph_service is wired in conftest with enabled=False by default
-        with patch("palace.api.graph.graph_service") as mock_graph:
+        with patch("mypalace.api.graph.graph_service") as mock_graph:
             mock_graph.enabled = False
             r = client.get("/v1/graph/neighbors?node_id=m1")
             assert r.status_code == 503
@@ -16,7 +16,7 @@ class TestNeighborsRoute:
     def test_returns_neighbors_when_enabled(self, client):
         from unittest.mock import AsyncMock
 
-        with patch("palace.api.graph.graph_service") as mock_graph:
+        with patch("mypalace.api.graph.graph_service") as mock_graph:
             mock_graph.enabled = True
             mock_graph.neighbors = AsyncMock(return_value={
                 "nodes": [{"id": "m1", "label": "Memory", "properties": {}}],

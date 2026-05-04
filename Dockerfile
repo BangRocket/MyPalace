@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml README.md ./
-COPY palace ./palace
+COPY mypalace ./mypalace
 COPY proto ./proto
 
 RUN pip install --upgrade pip && pip install .
@@ -21,4 +21,4 @@ EXPOSE 8000 50051
 
 # Default: HTTP only on :8000.
 # Set PALACE_GRPC_PORT=50051 to also start the gRPC server alongside.
-CMD ["uvicorn", "palace.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "mypalace.main:app", "--host", "0.0.0.0", "--port", "8000"]

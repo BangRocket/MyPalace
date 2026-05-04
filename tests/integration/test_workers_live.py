@@ -8,7 +8,7 @@ pytestmark = pytest.mark.integration
 
 
 async def test_enqueue_and_claim_round_trip(palace_app):
-    from palace.workers.queue import claim_next, complete_job, enqueue
+    from mypalace.workers.queue import claim_next, complete_job, enqueue
 
     job = await enqueue(
         kind="test_kind",
@@ -39,8 +39,8 @@ async def test_enqueue_and_claim_round_trip(palace_app):
     # Verify result_json persisted.
     from sqlalchemy import select
 
-    from palace.database import async_session
-    from palace.models import ReflectionJob
+    from mypalace.database import async_session
+    from mypalace.models import ReflectionJob
     async with async_session() as db:
         result = await db.execute(select(ReflectionJob).where(ReflectionJob.id == job.id))
         final = result.scalar_one()
@@ -52,7 +52,7 @@ async def test_two_claims_dont_collide(palace_app):
     """Insert one job; two claim_next calls in parallel — only one wins."""
     import asyncio
 
-    from palace.workers.queue import claim_next, enqueue
+    from mypalace.workers.queue import claim_next, enqueue
 
     await enqueue(
         kind="test_kind", user_id="u1", payload={}, tenant_id="test",
@@ -67,8 +67,8 @@ async def test_two_claims_dont_collide(palace_app):
 
 
 async def test_failed_job_with_attempts_below_max_can_be_retried(palace_app):
-    from palace.config import settings
-    from palace.workers.queue import claim_next, enqueue, fail_job
+    from mypalace.config import settings
+    from mypalace.workers.queue import claim_next, enqueue, fail_job
 
     job = await enqueue(
         kind="test_kind", user_id="u1", payload={}, tenant_id="test",

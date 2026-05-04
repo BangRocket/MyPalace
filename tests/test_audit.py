@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from palace.audit.middleware import (
+from mypalace.audit.middleware import (
     _audit_path,
     _hash_body,
     _status_class,
@@ -47,7 +47,7 @@ class TestHelpers:
 class TestPersist:
     @pytest.mark.asyncio
     async def test_persist_inserts_audit_row(self, monkeypatch):
-        from palace.audit import middleware as mw
+        from mypalace.audit import middleware as mw
 
         captured: dict = {}
         db_mock = MagicMock()
@@ -57,7 +57,7 @@ class TestPersist:
         cm.__aenter__ = AsyncMock(return_value=db_mock)
         cm.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("palace.database.async_session", MagicMock(return_value=cm)):
+        with patch("mypalace.database.async_session", MagicMock(return_value=cm)):
             await mw._persist(
                 key_id="k-1",
                 tenant_id="acme",
@@ -78,9 +78,9 @@ class TestPersist:
 
     @pytest.mark.asyncio
     async def test_persist_failure_swallowed(self, monkeypatch):
-        from palace.audit import middleware as mw
+        from mypalace.audit import middleware as mw
 
-        with patch("palace.database.async_session",
+        with patch("mypalace.database.async_session",
                    MagicMock(side_effect=RuntimeError("db down"))):
             # Should not raise.
             await mw._persist(
@@ -93,7 +93,7 @@ class TestPersist:
 class TestMiddlewareSkipsNonAdminPaths:
     def test_health_not_audited(self, client, monkeypatch):
         captured = []
-        from palace.audit import middleware as mw
+        from mypalace.audit import middleware as mw
 
         async def fake_persist(**kw):
             captured.append(kw)
@@ -107,7 +107,7 @@ class TestMiddlewareSkipsNonAdminPaths:
 
     def test_memories_not_audited(self, client, monkeypatch, mock_memory_service):
         captured = []
-        from palace.audit import middleware as mw
+        from mypalace.audit import middleware as mw
 
         async def fake_persist(**kw):
             captured.append(kw)
@@ -121,7 +121,7 @@ class TestMiddlewareSkipsNonAdminPaths:
 
 class TestAuditQueryRoute:
     def _row(self, **overrides):
-        from palace.models import AuditLog
+        from mypalace.models import AuditLog
         defaults = {
             "id": "a-1",
             "key_id": "k-1",
@@ -137,7 +137,7 @@ class TestAuditQueryRoute:
         return AuditLog(**defaults)
 
     def test_returns_recent_first(self, client, monkeypatch):
-        from palace.api import audit as audit_mod
+        from mypalace.api import audit as audit_mod
 
         rows = [
             self._row(id="a-2", path="/v1/admin/keys"),

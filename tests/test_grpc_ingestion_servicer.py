@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from palace.grpc._generated import palace_pb2
-from palace.grpc.ingestion_servicer import IngestionServicer
+from mypalace.grpc._generated import mypalace_pb2
+from mypalace.grpc.ingestion_servicer import IngestionServicer
 
 
 @pytest.mark.asyncio
@@ -19,10 +19,10 @@ async def test_supersede_memory():
         "reason": "manual_correction",
     }
     with patch(
-        "palace.grpc.ingestion_servicer.smart_ingestion_service.supersede_memory",
+        "mypalace.grpc.ingestion_servicer.smart_ingestion_service.supersede_memory",
         new=AsyncMock(return_value=result),
     ):
-        req = palace_pb2.SupersedeMemoryRequest(
+        req = mypalace_pb2.SupersedeMemoryRequest(
             memory_id="old1", user_id="u1", new_content="updated",
         )
         ctx = MagicMock()
@@ -36,10 +36,10 @@ async def test_supersede_memory():
 async def test_supersede_memory_404():
     svc = IngestionServicer()
     with patch(
-        "palace.grpc.ingestion_servicer.smart_ingestion_service.supersede_memory",
+        "mypalace.grpc.ingestion_servicer.smart_ingestion_service.supersede_memory",
         new=AsyncMock(return_value=None),
     ):
-        req = palace_pb2.SupersedeMemoryRequest(
+        req = mypalace_pb2.SupersedeMemoryRequest(
             memory_id="missing", user_id="u1", new_content="x",
         )
         ctx = MagicMock()
@@ -61,10 +61,10 @@ async def test_get_supersessions():
         },
     ]
     with patch(
-        "palace.grpc.ingestion_servicer.smart_ingestion_service.get_supersessions",
+        "mypalace.grpc.ingestion_servicer.smart_ingestion_service.get_supersessions",
         new=AsyncMock(return_value=rows),
     ):
-        req = palace_pb2.GetSupersessionsRequest(memory_id="new1")
+        req = mypalace_pb2.GetSupersessionsRequest(memory_id="new1")
         ctx = MagicMock()
         resp = await svc.GetSupersessions(req, ctx)
         assert len(resp.supersessions) == 1

@@ -11,7 +11,7 @@ import pytest
 def _patch_stats_for(monkeypatch, mapping: dict[str, dict]):
     """Patch the four stats helpers so each tenant returns deterministic
     fixtures. ``mapping`` is {tenant_id: {row_counts: {...}, ...}}."""
-    from palace.api import stats as stats_mod
+    from mypalace.api import stats as stats_mod
 
     async def fake_row_counts(tenant_id):
         return stats_mod.RowCounts(**mapping[tenant_id]["row_counts"])
@@ -98,8 +98,8 @@ class TestAllTenantsRollup:
     def test_all_works_with_cross_tenant_admin(
         self, client, mock_key_service, monkeypatch,
     ):
-        from palace.auth.context import AuthContext
-        from palace.config import settings
+        from mypalace.auth.context import AuthContext
+        from mypalace.config import settings
 
         mock_key_service.lookup = AsyncMock(return_value=AuthContext(
             key_id="admin-x", label="cross",
@@ -110,7 +110,7 @@ class TestAllTenantsRollup:
             "alpha": _DEFAULT_FIXTURE,
             "beta": _DEFAULT_FIXTURE,
         })
-        from palace.api import stats as stats_mod
+        from mypalace.api import stats as stats_mod
         monkeypatch.setattr(
             stats_mod, "_all_tenant_ids",
             AsyncMock(return_value=["alpha", "beta"]),
@@ -130,8 +130,8 @@ class TestAllTenantsRollup:
     def test_all_denied_with_tenant_bound_key(
         self, client, mock_key_service, monkeypatch,
     ):
-        from palace.auth.context import AuthContext
-        from palace.config import settings
+        from mypalace.auth.context import AuthContext
+        from mypalace.config import settings
 
         mock_key_service.lookup = AsyncMock(return_value=AuthContext(
             key_id="k1", label="bound",
@@ -151,7 +151,7 @@ class TestAllTenantsRollup:
 class TestRowCountsHelper:
     @pytest.mark.asyncio
     async def test_row_counts_filters_by_tenant(self, monkeypatch):
-        from palace.api import stats as stats_mod
+        from mypalace.api import stats as stats_mod
 
         # Build a stub async_session whose execute returns counts in order:
         # memories, sessions, episodes, narrative_arcs, intentions, supersessions.

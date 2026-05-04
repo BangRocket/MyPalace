@@ -20,8 +20,8 @@ def _fake_memory(mid: str, content: str = "x"):
 
 class TestRouteValidation:
     def test_all_denied_for_tenant_bound_key(self, client, mock_key_service):
-        from palace.auth.context import AuthContext
-        from palace.config import settings
+        from mypalace.auth.context import AuthContext
+        from mypalace.config import settings
 
         mock_key_service.lookup = AsyncMock(return_value=AuthContext(
             key_id="k1", label="bound",
@@ -42,8 +42,8 @@ class TestCrossTenantFanout:
     def test_all_works_for_cross_tenant_admin(
         self, client, mock_memory_service, mock_key_service,
     ):
-        from palace.auth.context import AuthContext
-        from palace.config import settings
+        from mypalace.auth.context import AuthContext
+        from mypalace.config import settings
 
         mock_key_service.lookup = AsyncMock(return_value=AuthContext(
             key_id="admin-x", label="cross",
@@ -86,8 +86,8 @@ class TestCrossTenantFanout:
 class TestSearchAllTenantsService:
     @pytest.mark.asyncio
     async def test_no_tenants_returns_empty(self, monkeypatch):
-        from palace import memory_service as ms
-        from palace.memory_service import MemoryService
+        from mypalace import memory_service as ms
+        from mypalace.memory_service import MemoryService
 
         # Stub embedder
         fake_embedder = MagicMock()
@@ -111,8 +111,8 @@ class TestSearchAllTenantsService:
 
     @pytest.mark.asyncio
     async def test_merges_and_caps_at_limit(self, monkeypatch):
-        from palace import memory_service as ms
-        from palace.memory_service import MemoryService
+        from mypalace import memory_service as ms
+        from mypalace.memory_service import MemoryService
 
         fake_embedder = MagicMock()
         fake_embedder.embed = AsyncMock(return_value=[[0.0] * 384])

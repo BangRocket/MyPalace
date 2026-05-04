@@ -8,8 +8,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from palace.grpc._generated import palace_pb2
-from palace.grpc.intention_servicer import IntentionServicer
+from mypalace.grpc._generated import mypalace_pb2
+from mypalace.grpc.intention_servicer import IntentionServicer
 
 
 def _fake_intention(**overrides):
@@ -35,10 +35,10 @@ def _fake_intention(**overrides):
 async def test_set_intention_calls_service():
     svc = IntentionServicer()
     fake = _fake_intention(id="new-i", priority=7)
-    with patch("palace.grpc.intention_servicer.intention_service.set",
+    with patch("mypalace.grpc.intention_servicer.intention_service.set",
                new=AsyncMock(return_value=fake)) as mock_set:
         trigger = {"type": "keyword", "keywords": ["foo"]}
-        req = palace_pb2.SetIntentionRequest(
+        req = mypalace_pb2.SetIntentionRequest(
             user_id="u1",
             content="remind me",
             trigger_conditions_json=json.dumps(trigger),
@@ -56,7 +56,7 @@ async def test_set_intention_calls_service():
 @pytest.mark.asyncio
 async def test_set_intention_invalid_trigger():
     svc = IntentionServicer()
-    req = palace_pb2.SetIntentionRequest(
+    req = mypalace_pb2.SetIntentionRequest(
         user_id="u1",
         content="x",
         trigger_conditions_json="",  # missing
@@ -80,9 +80,9 @@ async def test_check_intentions_returns_fired():
             "source_memory_id": None,
         },
     ]
-    with patch("palace.grpc.intention_servicer.intention_service.check",
+    with patch("mypalace.grpc.intention_servicer.intention_service.check",
                new=AsyncMock(return_value=fired)):
-        req = palace_pb2.CheckIntentionsRequest(user_id="u1", message="foo")
+        req = mypalace_pb2.CheckIntentionsRequest(user_id="u1", message="foo")
         ctx = MagicMock()
         resp = await svc.CheckIntentions(req, ctx)
         assert len(resp.fired) == 1
@@ -94,10 +94,10 @@ async def test_check_intentions_returns_fired():
 async def test_format_intentions_returns_text():
     svc = IntentionServicer()
     with patch(
-        "palace.grpc.intention_servicer.intention_service.format_for_prompt",
+        "mypalace.grpc.intention_servicer.intention_service.format_for_prompt",
         return_value="## Reminders\n- do thing",
     ):
-        req = palace_pb2.FormatIntentionsRequest(
+        req = mypalace_pb2.FormatIntentionsRequest(
             intentions_json=json.dumps([{"content": "do thing"}]), max=3,
         )
         ctx = MagicMock()
@@ -108,7 +108,7 @@ async def test_format_intentions_returns_text():
 @pytest.mark.asyncio
 async def test_format_intentions_invalid_json():
     svc = IntentionServicer()
-    req = palace_pb2.FormatIntentionsRequest(
+    req = mypalace_pb2.FormatIntentionsRequest(
         intentions_json='{"not": "a list"}', max=3,
     )
     ctx = MagicMock()
@@ -121,9 +121,9 @@ async def test_format_intentions_invalid_json():
 async def test_list_intentions():
     svc = IntentionServicer()
     intentions = [_fake_intention(id="i1"), _fake_intention(id="i2")]
-    with patch("palace.grpc.intention_servicer.intention_service.list_for_user",
+    with patch("mypalace.grpc.intention_servicer.intention_service.list_for_user",
                new=AsyncMock(return_value=intentions)):
-        req = palace_pb2.ListIntentionsRequest(user_id="u1", fired="false")
+        req = mypalace_pb2.ListIntentionsRequest(user_id="u1", fired="false")
         ctx = MagicMock()
         resp = await svc.ListIntentions(req, ctx)
         assert [i.id for i in resp.intentions] == ["i1", "i2"]
@@ -132,7 +132,7 @@ async def test_list_intentions():
 @pytest.mark.asyncio
 async def test_list_intentions_invalid_fired_filter():
     svc = IntentionServicer()
-    req = palace_pb2.ListIntentionsRequest(user_id="u1", fired="bogus")
+    req = mypalace_pb2.ListIntentionsRequest(user_id="u1", fired="bogus")
     ctx = MagicMock()
     ctx.abort = AsyncMock(side_effect=Exception("aborted"))
     with pytest.raises(Exception, match="aborted"):
@@ -142,9 +142,9 @@ async def test_list_intentions_invalid_fired_filter():
 @pytest.mark.asyncio
 async def test_delete_intention():
     svc = IntentionServicer()
-    with patch("palace.grpc.intention_servicer.intention_service.delete",
+    with patch("mypalace.grpc.intention_servicer.intention_service.delete",
                new=AsyncMock(return_value=True)):
-        req = palace_pb2.DeleteIntentionRequest(intention_id="i1")
+        req = mypalace_pb2.DeleteIntentionRequest(intention_id="i1")
         ctx = MagicMock()
         resp = await svc.DeleteIntention(req, ctx)
         assert resp.deleted is True
@@ -153,9 +153,9 @@ async def test_delete_intention():
 @pytest.mark.asyncio
 async def test_delete_intention_404():
     svc = IntentionServicer()
-    with patch("palace.grpc.intention_servicer.intention_service.delete",
+    with patch("mypalace.grpc.intention_servicer.intention_service.delete",
                new=AsyncMock(return_value=False)):
-        req = palace_pb2.DeleteIntentionRequest(intention_id="missing")
+        req = mypalace_pb2.DeleteIntentionRequest(intention_id="missing")
         ctx = MagicMock()
         ctx.abort = AsyncMock(side_effect=Exception("aborted"))
         with pytest.raises(Exception, match="aborted"):

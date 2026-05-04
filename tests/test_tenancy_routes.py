@@ -5,12 +5,12 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from unittest.mock import patch
 
-from palace.models import Tenant
+from mypalace.models import Tenant
 
 
 class TestCreateTenant:
     def test_create_tenant(self, client):
-        with patch("palace.api.tenants.async_session") as mock_session:
+        with patch("mypalace.api.tenants.async_session") as mock_session:
             db = mock_session.return_value.__aenter__.return_value
             from unittest.mock import AsyncMock, MagicMock
 
@@ -42,7 +42,7 @@ class TestCreateTenant:
         assert r.status_code in (400, 422)
 
     def test_create_tenant_conflict(self, client):
-        with patch("palace.api.tenants.async_session") as mock_session:
+        with patch("mypalace.api.tenants.async_session") as mock_session:
             from unittest.mock import AsyncMock, MagicMock
             db = mock_session.return_value.__aenter__.return_value
 
@@ -56,7 +56,7 @@ class TestCreateTenant:
 
 class TestListTenants:
     def test_list_tenants(self, client):
-        with patch("palace.api.tenants.async_session") as mock_session:
+        with patch("mypalace.api.tenants.async_session") as mock_session:
             from unittest.mock import AsyncMock, MagicMock
             db = mock_session.return_value.__aenter__.return_value
             t = Tenant(id="default", label="Default Tenant")
@@ -73,7 +73,7 @@ class TestListTenants:
 
 class TestDeleteTenant:
     def test_delete_missing_tenant_404(self, client):
-        with patch("palace.api.tenants.async_session") as mock_session:
+        with patch("mypalace.api.tenants.async_session") as mock_session:
             from unittest.mock import AsyncMock, MagicMock
             db = mock_session.return_value.__aenter__.return_value
             no_row = MagicMock()

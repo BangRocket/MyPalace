@@ -15,7 +15,7 @@ class TestWorkerQueueRouting:
     def test_async_reflection_uses_run_async_when_flag_off(
         self, client, mock_episode_service, mock_job_service,
     ):
-        from palace.config import settings
+        from mypalace.config import settings
         with patch.object(settings, "worker_queue_enabled", False):
             mock_job_service.run_async.return_value = MagicMock(id="job-1")
             r = client.post(
@@ -28,9 +28,9 @@ class TestWorkerQueueRouting:
     def test_async_reflection_uses_enqueue_when_flag_on(
         self, client, mock_episode_service, mock_job_service,
     ):
-        from palace.config import settings
+        from mypalace.config import settings
         with patch.object(settings, "worker_queue_enabled", True), \
-             patch("palace.api.episodes.enqueue_job",
+             patch("mypalace.api.episodes.enqueue_job",
                    new=AsyncMock(return_value=MagicMock(id="job-2"))) as mock_enq:
             r = client.post(
                 "/v1/reflection/session?mode=async",
@@ -53,9 +53,9 @@ class TestWorkerQueueRouting:
     def test_async_synthesis_uses_enqueue_when_flag_on(
         self, client, mock_arc_service, mock_job_service,
     ):
-        from palace.config import settings
+        from mypalace.config import settings
         with patch.object(settings, "worker_queue_enabled", True), \
-             patch("palace.api.arcs.enqueue_job",
+             patch("mypalace.api.arcs.enqueue_job",
                    new=AsyncMock(return_value=MagicMock(id="job-3"))) as mock_enq:
             r = client.post(
                 "/v1/synthesis/narratives?mode=async",
@@ -79,9 +79,9 @@ class TestEpisodePublisher:
         """episode_service.reflect_session writes episodes to Qdrant AND
         publishes one episode.created event per written episode."""
         # Stub the LLM to return two episodes.
-        from palace import llm as llm_module
-        from palace.config import settings
-        from palace.episode_service import episode_service
+        from mypalace import llm as llm_module
+        from mypalace.config import settings
+        from mypalace.episode_service import episode_service
         monkeypatch.setattr(
             llm_module.llm, "complete",
             AsyncMock(return_value=(
@@ -102,14 +102,14 @@ class TestEpisodePublisher:
         monkeypatch.setattr(episode_service, "_embedder", fake_embedder)
 
         # Stub the vector upsert.
-        from palace.vector import episode_vector_store
+        from mypalace.vector import episode_vector_store
         monkeypatch.setattr(
             episode_vector_store, "upsert", AsyncMock(),
         )
 
         # Force in-process broker (no Redis).
         monkeypatch.setattr(settings, "redis_url", None)
-        from palace.events.broker import broker
+        from mypalace.events.broker import broker
         async with broker.subscribe(tenant_id="t1") as q:
             await episode_service.reflect_session(
                 messages=[
@@ -135,11 +135,11 @@ class TestEpisodePublisher:
 class TestIntentionPublisher:
     @pytest.mark.asyncio
     async def test_intention_fired_published_after_check(self, monkeypatch):
-        from palace.config import settings
-        from palace.intentions.service import IntentionService
+        from mypalace.config import settings
+        from mypalace.intentions.service import IntentionService
 
         # Fake an intention that matches a keyword trigger.
-        from palace.models import Intention
+        from mypalace.models import Intention
         fake_intention = MagicMock(spec=Intention)
         fake_intention.id = "int-1"
         fake_intention.user_id = "u1"
@@ -167,11 +167,11 @@ class TestIntentionPublisher:
         cm.__aenter__ = AsyncMock(return_value=db_mock)
         cm.__aexit__ = AsyncMock(return_value=None)
         monkeypatch.setattr(
-            "palace.intentions.service.async_session", MagicMock(return_value=cm),
+            "mypalace.intentions.service.async_session", MagicMock(return_value=cm),
         )
 
         monkeypatch.setattr(settings, "redis_url", None)
-        from palace.events.broker import broker
+        from mypalace.events.broker import broker
         svc = IntentionService()
         async with broker.subscribe(tenant_id="t1") as q:
             fired = await svc.check(
@@ -193,9 +193,9 @@ class TestArcPublisher:
     @pytest.mark.asyncio
     async def test_arc_synthesized_published_per_new_arc(self, monkeypatch):
         # Stub the LLM
-        from palace import llm as llm_module
-        from palace.arc_service import arc_service
-        from palace.config import settings
+        from mypalace import llm as llm_module
+        from mypalace.arc_service import arc_service
+        from mypalace.config import settings
         monkeypatch.setattr(
             llm_module.llm, "complete",
             AsyncMock(return_value=(
@@ -208,7 +208,7 @@ class TestArcPublisher:
 
         # Stub episode_service.get_recent and self.get_active.
         monkeypatch.setattr(
-            "palace.arc_service.episode_service.get_recent",
+            "mypalace.arc_service.episode_service.get_recent",
             AsyncMock(return_value=[]),
         )
         monkeypatch.setattr(arc_service, "get_active", AsyncMock(return_value=[]))
@@ -224,7 +224,7 @@ class TestArcPublisher:
         )
 
         monkeypatch.setattr(settings, "redis_url", None)
-        from palace.events.broker import broker
+        from mypalace.events.broker import broker
         async with broker.subscribe(tenant_id="t1") as q:
             await arc_service.synthesize_narratives(
                 user_id="u1", tenant_id="t1",

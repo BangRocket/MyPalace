@@ -1,5 +1,0 @@
-"""Read-through Redis cache (phase 3 slice 4)."""
-
-from palace.cache.client import cache
-
-__all__ = ["cache"]

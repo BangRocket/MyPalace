@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from palace.grpc._generated import palace_pb2
-from palace.grpc.arc_servicer import ArcServicer
+from mypalace.grpc._generated import mypalace_pb2
+from mypalace.grpc.arc_servicer import ArcServicer
 
 
 def _fake_arc(**overrides):
@@ -29,9 +29,9 @@ def _fake_arc(**overrides):
 @pytest.mark.asyncio
 async def test_synthesize_sync_returns_arcs():
     svc = ArcServicer()
-    with patch("palace.grpc.arc_servicer.arc_service.synthesize_narratives",
+    with patch("mypalace.grpc.arc_servicer.arc_service.synthesize_narratives",
                new=AsyncMock(return_value=[_fake_arc(id="a1")])):
-        req = palace_pb2.SynthesizeNarrativesRequest(user_id="u1", mode="sync")
+        req = mypalace_pb2.SynthesizeNarrativesRequest(user_id="u1", mode="sync")
         ctx = MagicMock()
         resp = await svc.SynthesizeNarratives(req, ctx)
         assert resp.WhichOneof("result") == "arcs"
@@ -43,13 +43,13 @@ async def test_synthesize_sync_returns_arcs():
 async def test_synthesize_async_returns_pending(monkeypatch):
     svc = ArcServicer()
     monkeypatch.setattr(
-        "palace.grpc.arc_servicer.settings.worker_queue_enabled", False,
+        "mypalace.grpc.arc_servicer.settings.worker_queue_enabled", False,
     )
     fake_job = MagicMock()
     fake_job.id = "job-2"
-    with patch("palace.grpc.arc_servicer.job_service.run_async",
+    with patch("mypalace.grpc.arc_servicer.job_service.run_async",
                new=AsyncMock(return_value=fake_job)):
-        req = palace_pb2.SynthesizeNarrativesRequest(user_id="u1", mode="async")
+        req = mypalace_pb2.SynthesizeNarrativesRequest(user_id="u1", mode="async")
         ctx = MagicMock()
         resp = await svc.SynthesizeNarratives(req, ctx)
         assert resp.WhichOneof("result") == "pending"
@@ -60,13 +60,13 @@ async def test_synthesize_async_returns_pending(monkeypatch):
 async def test_synthesize_async_with_worker_queue(monkeypatch):
     svc = ArcServicer()
     monkeypatch.setattr(
-        "palace.grpc.arc_servicer.settings.worker_queue_enabled", True,
+        "mypalace.grpc.arc_servicer.settings.worker_queue_enabled", True,
     )
     fake_job = MagicMock()
     fake_job.id = "job-q2"
-    with patch("palace.grpc.arc_servicer.enqueue_job",
+    with patch("mypalace.grpc.arc_servicer.enqueue_job",
                new=AsyncMock(return_value=fake_job)) as mock_enq:
-        req = palace_pb2.SynthesizeNarrativesRequest(user_id="u1", mode="async")
+        req = mypalace_pb2.SynthesizeNarrativesRequest(user_id="u1", mode="async")
         ctx = MagicMock()
         resp = await svc.SynthesizeNarratives(req, ctx)
         assert resp.WhichOneof("result") == "pending"
@@ -77,7 +77,7 @@ async def test_synthesize_async_with_worker_queue(monkeypatch):
 @pytest.mark.asyncio
 async def test_synthesize_invalid_mode():
     svc = ArcServicer()
-    req = palace_pb2.SynthesizeNarrativesRequest(user_id="u1", mode="weird")
+    req = mypalace_pb2.SynthesizeNarrativesRequest(user_id="u1", mode="weird")
     ctx = MagicMock()
     ctx.abort = AsyncMock(side_effect=Exception("aborted"))
     with pytest.raises(Exception, match="aborted"):
@@ -88,9 +88,9 @@ async def test_synthesize_invalid_mode():
 async def test_get_active_arcs():
     svc = ArcServicer()
     arcs = [_fake_arc(id="a1"), _fake_arc(id="a2")]
-    with patch("palace.grpc.arc_servicer.arc_service.get_active",
+    with patch("mypalace.grpc.arc_servicer.arc_service.get_active",
                new=AsyncMock(return_value=arcs)):
-        req = palace_pb2.GetActiveArcsRequest(user_id="u1", limit=10)
+        req = mypalace_pb2.GetActiveArcsRequest(user_id="u1", limit=10)
         ctx = MagicMock()
         resp = await svc.GetActiveArcs(req, ctx)
         assert [a.id for a in resp.arcs] == ["a1", "a2"]

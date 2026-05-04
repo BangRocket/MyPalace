@@ -167,33 +167,33 @@ def client(
     from contextlib import ExitStack, asynccontextmanager
 
     patches = [
-        patch("palace.api.memories.memory_service", mock_memory_service),
-        patch("palace.api.sessions.session_service", mock_session_service),
-        patch("palace.api.context.context_service", mock_context_service),
-        patch("palace.api.episodes.episode_service", mock_episode_service),
-        patch("palace.api.episodes.job_service", mock_job_service),
-        patch("palace.api.arcs.arc_service", mock_arc_service),
-        patch("palace.api.arcs.job_service", mock_job_service),
-        patch("palace.api.jobs.job_service", mock_job_service),
-        patch("palace.api.dynamics.dynamics_service", mock_dynamics_service),
-        patch("palace.api.maintenance.dynamics_service", mock_dynamics_service),
-        patch("palace.api.intentions.intention_service", mock_intention_service),
-        patch("palace.api.maintenance.intention_service", mock_intention_service),
-        patch("palace.api.retrieval.layered_retrieval_service", mock_layered_service),
-        patch("palace.api.memories.smart_ingestion_service", mock_ingestion_service),
-        patch("palace.api.admin.key_service", mock_key_service),
-        patch("palace.auth.key_service.key_service", mock_key_service),
-        patch("palace.auth.middleware.key_service", mock_key_service),
-        patch("palace.main.key_service", mock_key_service),
-        patch("palace.memory_service.memory_service", mock_memory_service),
-        patch("palace.episode_service.episode_service", mock_episode_service),
-        patch("palace.database.init_db", AsyncMock()),
+        patch("mypalace.api.memories.memory_service", mock_memory_service),
+        patch("mypalace.api.sessions.session_service", mock_session_service),
+        patch("mypalace.api.context.context_service", mock_context_service),
+        patch("mypalace.api.episodes.episode_service", mock_episode_service),
+        patch("mypalace.api.episodes.job_service", mock_job_service),
+        patch("mypalace.api.arcs.arc_service", mock_arc_service),
+        patch("mypalace.api.arcs.job_service", mock_job_service),
+        patch("mypalace.api.jobs.job_service", mock_job_service),
+        patch("mypalace.api.dynamics.dynamics_service", mock_dynamics_service),
+        patch("mypalace.api.maintenance.dynamics_service", mock_dynamics_service),
+        patch("mypalace.api.intentions.intention_service", mock_intention_service),
+        patch("mypalace.api.maintenance.intention_service", mock_intention_service),
+        patch("mypalace.api.retrieval.layered_retrieval_service", mock_layered_service),
+        patch("mypalace.api.memories.smart_ingestion_service", mock_ingestion_service),
+        patch("mypalace.api.admin.key_service", mock_key_service),
+        patch("mypalace.auth.key_service.key_service", mock_key_service),
+        patch("mypalace.auth.middleware.key_service", mock_key_service),
+        patch("mypalace.main.key_service", mock_key_service),
+        patch("mypalace.memory_service.memory_service", mock_memory_service),
+        patch("mypalace.episode_service.episode_service", mock_episode_service),
+        patch("mypalace.database.init_db", AsyncMock()),
     ]
     with ExitStack() as stack:
         for p in patches:
             stack.enter_context(p)
 
-        from palace.main import app
+        from mypalace.main import app
 
         @asynccontextmanager
         async def dummy_lifespan(app):

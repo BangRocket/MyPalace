@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from palace.database import LATEST_ALEMBIC_REVISION, _ensure_alembic_stamp
+from mypalace.database import LATEST_ALEMBIC_REVISION, _ensure_alembic_stamp
 
 
 @pytest.mark.asyncio
@@ -72,9 +72,9 @@ async def test_stamp_warns_on_outdated_revision(caplog):
 @pytest.mark.asyncio
 async def test_init_db_calls_stamp():
     """init_db should both create tables and stamp."""
-    with patch("palace.database._ensure_alembic_stamp",
+    with patch("mypalace.database._ensure_alembic_stamp",
                new=AsyncMock()) as mock_stamp, \
-         patch("palace.database.engine") as mock_engine:
+         patch("mypalace.database.engine") as mock_engine:
         # engine.begin() returns an async context manager yielding a connection
         conn = MagicMock()
         conn.run_sync = AsyncMock()
@@ -83,7 +83,7 @@ async def test_init_db_calls_stamp():
         ctx.__aexit__ = AsyncMock(return_value=None)
         mock_engine.begin = MagicMock(return_value=ctx)
 
-        from palace.database import init_db
+        from mypalace.database import init_db
         await init_db()
 
         conn.run_sync.assert_awaited_once()  # SQLModel.metadata.create_all

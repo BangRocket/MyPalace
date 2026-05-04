@@ -8,13 +8,13 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from palace.api.portability import EXPORTABLE, _coerce_timestamps, _row_to_dict
+from mypalace.api.portability import EXPORTABLE, _coerce_timestamps, _row_to_dict
 
 
 class TestRowToDict:
     def test_isoformats_datetimes(self):
         # Use a real SQLModel row (Tenant) to avoid __table__ mocking gymnastics.
-        from palace.models import Tenant
+        from mypalace.models import Tenant
         row = Tenant(id="t1", label="Test", created_at=datetime(2026, 5, 4, 12, 0, tzinfo=UTC))
         out = _row_to_dict(row)
         assert out["id"] == "t1"
@@ -24,7 +24,7 @@ class TestRowToDict:
 
 class TestCoerceTimestamps:
     def test_iso_strings_become_datetimes(self):
-        from palace.models import Memory
+        from mypalace.models import Memory
         rec = {
             "id": "m1",
             "tenant_id": "t1",
@@ -37,7 +37,7 @@ class TestCoerceTimestamps:
         assert out["content"] == "hello"  # unchanged
 
     def test_non_iso_strings_kept_as_string(self):
-        from palace.models import Memory
+        from mypalace.models import Memory
         out = _coerce_timestamps({"content": "hello"}, Memory)
         assert out["content"] == "hello"
 
@@ -64,7 +64,7 @@ class TestExportRoute:
         assert r.status_code == 422
 
     def test_export_streams_ndjson_for_empty_tenant(self, client, monkeypatch):
-        from palace.api import portability as port_mod
+        from mypalace.api import portability as port_mod
 
         async def fake_stream(tenant_id):
             yield (json.dumps(
@@ -95,7 +95,7 @@ class TestImportRoute:
         assert r.status_code == 422
 
     def test_import_calls_ingest_with_target(self, client, monkeypatch):
-        from palace.api import portability as port_mod
+        from mypalace.api import portability as port_mod
 
         captured: dict = {}
 
@@ -131,7 +131,7 @@ class TestImportRoute:
 class TestIngestRecords:
     @pytest.mark.asyncio
     async def test_unknown_type_skipped(self, monkeypatch):
-        from palace.api import portability as port_mod
+        from mypalace.api import portability as port_mod
 
         # Stub session — no real Tenant lookup.
         existing = MagicMock()
@@ -162,7 +162,7 @@ class TestIngestRecords:
     @pytest.mark.asyncio
     async def test_target_tenant_overrides_source(self, monkeypatch):
         """A record with tenant_id='wrong' must end up under target_tenant."""
-        from palace.api import portability as port_mod
+        from mypalace.api import portability as port_mod
 
         merged: list[Any] = []
 
@@ -199,7 +199,7 @@ class TestIngestRecords:
 
     @pytest.mark.asyncio
     async def test_malformed_json_counted_as_skipped(self, monkeypatch):
-        from palace.api import portability as port_mod
+        from mypalace.api import portability as port_mod
 
         existing = MagicMock()
         existing.scalar_one_or_none.return_value = MagicMock()

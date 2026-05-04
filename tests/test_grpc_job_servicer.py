@@ -8,8 +8,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from palace.grpc._generated import palace_pb2
-from palace.grpc.job_servicer import JobServicer
+from mypalace.grpc._generated import mypalace_pb2
+from mypalace.grpc.job_servicer import JobServicer
 
 
 def _fake_job(**overrides):
@@ -29,9 +29,9 @@ def _fake_job(**overrides):
 async def test_get_job():
     svc = JobServicer()
     fake = _fake_job(id="job-1")
-    with patch("palace.grpc.job_servicer.job_service.get",
+    with patch("mypalace.grpc.job_servicer.job_service.get",
                new=AsyncMock(return_value=fake)):
-        req = palace_pb2.GetJobRequest(job_id="job-1")
+        req = mypalace_pb2.GetJobRequest(job_id="job-1")
         ctx = MagicMock()
         resp = await svc.GetJob(req, ctx)
         assert resp.job.id == "job-1"
@@ -43,9 +43,9 @@ async def test_get_job():
 @pytest.mark.asyncio
 async def test_get_job_404():
     svc = JobServicer()
-    with patch("palace.grpc.job_servicer.job_service.get",
+    with patch("mypalace.grpc.job_servicer.job_service.get",
                new=AsyncMock(return_value=None)):
-        req = palace_pb2.GetJobRequest(job_id="missing")
+        req = mypalace_pb2.GetJobRequest(job_id="missing")
         ctx = MagicMock()
         ctx.abort = AsyncMock(side_effect=Exception("aborted"))
         with pytest.raises(Exception, match="aborted"):
@@ -56,9 +56,9 @@ async def test_get_job_404():
 async def test_get_job_no_result():
     svc = JobServicer()
     fake = _fake_job(status="pending", completed_at=None, result_json=None)
-    with patch("palace.grpc.job_servicer.job_service.get",
+    with patch("mypalace.grpc.job_servicer.job_service.get",
                new=AsyncMock(return_value=fake)):
-        req = palace_pb2.GetJobRequest(job_id="job-1")
+        req = mypalace_pb2.GetJobRequest(job_id="job-1")
         ctx = MagicMock()
         resp = await svc.GetJob(req, ctx)
         assert resp.job.completed_at == ""

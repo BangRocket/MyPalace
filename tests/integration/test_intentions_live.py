@@ -57,8 +57,8 @@ async def test_fire_once_deletes_after_first_fire_live(http_client):
     assert len(r.json()["data"]) == 1
 
     # Confirm the intention row is gone.
-    from palace.database import async_session
-    from palace.models import Intention
+    from mypalace.database import async_session
+    from mypalace.models import Intention
 
     async with async_session() as db:
         result = await db.execute(
@@ -79,8 +79,8 @@ async def test_fire_once_deletes_after_first_fire_live(http_client):
 async def test_cleanup_expired_intentions_live(http_client):
     """Intentions with expires_at in the past are deleted by the cleanup
     endpoint."""
-    from palace.database import async_session
-    from palace.models import Intention
+    from mypalace.database import async_session
+    from mypalace.models import Intention
 
     user_id = "live-int-3"
     past = datetime.now(UTC) - timedelta(days=1)

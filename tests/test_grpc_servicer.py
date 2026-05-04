@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from palace.grpc._generated import palace_pb2
-from palace.grpc.memory_servicer import MemoryServicer
+from mypalace.grpc._generated import mypalace_pb2
+from mypalace.grpc.memory_servicer import MemoryServicer
 
 
 def _fake_memory(**overrides):
@@ -32,9 +32,9 @@ def _fake_memory(**overrides):
 async def test_create_memory_calls_service():
     svc = MemoryServicer()
     fake = _fake_memory(id="new-1", content="hi")
-    with patch("palace.grpc.memory_servicer.memory_service.create",
+    with patch("mypalace.grpc.memory_servicer.memory_service.create",
                new=AsyncMock(return_value=fake)) as mock_create:
-        req = palace_pb2.CreateMemoryRequest(
+        req = mypalace_pb2.CreateMemoryRequest(
             user_id="u1", content="hi", memory_type="semantic", importance=1.0,
         )
         ctx = MagicMock()
@@ -50,9 +50,9 @@ async def test_create_memory_calls_service():
 async def test_get_memory_returns_proto():
     svc = MemoryServicer()
     fake = _fake_memory(id="m9")
-    with patch("palace.grpc.memory_servicer.memory_service.get",
+    with patch("mypalace.grpc.memory_servicer.memory_service.get",
                new=AsyncMock(return_value=fake)):
-        req = palace_pb2.GetMemoryRequest(memory_id="m9")
+        req = mypalace_pb2.GetMemoryRequest(memory_id="m9")
         ctx = MagicMock()
         resp = await svc.GetMemory(req, ctx)
         assert resp.memory.id == "m9"
@@ -61,9 +61,9 @@ async def test_get_memory_returns_proto():
 @pytest.mark.asyncio
 async def test_get_memory_404_aborts():
     svc = MemoryServicer()
-    with patch("palace.grpc.memory_servicer.memory_service.get",
+    with patch("mypalace.grpc.memory_servicer.memory_service.get",
                new=AsyncMock(return_value=None)):
-        req = palace_pb2.GetMemoryRequest(memory_id="missing")
+        req = mypalace_pb2.GetMemoryRequest(memory_id="missing")
         ctx = MagicMock()
         ctx.abort = AsyncMock(side_effect=Exception("aborted"))
         with pytest.raises(Exception, match="aborted"):
@@ -73,9 +73,9 @@ async def test_get_memory_404_aborts():
 @pytest.mark.asyncio
 async def test_delete_memory_returns_deleted_true():
     svc = MemoryServicer()
-    with patch("palace.grpc.memory_servicer.memory_service.delete",
+    with patch("mypalace.grpc.memory_servicer.memory_service.delete",
                new=AsyncMock(return_value=True)):
-        req = palace_pb2.DeleteMemoryRequest(memory_id="m1")
+        req = mypalace_pb2.DeleteMemoryRequest(memory_id="m1")
         ctx = MagicMock()
         resp = await svc.DeleteMemory(req, ctx)
         assert resp.deleted is True
@@ -86,9 +86,9 @@ async def test_search_memories_packs_score_and_memory():
     svc = MemoryServicer()
     fake = _fake_memory(id="m1")
     results = [(fake, 0.87)]
-    with patch("palace.grpc.memory_servicer.memory_service.search",
+    with patch("mypalace.grpc.memory_servicer.memory_service.search",
                new=AsyncMock(return_value=results)):
-        req = palace_pb2.SearchMemoriesRequest(query="hello", limit=5)
+        req = mypalace_pb2.SearchMemoriesRequest(query="hello", limit=5)
         ctx = MagicMock()
         resp = await svc.SearchMemories(req, ctx)
         assert len(resp.results) == 1
@@ -100,9 +100,9 @@ async def test_search_memories_packs_score_and_memory():
 async def test_list_memories_returns_list():
     svc = MemoryServicer()
     items = [_fake_memory(id="m1"), _fake_memory(id="m2")]
-    with patch("palace.grpc.memory_servicer.memory_service.list_filtered",
+    with patch("mypalace.grpc.memory_servicer.memory_service.list_filtered",
                new=AsyncMock(return_value=items)):
-        req = palace_pb2.ListMemoriesRequest(limit=10)
+        req = mypalace_pb2.ListMemoriesRequest(limit=10)
         ctx = MagicMock()
         resp = await svc.ListMemories(req, ctx)
         assert [m.id for m in resp.memories] == ["m1", "m2"]
@@ -114,9 +114,9 @@ async def test_list_memories_returns_list():
 
 @pytest.mark.asyncio
 async def test_interceptor_passes_when_auth_disabled(monkeypatch):
-    from palace.grpc.auth_interceptor import AuthInterceptor
+    from mypalace.grpc.auth_interceptor import AuthInterceptor
 
-    monkeypatch.setattr("palace.grpc.auth_interceptor.settings.auth_disabled", True)
+    monkeypatch.setattr("mypalace.grpc.auth_interceptor.settings.auth_disabled", True)
     interceptor = AuthInterceptor()
 
     handler_call_details = MagicMock()
@@ -130,9 +130,9 @@ async def test_interceptor_passes_when_auth_disabled(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_interceptor_rejects_missing_key(monkeypatch):
-    from palace.grpc.auth_interceptor import AuthInterceptor
+    from mypalace.grpc.auth_interceptor import AuthInterceptor
 
-    monkeypatch.setattr("palace.grpc.auth_interceptor.settings.auth_disabled", False)
+    monkeypatch.setattr("mypalace.grpc.auth_interceptor.settings.auth_disabled", False)
     interceptor = AuthInterceptor()
 
     handler_call_details = MagicMock()

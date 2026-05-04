@@ -1,6 +1,6 @@
 """Unit tests for the route → scope mapping table."""
 
-from palace.auth.scopes import is_public, required_scope
+from mypalace.auth.scopes import is_public, required_scope
 
 
 class TestPublicPaths:
