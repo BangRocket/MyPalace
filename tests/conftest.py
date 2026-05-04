@@ -1,9 +1,14 @@
 """Shared test fixtures."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+import os
 
-import pytest
-from fastapi.testclient import TestClient
+# Disable auth before any palace.* import — settings is a module-level singleton.
+os.environ.setdefault("PALACE_AUTH_DISABLED", "true")
+
+from unittest.mock import AsyncMock, MagicMock, patch  # noqa: E402
+
+import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
 
 
 @pytest.fixture
@@ -121,6 +126,17 @@ def mock_ingestion_service():
 
 
 @pytest.fixture
+def mock_key_service():
+    mock = MagicMock()
+    mock.create_key = AsyncMock()
+    mock.lookup = AsyncMock(return_value=None)
+    mock.list_keys = AsyncMock(return_value=[])
+    mock.revoke = AsyncMock(return_value=True)
+    mock.bootstrap_if_needed = AsyncMock(return_value=False)
+    return mock
+
+
+@pytest.fixture
 def mock_intention_service():
     mock = MagicMock()
     mock.set = AsyncMock()
@@ -144,8 +160,11 @@ def client(
     mock_intention_service,
     mock_layered_service,
     mock_ingestion_service,
+    mock_key_service,
 ):
-    with (
+    from contextlib import ExitStack, asynccontextmanager
+
+    patches = [
         patch("palace.api.memories.memory_service", mock_memory_service),
         patch("palace.api.sessions.session_service", mock_session_service),
         patch("palace.api.context.context_service", mock_context_service),
@@ -160,11 +179,16 @@ def client(
         patch("palace.api.maintenance.intention_service", mock_intention_service),
         patch("palace.api.retrieval.layered_retrieval_service", mock_layered_service),
         patch("palace.api.memories.smart_ingestion_service", mock_ingestion_service),
+        patch("palace.api.admin.key_service", mock_key_service),
+        patch("palace.auth.key_service.key_service", mock_key_service),
+        patch("palace.main.key_service", mock_key_service),
         patch("palace.memory_service.memory_service", mock_memory_service),
         patch("palace.episode_service.episode_service", mock_episode_service),
         patch("palace.database.init_db", AsyncMock()),
-    ):
-        from contextlib import asynccontextmanager
+    ]
+    with ExitStack() as stack:
+        for p in patches:
+            stack.enter_context(p)
 
         from palace.main import app
 

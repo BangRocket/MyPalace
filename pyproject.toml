@@ -19,6 +19,7 @@ dependencies = [
     "numpy<2",         # torch 2.2.2 was built against numpy 1.x ABI
     "openai>=1.59",
     "structlog>=24.4",
+    "bcrypt>=4.1",
 ]
 
 [project.optional-dependencies]

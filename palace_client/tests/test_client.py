@@ -50,6 +50,62 @@ def make_client(handler) -> PalaceClient:
     return PalaceClient(base_url="http://palace.test", client=httpx_client)
 
 
+# ---- auth header (phase 3 slice 1) ----
+
+@pytest.mark.asyncio
+async def test_api_key_sent_as_x_palace_key_header():
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["headers"] = dict(request.headers)
+        return httpx.Response(200, json={"status": "ok"})
+
+    transport = httpx.MockTransport(handler)
+    httpx_client = httpx.AsyncClient(
+        transport=transport,
+        base_url="http://palace.test",
+        headers={"X-Palace-Key": "pk_live_abc123abc123abc123abc123abc1234"},
+    )
+    client = PalaceClient(base_url="http://palace.test", client=httpx_client)
+    await client.health()
+    assert captured["headers"].get("x-palace-key") == (
+        "pk_live_abc123abc123abc123abc123abc1234"
+    )
+    # Authorization header must NOT be set — Palace doesn't use Bearer
+    assert "authorization" not in captured["headers"]
+
+
+@pytest.mark.asyncio
+async def test_no_api_key_means_no_auth_header():
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["headers"] = dict(request.headers)
+        return httpx.Response(200, json={"status": "ok"})
+
+    client = make_client(handler)
+    await client.health()
+    assert "x-palace-key" not in captured["headers"]
+    assert "authorization" not in captured["headers"]
+
+
+@pytest.mark.asyncio
+async def test_palace_client_attaches_x_palace_key_when_constructing_own_client():
+    """When no httpx client is passed in, the constructor must attach
+    X-Palace-Key to the auto-built httpx.AsyncClient.headers."""
+    client = PalaceClient(
+        base_url="http://palace.test",
+        api_key="pk_live_xyz789xyz789xyz789xyz789xyz78901",
+    )
+    try:
+        assert client._client.headers.get("X-Palace-Key") == (
+            "pk_live_xyz789xyz789xyz789xyz789xyz78901"
+        )
+        assert "Authorization" not in client._client.headers
+    finally:
+        await client.aclose()
+
+
 # ---- memory CRUD ----
 
 @pytest.mark.asyncio
