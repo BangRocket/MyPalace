@@ -8,8 +8,10 @@ from palace_client.models import (
     Job,
     JobPending,
     Memory,
+    MemoryDynamics,
     Message,
     NarrativeArc,
+    ScoreBreakdown,
     ScoredMemory,
     Session,
     SessionWithMessages,
@@ -30,4 +32,6 @@ __all__ = [
     "NarrativeArc",
     "Job",
     "JobPending",
+    "MemoryDynamics",
+    "ScoreBreakdown",
 ]

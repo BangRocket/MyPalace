@@ -109,3 +109,33 @@ class JobPending(BaseModel):
     model_config = ConfigDict(extra="ignore")
     job_id: str
     status: str = "pending"
+
+
+class MemoryDynamics(BaseModel):
+    """FSRS-6 state for a memory (slice 3)."""
+
+    model_config = ConfigDict(extra="ignore")
+    memory_id: str
+    user_id: str
+    stability: float
+    difficulty: float
+    retrieval_strength: float
+    storage_strength: float
+    is_key: bool = False
+    importance_weight: float = 1.0
+    category: str | None = None
+    tags: dict[str, Any] | None = None
+    last_accessed_at: datetime | None = None
+    access_count: int = 0
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class ScoreBreakdown(BaseModel):
+    """Composite-score breakdown returned by /v1/memories/{id}/score."""
+
+    model_config = ConfigDict(extra="ignore")
+    composite_score: float
+    fsrs_score: float
+    retrievability: float
+    storage_strength: float

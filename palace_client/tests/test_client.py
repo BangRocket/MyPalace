@@ -564,3 +564,129 @@ async def test_get_job_404_raises_not_found():
     client = make_client(handler)
     with pytest.raises(PalaceNotFound):
         await client.get_job("missing")
+
+
+# ---- dynamics (slice 3) ----
+
+def fake_dynamics(memory_id: str = "m1", **overrides) -> dict:
+    base = {
+        "memory_id": memory_id,
+        "user_id": "u1",
+        "stability": 2.3065,
+        "difficulty": 2.118,
+        "retrieval_strength": 1.0,
+        "storage_strength": 0.5,
+        "is_key": False,
+        "importance_weight": 1.0,
+        "category": None,
+        "tags": None,
+        "last_accessed_at": "2026-05-03T19:33:40.210487+00:00",
+        "access_count": 1,
+        "created_at": "2026-05-03T19:33:40.210487+00:00",
+        "updated_at": "2026-05-03T19:33:40.210487+00:00",
+    }
+    base.update(overrides)
+    return base
+
+
+@pytest.mark.asyncio
+async def test_promote_memory():
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(200, json=make_envelope(fake_dynamics(access_count=2)))
+
+    client = make_client(handler)
+    from palace_client import MemoryDynamics
+    dyn = await client.promote_memory("m1", user_id="u1", grade=3)
+    assert "/v1/memories/m1/promote" in captured["url"]
+    assert captured["body"] == {
+        "user_id": "u1", "grade": 3, "signal_type": "used_in_response",
+    }
+    assert isinstance(dyn, MemoryDynamics)
+    assert dyn.memory_id == "m1"
+    assert dyn.access_count == 2
+
+
+@pytest.mark.asyncio
+async def test_demote_memory():
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(200, json=make_envelope(fake_dynamics()))
+
+    client = make_client(handler)
+    dyn = await client.demote_memory("m1", user_id="u1", reason="user_correction")
+    assert "/v1/memories/m1/demote" in captured["url"]
+    assert captured["body"] == {"user_id": "u1", "reason": "user_correction"}
+    assert dyn.memory_id == "m1"
+
+
+@pytest.mark.asyncio
+async def test_get_dynamics():
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["params"] = dict(request.url.params)
+        return httpx.Response(200, json=make_envelope(fake_dynamics()))
+
+    client = make_client(handler)
+    dyn = await client.get_dynamics("m1", user_id="u1")
+    assert "/v1/memories/m1/dynamics" in captured["url"]
+    assert captured["params"] == {"user_id": "u1"}
+    assert dyn.user_id == "u1"
+
+
+@pytest.mark.asyncio
+async def test_get_dynamics_404_raises_not_found():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"detail": "Dynamics not found"})
+
+    from palace_client import PalaceNotFound
+    client = make_client(handler)
+    with pytest.raises(PalaceNotFound):
+        await client.get_dynamics("missing", user_id="u1")
+
+
+@pytest.mark.asyncio
+async def test_score_memory():
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(200, json=make_envelope({
+            "composite_score": 0.79,
+            "fsrs_score": 0.65,
+            "retrievability": 0.82,
+            "storage_strength": 0.5,
+        }))
+
+    client = make_client(handler)
+    from palace_client import ScoreBreakdown
+    breakdown = await client.score_memory("m1", user_id="u1", semantic_score=0.87)
+    assert "/v1/memories/m1/score" in captured["url"]
+    assert captured["body"] == {"user_id": "u1", "semantic_score": 0.87}
+    assert isinstance(breakdown, ScoreBreakdown)
+    assert breakdown.composite_score == pytest.approx(0.79)
+
+
+@pytest.mark.asyncio
+async def test_prune_access_logs():
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["params"] = dict(request.url.params)
+        return httpx.Response(200, json=make_envelope({"deleted": 5}, count=5))
+
+    client = make_client(handler)
+    deleted = await client.prune_access_logs(retention_days=30)
+    assert "/v1/maintenance/prune-access-logs" in captured["url"]
+    assert captured["params"] == {"retention_days": "30"}
+    assert deleted == 5
