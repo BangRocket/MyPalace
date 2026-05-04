@@ -4,6 +4,53 @@ All notable changes to MyPalace are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and MyPalace adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] — 2026-05-04
+
+Production hardening. Three slices since 0.7.1.
+
+### Added — phase 8
+
+- **Deep health check (slice 1)** — `GET /health/deep` pings every
+  configured backend (Postgres, Qdrant, optional FalkorDB, optional
+  Redis) in parallel with per-check 2s timeout. Returns
+  `{"status": "ok"|"degraded", "backends": [...]}` with per-backend
+  latency + detail. 200 if all configured backends answered, 503 if
+  any failed. Optional backends (FalkorDB, Redis) are tagged
+  `configured=False` when their env vars are unset and excluded from
+  the overall verdict. Wired into the production compose container
+  healthcheck so `depends_on:condition:service_healthy` actually
+  means the backend is reachable.
+- **Boot-time config validation (slice 1)** — lifespan startup runs
+  `validate_config()` BEFORE `init_db()` and refuses to start the
+  service if any required env var is malformed (default tenant id,
+  bootstrap admin key format, async DB driver, rate-limit-without-redis,
+  log format, cache TTLs). Soft issues become structlog warnings
+  instead of crashes. Operators see a clean fatal message in the logs
+  rather than a confusing first-request traceback.
+- **DB query observability (slice 2)** — SQLAlchemy
+  `before_cursor_execute` / `after_cursor_execute` hooks emit per-query
+  timing into `palace_db_query_duration_seconds` (histogram), bump
+  `palace_db_queries_total` (counter), and gate a slow-query log line
+  + `palace_db_slow_queries_total` counter at the configurable
+  `PALACE_DB_SLOW_QUERY_MS` threshold (default 200ms). Operation
+  labels capped to a known set (SELECT/INSERT/UPDATE/DELETE/WITH/
+  BEGIN/COMMIT/ROLLBACK/SAVEPOINT/RELEASE/OTHER) so Prometheus label
+  cardinality stays bounded. Idempotent install — safe to call
+  multiple times on the same engine.
+- **Production docker-compose + deployment guide (slice 3)** —
+  `docker-compose.prod.yml` with mypalace + worker + Postgres + Qdrant
+  + FalkorDB (also serves as the cache/rate-limiter Redis since
+  FalkorDB is a Redis module). Healthchecks + `restart: unless-stopped`
+  on every container. Production-default knobs preset:
+  `PALACE_RATE_LIMIT_ENABLED=true`, `PALACE_WORKER_QUEUE_ENABLED=true`,
+  `PALACE_LOG_FORMAT=json`. Required vars (`PALACE_BOOTSTRAP_ADMIN_KEY`,
+  `POSTGRES_PASSWORD`) refuse to start the stack if missing.
+  `.env.example` rewritten to cover both local-dev defaults and the
+  production-required vars. `docs/deployment.md` walks through bring-up,
+  scaling (web + workers), observability (PromQL examples), backups
+  (pg_dump, Qdrant volume snapshot, per-tenant NDJSON export),
+  upgrades, common operational scenarios, and troubleshooting.
+
 ## [0.7.1] — 2026-05-04
 
 License metadata correction follow-up to 0.7.0.
