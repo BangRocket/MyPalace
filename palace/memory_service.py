@@ -18,6 +18,71 @@ def _not_expired_clause():
     return or_(Memory.expires_at.is_(None), Memory.expires_at > utcnow())
 
 
+async def _record_version(
+    *,
+    memory_id: str,
+    tenant_id: str,
+    user_id: str,
+    version_number: int,
+    content: str,
+    metadata: dict | None,
+    change_kind: str,
+    actor_key_id: str | None = None,
+) -> None:
+    """Phase 7 slice 2: append-only snapshot to memory_versions.
+
+    Best-effort: failures log + swallow so the primary write path stays
+    correct even if the version table has issues. Version history is
+    forensics, not source-of-truth.
+    """
+    import logging
+    log = logging.getLogger("palace.memory.versions")
+    try:
+        from palace.models import MemoryVersion
+        async with async_session() as db:
+            row = MemoryVersion(
+                memory_id=memory_id,
+                tenant_id=tenant_id,
+                user_id=user_id,
+                version_number=version_number,
+                content=content,
+                metadata_json=metadata,
+                change_kind=change_kind,
+                actor_key_id=actor_key_id,
+            )
+            db.add(row)
+            await db.commit()
+    except Exception:
+        log.warning(
+            "memory version snapshot failed (memory_id=%s)",
+            memory_id, exc_info=True,
+        )
+
+
+async def _next_version_number(memory_id: str) -> int:
+    """Compute the next version_number for a memory. New memories start
+    at 1; updates increment from the current max. Best-effort — returns
+    a fallback that's monotonic but may collide if multiple writers race
+    (acceptable for forensics-only data)."""
+    import logging
+
+    from sqlalchemy import func
+
+    from palace.models import MemoryVersion
+    log = logging.getLogger("palace.memory.versions")
+    try:
+        async with async_session() as db:
+            result = await db.execute(
+                select(func.max(MemoryVersion.version_number))
+                .where(MemoryVersion.memory_id == memory_id),
+            )
+            current = result.scalar_one_or_none() or 0
+            return int(current) + 1
+    except Exception:
+        log.warning("version number lookup failed (memory_id=%s)", memory_id, exc_info=True)
+        return 1
+
+
 class MemoryService:
     """Business logic for memory storage and retrieval."""
 
@@ -99,6 +164,16 @@ class MemoryService:
 
         # Phase 3 slice 4: bust cached search/context entries for this tenant.
         await self._bust_cache(tenant_id)
+        # Phase 7 slice 2: snapshot version 1.
+        await _record_version(
+            memory_id=memory.id,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            version_number=1,
+            content=content,
+            metadata=metadata,
+            change_kind="created",
+        )
         # Phase 4 slice 5: publish memory.created event.
         await self._publish_event("memory.created", tenant_id, {
             "memory_id": memory.id, "user_id": user_id,
@@ -288,6 +363,17 @@ class MemoryService:
             memory.updated_at = utcnow()
             await db.commit()
         await self._bust_cache(tenant_id)
+        # Phase 7 slice 2: snapshot the new content as a new version row.
+        version_n = await _next_version_number(memory_id)
+        await _record_version(
+            memory_id=memory_id,
+            tenant_id=tenant_id,
+            user_id=memory.user_id,
+            version_number=version_n,
+            content=memory.content,
+            metadata=memory.metadata_json,
+            change_kind="updated",
+        )
         await self._publish_event("memory.updated", tenant_id, {
             "memory_id": memory_id, "user_id": memory.user_id,
         })

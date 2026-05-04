@@ -343,6 +343,41 @@ class SmartIngestionService:
             reason=reason,
         ))
 
+        # Phase 7 slice 2: snapshot a 'superseded' version row on the OLD
+        # memory so its change history shows the moment it was retired.
+        # Best-effort: load old content, then record. Failures swallowed.
+        # Use a renamed import to avoid shadowing the module-level
+        # `async_session` symbol (UnboundLocalError otherwise).
+        try:
+            from sqlalchemy import select as _sa_select
+
+            from palace.database import async_session as _async_session
+            from palace.memory_service import _next_version_number, _record_version
+            from palace.models import Memory as _Memory
+
+            async with _async_session() as db:
+                result = await db.execute(
+                    _sa_select(_Memory).where(_Memory.id == superseded_id),
+                )
+                old_memory = result.scalar_one_or_none()
+            if old_memory is not None:
+                version_n = await _next_version_number(superseded_id)
+                await _record_version(
+                    memory_id=superseded_id,
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    version_number=version_n,
+                    content=old_memory.content,
+                    metadata=old_memory.metadata_json,
+                    change_kind="superseded",
+                )
+        except Exception:
+            import logging
+            logging.getLogger("palace.memory.versions").warning(
+                "version snapshot for supersession failed (old=%s, new=%s)",
+                superseded_id, new_id, exc_info=True,
+            )
+
         # Phase 4 slice 5: publish memory.superseded event.
         from palace.events.broker import broker
         await broker.publish(
