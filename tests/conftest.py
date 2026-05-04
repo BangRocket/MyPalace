@@ -108,6 +108,7 @@ def mock_layered_service():
                 "memories": [],
                 "episodes": [],
             },
+            "l3_graph_context": None,
             "recent_messages": None,
             "summary": None,
             "char_counts": {"l1": 0, "l2": 0},

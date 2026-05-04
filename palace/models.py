@@ -123,6 +123,13 @@ class ReflectionJob(SQLModel, table=True):
         sa_column=Column(JSONB, nullable=True),
     )
     error: str | None = None
+    # Phase 4 slice 3: worker lease + retry tracking.
+    leased_until: datetime | None = Field(default=None, sa_column=_ts_column(nullable=True))
+    attempts: int = Field(default=0)
+    payload_json: dict | None = Field(
+        default=None,
+        sa_column=Column(JSONB, nullable=True),
+    )
 
 
 class MemoryDynamics(SQLModel, table=True):

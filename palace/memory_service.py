@@ -78,6 +78,11 @@ class MemoryService:
 
         # Phase 3 slice 4: bust cached search/context entries for this tenant.
         await self._bust_cache(tenant_id)
+        # Phase 4 slice 5: publish memory.created event.
+        await self._publish_event("memory.created", tenant_id, {
+            "memory_id": memory.id, "user_id": user_id,
+            "agent_id": agent_id, "memory_type": memory_type,
+        })
         return memory
 
     @staticmethod
@@ -87,6 +92,11 @@ class MemoryService:
             return
         for ns in ("memories_search", "context_layered"):
             await _cache.invalidate_tenant_namespace(tenant_id, ns)
+
+    @staticmethod
+    async def _publish_event(event_type: str, tenant_id: str, payload: dict) -> None:
+        from palace.events.broker import broker
+        await broker.publish(event_type, tenant_id, payload)
 
     async def create_batch(
         self,
@@ -219,6 +229,9 @@ class MemoryService:
             memory.updated_at = utcnow()
             await db.commit()
         await self._bust_cache(tenant_id)
+        await self._publish_event("memory.updated", tenant_id, {
+            "memory_id": memory_id, "user_id": memory.user_id,
+        })
         return memory
 
     async def delete(
@@ -242,6 +255,9 @@ class MemoryService:
 
         await vector_store.delete(memory_id, tenant_id=tenant_id)
         await self._bust_cache(tenant_id)
+        await self._publish_event("memory.deleted", tenant_id, {
+            "memory_id": memory_id,
+        })
         return True
 
     async def delete_for_user(

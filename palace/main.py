@@ -8,6 +8,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from palace.api import admin, arcs, context, episodes, jobs, memories, sessions, tenants
 from palace.api import dynamics as dynamics_api
+from palace.api import events as events_api
 from palace.api import graph as graph_api
 from palace.api import intentions as intentions_api
 from palace.api import maintenance as maintenance_api
@@ -19,6 +20,11 @@ from palace.database import async_session, init_db
 from palace.episode_service import episode_service
 from palace.memory_service import memory_service
 from palace.models import Tenant
+from palace.observability.logging import configure_logging
+from palace.observability.metrics import metrics_response
+from palace.observability.middleware import ObservabilityMiddleware
+from palace.observability.tracing import configure_tracing
+from palace.ratelimit.middleware import RateLimitMiddleware
 
 
 async def _ensure_default_tenant() -> None:
@@ -39,6 +45,8 @@ async def _ensure_default_tenant() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup: create tables and init vector collections."""
+    configure_logging()
+    configure_tracing(app)
     await init_db()
     await _ensure_default_tenant()
     await memory_service.init(tenant_id=settings.default_tenant_id)
@@ -64,12 +72,24 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Order matters (Starlette is inside-out: last added = outermost):
+#   ObservabilityMiddleware (outermost) — counts/timing/request_id even on 401/429
+#   AuthMiddleware                       — populates request.state.auth
+#   RateLimitMiddleware (innermost)      — needs auth context to bucket
+app.add_middleware(RateLimitMiddleware)
 app.add_middleware(AuthMiddleware)
+app.add_middleware(ObservabilityMiddleware)
 
 
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "palace-memory"}
+
+
+@app.get("/metrics", include_in_schema=False)
+async def metrics():
+    """Prometheus exposition endpoint. Public — k8s scrapers need it."""
+    return metrics_response()
 
 
 app.include_router(admin.router, prefix="/v1/admin", tags=["admin"])
@@ -90,3 +110,4 @@ app.include_router(intentions_api.users_router, prefix="/v1/users", tags=["inten
 app.include_router(maintenance_api.router, prefix="/v1/maintenance", tags=["maintenance"])
 app.include_router(retrieval_api.router, prefix="/v1/context", tags=["retrieval"])
 app.include_router(graph_api.router, prefix="/v1/graph", tags=["graph"])
+app.include_router(events_api.router, prefix="/v1", tags=["events"])

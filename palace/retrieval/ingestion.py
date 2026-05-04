@@ -343,6 +343,16 @@ class SmartIngestionService:
             reason=reason,
         ))
 
+        # Phase 4 slice 5: publish memory.superseded event.
+        from palace.events.broker import broker
+        await broker.publish(
+            "memory.superseded", tenant_id,
+            {
+                "superseded_id": superseded_id, "new_id": new_id,
+                "user_id": user_id, "reason": reason,
+            },
+        )
+
         return row
 
     # ------------------------------------------------------------------ #

@@ -106,9 +106,133 @@ curl -X POST http://localhost:8000/v1/admin/keys \
 
 The bootstrap admin key (from `PALACE_BOOTSTRAP_ADMIN_KEY`) is a cross-tenant key by default.
 
-### Migration story
+### Migrations (phase 4 slice 1)
 
-There is no Alembic yet — `init_db()` creates the schema on startup. Slice 6 (publish) introduces Alembic with one consolidated phase-3 migration. If you have a pre-phase-3 Palace deployment with data, contact the maintainers.
+Alembic now manages schema. `init_db()` still creates tables on first boot for zero-config dev, AND stamps the latest revision so future `alembic upgrade head` calls know where to start.
+
+```bash
+# Fresh install — nothing to do; lifespan startup handles it.
+.venv/bin/uvicorn palace.main:app
+
+# Pre-phase-4 install with existing data — stamp once, then upgrade as usual:
+.venv/bin/alembic stamp 2026_05_04_0001_baseline
+.venv/bin/alembic upgrade head
+
+# Day-to-day after a new migration lands:
+.venv/bin/alembic upgrade head
+
+# Generate a new migration from model changes:
+.venv/bin/alembic revision --autogenerate -m "add foo column"
+```
+
+DB URL is read from `PALACE_DATABASE_URL` (no need to set `sqlalchemy.url` in `alembic.ini`).
+
+---
+
+## Observability (phase 4 slice 2)
+
+### Prometheus metrics
+
+`/metrics` exposes Prometheus exposition format. Always on, always public (k8s scrapers need that — lock down via your ingress if necessary).
+
+Counters:
+- `palace_http_requests_total{method, route, status_class}`
+- `palace_http_request_duration_seconds{method, route}` (histogram)
+- `palace_cache_hits_total{namespace}`, `palace_cache_misses_total{namespace}`
+- `palace_graph_writes_total{kind}`, `palace_graph_failures_total`
+- `palace_jobs_total{kind, outcome}` (populated by phase-4 slice 3)
+
+Routes are normalized — UUIDs and long IDs become `{id}` so Prometheus label cardinality stays bounded.
+
+### OpenTelemetry traces
+
+Optional. Set `PALACE_OTLP_ENDPOINT=http://otel-collector:4317` and install the optional extra:
+
+```bash
+pip install "palace-memory[otel]"
+```
+
+Auto-instruments FastAPI + httpx. Service name defaults to `palace-memory` (override via `PALACE_OTLP_SERVICE_NAME`). No-op if either the env var is unset or the SDK isn't installed.
+
+### Structured logs
+
+`structlog` configured at lifespan startup. Two modes via `PALACE_LOG_FORMAT`:
+- `pretty` (default) — colored console output, dev-friendly
+- `json` — newline-delimited JSON, production-ready
+
+Every request gets a `request_id` (read from `X-Request-ID` header if present, else a fresh uuid4). It's bound to structlog's contextvars so every log line in the request scope carries it. The same `X-Request-ID` is echoed back on the response.
+
+---
+
+## Background workers (phase 4 slice 3)
+
+Postgres-backed job queue using `SELECT ... FOR UPDATE SKIP LOCKED`. Built-in handlers cover `reflection` (episode reflection from a session) and `synthesis` (narrative arc rollup). The web process can opt to enqueue jobs and let a separate worker process pick them up.
+
+```bash
+# In one terminal: the web server
+.venv/bin/uvicorn palace.main:app --port 8000
+
+# In another: one or more workers
+.venv/bin/python -m palace.workers.runner
+# (Run multiple — SKIP LOCKED gives them safe concurrency)
+```
+
+### Knobs
+
+- `PALACE_WORKER_POLL_INTERVAL=1.0` — seconds between polls when idle
+- `PALACE_WORKER_LEASE_SECONDS=60` — max time a worker holds a claim before another can re-take it
+- `PALACE_WORKER_MAX_ATTEMPTS=3` — failures past this mark `status=failed`
+
+### Custom handlers
+
+```python
+from palace.workers import register_handler
+
+async def my_handler(payload: dict, tenant_id: str) -> dict:
+    return {"processed": payload}
+
+register_handler("my_kind", my_handler)
+# Then enqueue:
+from palace.workers import enqueue
+await enqueue(kind="my_kind", user_id="u1", payload={"x": 1}, tenant_id="default")
+```
+
+The runner picks up `my_kind` automatically once the registry is populated.
+
+---
+
+## Rate limits (phase 4 slice 4)
+
+Optional sliding-window rate limiter, scoped to (tenant, key, user). Requires Redis.
+
+```bash
+export PALACE_RATE_LIMIT_ENABLED=true
+export PALACE_REDIS_URL=redis://localhost:6379
+export PALACE_RATE_LIMIT_DEFAULT=120     # req/min for most endpoints
+export PALACE_RATE_LIMIT_SEARCH=60       # tighter bucket for /search + /context
+```
+
+Disabled by default. When disabled, the middleware is a fast no-op. When enabled but Redis is unreachable, it **fails open** (logs a warning, lets the request through) — Palace stays available even when the limiter can't.
+
+### Bypass with `unlimited` scope
+
+Trusted server-to-server keys can opt out by adding the `unlimited` scope at issuance time:
+
+```bash
+curl -X POST http://localhost:8000/v1/admin/keys \
+  -H "X-Palace-Key: $ADMIN_KEY" \
+  -d '{"label":"trusted-svc","scopes":["read","write","unlimited"]}'
+```
+
+### Response shape on 429
+
+```http
+HTTP/1.1 429 Too Many Requests
+Retry-After: 60
+Content-Type: application/json
+
+{"error": {"code": "rate_limited", "message": "Too many requests in 60s window: 121/120", "retry_after_seconds": 60}}
+```
 
 ---
 

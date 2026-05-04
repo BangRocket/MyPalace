@@ -58,5 +58,38 @@ class Settings(BaseSettings):
     grpc_port: int | None = Field(default=None, validation_alias="PALACE_GRPC_PORT")
     grpc_host: str = Field(default="0.0.0.0", validation_alias="PALACE_GRPC_HOST")
 
+    # Observability (phase 4 slice 2)
+    otlp_endpoint: str | None = Field(
+        default=None, validation_alias="PALACE_OTLP_ENDPOINT",
+    )
+    otlp_service_name: str = Field(
+        default="palace-memory", validation_alias="PALACE_OTLP_SERVICE_NAME",
+    )
+    log_format: str = Field(
+        default="pretty", validation_alias="PALACE_LOG_FORMAT",
+    )  # "pretty" or "json"
+
+    # Background workers (phase 4 slice 3)
+    worker_poll_interval: float = Field(
+        default=1.0, validation_alias="PALACE_WORKER_POLL_INTERVAL",
+    )
+    worker_lease_seconds: int = Field(
+        default=60, validation_alias="PALACE_WORKER_LEASE_SECONDS",
+    )
+    worker_max_attempts: int = Field(
+        default=3, validation_alias="PALACE_WORKER_MAX_ATTEMPTS",
+    )
+
+    # Rate limits (phase 4 slice 4) — enabled = require Redis.
+    rate_limit_enabled: bool = Field(
+        default=False, validation_alias="PALACE_RATE_LIMIT_ENABLED",
+    )
+    rate_limit_default_per_min: int = Field(
+        default=120, validation_alias="PALACE_RATE_LIMIT_DEFAULT",
+    )
+    rate_limit_search_per_min: int = Field(
+        default=60, validation_alias="PALACE_RATE_LIMIT_SEARCH",
+    )
+
 
 settings = Settings()

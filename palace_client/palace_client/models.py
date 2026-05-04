@@ -197,6 +197,9 @@ class LayeredContext(BaseModel):
     model_config = ConfigDict(extra="ignore")
     l1_user_profile: dict[str, Any] = Field(default_factory=dict)
     l2_relevant_context: dict[str, Any] = Field(default_factory=dict)
+    # Phase 4 slice 6: present when caller passed include_graph=True AND
+    # the server has the graph layer enabled. None otherwise.
+    l3_graph_context: dict[str, Any] | None = None
     recent_messages: list[dict[str, Any]] | None = None
     summary: str | None = None
     char_counts: dict[str, int] = Field(default_factory=dict)
