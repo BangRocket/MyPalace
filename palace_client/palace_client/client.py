@@ -8,6 +8,8 @@ from palace_client.exceptions import PalaceError, PalaceNotFound, PalaceTranspor
 from palace_client.models import (
     Context,
     Episode,
+    FiredIntention,
+    Intention,
     Job,
     JobPending,
     Memory,
@@ -435,6 +437,83 @@ class PalaceClient:
             "POST", "/v1/maintenance/prune-access-logs",
             params={"retention_days": retention_days},
         )
+        data = self._data(envelope) or {}
+        return int(data.get("deleted", 0))
+
+    # ---- intentions (slice 4) ----
+
+    async def set_intention(
+        self,
+        user_id: str,
+        content: str,
+        trigger_conditions: dict,
+        agent_id: str | None = None,
+        expires_at: Any | None = None,
+        source_memory_id: str | None = None,
+        priority: int = 0,
+        fire_once: bool = True,
+    ) -> Intention:
+        body: dict[str, Any] = {
+            "user_id": user_id,
+            "content": content,
+            "trigger_conditions": trigger_conditions,
+            "priority": priority,
+            "fire_once": fire_once,
+        }
+        if agent_id is not None:
+            body["agent_id"] = agent_id
+        if expires_at is not None:
+            body["expires_at"] = (
+                expires_at.isoformat() if hasattr(expires_at, "isoformat") else expires_at
+            )
+        if source_memory_id is not None:
+            body["source_memory_id"] = source_memory_id
+        envelope = await self._request("POST", "/v1/intentions", json=body)
+        return Intention.model_validate(self._data(envelope))
+
+    async def check_intentions(
+        self,
+        user_id: str,
+        message: str,
+        context: dict | None = None,
+        agent_id: str | None = None,
+    ) -> list[FiredIntention]:
+        body: dict[str, Any] = {"user_id": user_id, "message": message}
+        if context is not None:
+            body["context"] = context
+        if agent_id is not None:
+            body["agent_id"] = agent_id
+        envelope = await self._request("POST", "/v1/intentions/check", json=body)
+        return [FiredIntention.model_validate(f) for f in self._data(envelope) or []]
+
+    async def format_intentions(
+        self,
+        intentions: list[dict],
+        max: int = 3,
+    ) -> str:
+        body = {"intentions": intentions, "max": max}
+        envelope = await self._request("POST", "/v1/intentions/format", json=body)
+        data = self._data(envelope) or {}
+        return str(data.get("text", ""))
+
+    async def list_intentions(
+        self,
+        user_id: str,
+        fired: str = "all",
+        limit: int = 50,
+    ) -> list[Intention]:
+        envelope = await self._request(
+            "GET", f"/v1/users/{user_id}/intentions",
+            params={"fired": fired, "limit": limit},
+        )
+        return [Intention.model_validate(i) for i in self._data(envelope) or []]
+
+    async def delete_intention(self, intention_id: str) -> None:
+        await self._request("DELETE", f"/v1/intentions/{intention_id}")
+        return None
+
+    async def cleanup_expired_intentions(self) -> int:
+        envelope = await self._request("POST", "/v1/maintenance/cleanup-intentions")
         data = self._data(envelope) or {}
         return int(data.get("deleted", 0))
 

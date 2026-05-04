@@ -353,16 +353,49 @@ class RoutedMemoryManager:
         )
 
     # ---- Intentions (slice 4) ----
+    # Endpoints: set_intention, check_intentions, format_intentions_for_prompt
+    # all have remote equivalents in slice 4. Trigger matching is deterministic
+    # (no LLM) — purely structural keyword/topic/time/context matching.
 
-    def set_intention(self, *args, **kw):
-        return _EmbeddedMM.get_instance().set_intention(*args, **kw)
+    async def set_intention(
+        self,
+        user_id,
+        content,
+        trigger_conditions,
+        expires_at=None,
+        source_memory_id=None,
+    ):
+        if USE_PALACE_SERVICE:
+            intention = await _remote().set_intention(
+                user_id=user_id,
+                content=content,
+                trigger_conditions=trigger_conditions,
+                expires_at=expires_at,
+                source_memory_id=source_memory_id,
+            )
+            return intention.id
+        return await _maybe_await(
+            _EmbeddedMM.get_instance().set_intention(
+                user_id, content, trigger_conditions, expires_at, source_memory_id,
+            ),
+        )
 
-    def check_intentions(self, *args, **kw):
-        return _EmbeddedMM.get_instance().check_intentions(*args, **kw)
+    async def check_intentions(self, user_id, message, context=None):
+        if USE_PALACE_SERVICE:
+            fired = await _remote().check_intentions(
+                user_id=user_id, message=message, context=context,
+            )
+            # Embedded contract returns list[dict]; mirror that.
+            return [f.model_dump() for f in fired]
+        return await _maybe_await(
+            _EmbeddedMM.get_instance().check_intentions(user_id, message, context),
+        )
 
-    def format_intentions_for_prompt(self, fired_intentions):
-        return _EmbeddedMM.get_instance().format_intentions_for_prompt(
-            fired_intentions,
+    async def format_intentions_for_prompt(self, fired_intentions):
+        if USE_PALACE_SERVICE:
+            return await _remote().format_intentions(intentions=fired_intentions)
+        return await _maybe_await(
+            _EmbeddedMM.get_instance().format_intentions_for_prompt(fired_intentions),
         )
 
     # ---- Reflection (slice 4) ----

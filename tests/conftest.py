@@ -87,6 +87,18 @@ def mock_dynamics_service():
 
 
 @pytest.fixture
+def mock_intention_service():
+    mock = MagicMock()
+    mock.set = AsyncMock()
+    mock.check = AsyncMock(return_value=[])
+    mock.format_for_prompt = MagicMock(return_value="")
+    mock.list_for_user = AsyncMock(return_value=[])
+    mock.delete = AsyncMock(return_value=True)
+    mock.cleanup_expired = AsyncMock(return_value=0)
+    return mock
+
+
+@pytest.fixture
 def client(
     mock_memory_service,
     mock_session_service,
@@ -95,6 +107,7 @@ def client(
     mock_arc_service,
     mock_job_service,
     mock_dynamics_service,
+    mock_intention_service,
 ):
     with (
         patch("palace.api.memories.memory_service", mock_memory_service),
@@ -107,6 +120,8 @@ def client(
         patch("palace.api.jobs.job_service", mock_job_service),
         patch("palace.api.dynamics.dynamics_service", mock_dynamics_service),
         patch("palace.api.maintenance.dynamics_service", mock_dynamics_service),
+        patch("palace.api.intentions.intention_service", mock_intention_service),
+        patch("palace.api.maintenance.intention_service", mock_intention_service),
         patch("palace.memory_service.memory_service", mock_memory_service),
         patch("palace.episode_service.episode_service", mock_episode_service),
         patch("palace.database.init_db", AsyncMock()),
