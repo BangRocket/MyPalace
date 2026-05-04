@@ -75,8 +75,8 @@ async def test_demote_records_failure_log_live(http_client):
     assert r.status_code == 200, r.text
 
     # Read access logs directly to confirm grade=1 was recorded.
-    from palace.database import async_session
-    from palace.models import MemoryAccessLog
+    from mypalace.database import async_session
+    from mypalace.models import MemoryAccessLog
 
     async with async_session() as db:
         result = await db.execute(
@@ -94,8 +94,8 @@ async def test_demote_records_failure_log_live(http_client):
 async def test_prune_access_logs_live(http_client):
     """Old access logs should be deleted by the prune endpoint."""
     # Seed dynamics + an old log directly via the DB.
-    from palace.database import async_session
-    from palace.models import MemoryAccessLog, MemoryDynamics
+    from mypalace.database import async_session
+    from mypalace.models import MemoryAccessLog, MemoryDynamics
 
     mem_id = "live-prune-mem-1"
     user_id = "live-prune-user-1"

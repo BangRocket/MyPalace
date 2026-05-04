@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 from fastapi import HTTPException
 
-from palace.auth.context import AuthContext
-from palace.auth.tenant import is_valid_tenant_id, validate_tenant_id
+from mypalace.auth.context import AuthContext
+from mypalace.auth.tenant import is_valid_tenant_id, validate_tenant_id
 
 
 class TestValidateTenantId:
@@ -79,10 +79,10 @@ class TestResolveTenant:
             key_id="k1", label="admin", scopes=frozenset({"admin"}), tenant_id=None,
         )
         # In tests PALACE_DEFAULT_TENANT_ID="test" (set in conftest)
-        from palace.config import settings
+        from mypalace.config import settings
         assert ctx.resolve_tenant() == settings.default_tenant_id
 
     def test_all_scopes_helper_inherits_default_tenant(self):
         ctx = AuthContext.all_scopes()
-        from palace.config import settings
+        from mypalace.config import settings
         assert ctx.tenant_id == settings.default_tenant_id

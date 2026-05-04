@@ -1,19 +1,19 @@
 """Root pytest conftest.
 
-Fixes a namespace-package shadow caused by the palace_client subpackage
+Fixes a namespace-package shadow caused by the mypalace_client subpackage
 layout. The repo has two editable-installed packages:
 
-    palace          -> /Volumes/Storage/Code/Palace/palace
-    palace_client   -> /Volumes/Storage/Code/Palace/palace_client/palace_client
+    mypalace          -> /Volumes/Storage/Code/Palace/mypalace
+    mypalace_client   -> /Volumes/Storage/Code/Palace/mypalace_client/mypalace_client
 
 Pytest prepends the project root to sys.path. Python's PathFinder then
-discovers the OUTER directory `palace_client/` (which has no __init__.py)
-as a PEP 420 namespace package and resolves `import palace_client` to
+discovers the OUTER directory `mypalace_client/` (which has no __init__.py)
+as a PEP 420 namespace package and resolves `import mypalace_client` to
 that empty shadow rather than to the inner installed package. The
 editable-install meta-path finders are appended (not prepended) to
 sys.meta_path, so PathFinder always wins.
 
-Symptom: `from palace_client import PalaceClient` raises ImportError
+Symptom: `from mypalace_client import PalaceClient` raises ImportError
 because the namespace shadow has no PalaceClient attribute.
 
 Fix: move the editable-install finders ahead of PathFinder so the

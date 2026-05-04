@@ -6,13 +6,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from palace.ratelimit.limiter import LimitDecision, RateLimiter
-from palace.ratelimit.middleware import _bucket_for
+from mypalace.ratelimit.limiter import LimitDecision, RateLimiter
+from mypalace.ratelimit.middleware import _bucket_for
 
 
 class TestBucketFor:
     def test_search_paths_use_search_bucket(self):
-        from palace.config import settings
+        from mypalace.config import settings
         bucket, limit = _bucket_for("/v1/memories/search")
         assert bucket == "search"
         assert limit == settings.rate_limit_search_per_min
@@ -23,7 +23,7 @@ class TestBucketFor:
         assert bucket == "search"
 
     def test_other_paths_use_default(self):
-        from palace.config import settings
+        from mypalace.config import settings
         bucket, limit = _bucket_for("/v1/memories")
         assert bucket == "default"
         assert limit == settings.rate_limit_default_per_min
@@ -31,19 +31,19 @@ class TestBucketFor:
 
 class TestEnabledGate:
     def test_disabled_when_flag_false(self, monkeypatch):
-        from palace.config import settings
+        from mypalace.config import settings
         monkeypatch.setattr(settings, "rate_limit_enabled", False)
         monkeypatch.setattr(settings, "redis_url", "redis://x")
         assert RateLimiter().enabled is False
 
     def test_disabled_when_no_redis(self, monkeypatch):
-        from palace.config import settings
+        from mypalace.config import settings
         monkeypatch.setattr(settings, "rate_limit_enabled", True)
         monkeypatch.setattr(settings, "redis_url", None)
         assert RateLimiter().enabled is False
 
     def test_enabled_with_both(self, monkeypatch):
-        from palace.config import settings
+        from mypalace.config import settings
         monkeypatch.setattr(settings, "rate_limit_enabled", True)
         monkeypatch.setattr(settings, "redis_url", "redis://x")
         assert RateLimiter().enabled is True
@@ -52,7 +52,7 @@ class TestEnabledGate:
 class TestCheckBypassesWhenDisabled:
     @pytest.mark.asyncio
     async def test_disabled_always_allows(self, monkeypatch):
-        from palace.config import settings
+        from mypalace.config import settings
         monkeypatch.setattr(settings, "rate_limit_enabled", False)
 
         limiter = RateLimiter()
@@ -66,7 +66,7 @@ class TestCheckBypassesWhenDisabled:
 class TestCheckEnforcesLimit:
     @pytest.mark.asyncio
     async def test_under_limit_allows(self, monkeypatch):
-        from palace.config import settings
+        from mypalace.config import settings
         monkeypatch.setattr(settings, "rate_limit_enabled", True)
         monkeypatch.setattr(settings, "redis_url", "redis://x")
 
@@ -94,7 +94,7 @@ class TestCheckEnforcesLimit:
 
     @pytest.mark.asyncio
     async def test_at_limit_denies(self, monkeypatch):
-        from palace.config import settings
+        from mypalace.config import settings
         monkeypatch.setattr(settings, "rate_limit_enabled", True)
         monkeypatch.setattr(settings, "redis_url", "redis://x")
 
@@ -122,7 +122,7 @@ class TestCheckEnforcesLimit:
 
     @pytest.mark.asyncio
     async def test_redis_failure_fails_open(self, monkeypatch):
-        from palace.config import settings
+        from mypalace.config import settings
         monkeypatch.setattr(settings, "rate_limit_enabled", True)
         monkeypatch.setattr(settings, "redis_url", "redis://x")
 
@@ -149,8 +149,8 @@ class TestMiddleware:
     async def test_dispatch_429_when_limit_exceeded(self, monkeypatch):
         from starlette.requests import Request
 
-        from palace.auth.context import AuthContext
-        from palace.ratelimit import middleware as mw_mod
+        from mypalace.auth.context import AuthContext
+        from mypalace.ratelimit import middleware as mw_mod
 
         fake_limiter = MagicMock()
         fake_limiter.enabled = True
@@ -185,8 +185,8 @@ class TestMiddleware:
     async def test_dispatch_passes_when_under_limit(self, monkeypatch):
         from starlette.requests import Request
 
-        from palace.auth.context import AuthContext
-        from palace.ratelimit import middleware as mw_mod
+        from mypalace.auth.context import AuthContext
+        from mypalace.ratelimit import middleware as mw_mod
 
         fake_limiter = MagicMock()
         fake_limiter.enabled = True
@@ -217,8 +217,8 @@ class TestMiddleware:
     async def test_unlimited_scope_bypasses_check(self, monkeypatch):
         from starlette.requests import Request
 
-        from palace.auth.context import AuthContext
-        from palace.ratelimit import middleware as mw_mod
+        from mypalace.auth.context import AuthContext
+        from mypalace.ratelimit import middleware as mw_mod
 
         fake_limiter = MagicMock()
         fake_limiter.enabled = True
@@ -249,7 +249,7 @@ class TestMiddleware:
     async def test_public_paths_bypass(self, monkeypatch):
         from starlette.requests import Request
 
-        from palace.ratelimit import middleware as mw_mod
+        from mypalace.ratelimit import middleware as mw_mod
 
         fake_limiter = MagicMock()
         fake_limiter.enabled = True

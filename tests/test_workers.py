@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from palace.workers.handlers import HANDLER_REGISTRY, register_handler
+from mypalace.workers.handlers import HANDLER_REGISTRY, register_handler
 
 
 class TestHandlerRegistry:
@@ -32,7 +32,7 @@ class TestHandlerRegistry:
 class TestQueueEnqueue:
     @pytest.mark.asyncio
     async def test_enqueue_inserts_pending_row(self):
-        from palace.workers.queue import enqueue
+        from mypalace.workers.queue import enqueue
 
         mock_session = MagicMock()
         db = mock_session.return_value.__aenter__.return_value
@@ -43,7 +43,7 @@ class TestQueueEnqueue:
             job.id = "job-123"
 
         db.refresh = AsyncMock(side_effect=refresh)
-        with patch("palace.workers.queue.async_session", mock_session):
+        with patch("mypalace.workers.queue.async_session", mock_session):
             job = await enqueue(
                 kind="reflection",
                 user_id="u1",
@@ -60,7 +60,7 @@ class TestQueueEnqueue:
 class TestRunnerProcessOne:
     @pytest.mark.asyncio
     async def test_returns_false_when_no_job(self):
-        from palace.workers import runner
+        from mypalace.workers import runner
 
         with patch.object(runner, "claim_next", new=AsyncMock(return_value=None)):
             result = await runner.process_one()
@@ -68,7 +68,7 @@ class TestRunnerProcessOne:
 
     @pytest.mark.asyncio
     async def test_dispatches_to_registered_handler(self):
-        from palace.workers import runner
+        from mypalace.workers import runner
 
         fake_job = MagicMock()
         fake_job.id = "j1"
@@ -95,7 +95,7 @@ class TestRunnerProcessOne:
 
     @pytest.mark.asyncio
     async def test_unknown_kind_marks_permanent_failure(self):
-        from palace.workers import runner
+        from mypalace.workers import runner
 
         fake_job = MagicMock()
         fake_job.id = "j1"
@@ -116,7 +116,7 @@ class TestRunnerProcessOne:
 
     @pytest.mark.asyncio
     async def test_handler_exception_retries_then_permanent(self):
-        from palace.workers import runner
+        from mypalace.workers import runner
 
         fake_job = MagicMock()
         fake_job.id = "j1"
@@ -136,7 +136,7 @@ class TestRunnerProcessOne:
         assert mock_fail.await_args.kwargs["permanent"] is False
 
         # Final attempt: attempts == max → permanent.
-        from palace.config import settings
+        from mypalace.config import settings
         fake_job.attempts = settings.worker_max_attempts
         with patch.object(runner, "claim_next", new=AsyncMock(return_value=fake_job)), \
              patch.dict(runner.HANDLER_REGISTRY, {"reflection": boom}), \

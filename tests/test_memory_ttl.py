@@ -10,7 +10,7 @@ import pytest
 
 class TestNotExpiredClause:
     def test_clause_constructable(self):
-        from palace.memory_service import _not_expired_clause
+        from mypalace.memory_service import _not_expired_clause
         # Just verify it builds without error — the actual SQL is tested
         # against a live DB in tests/integration/test_memory_ttl_live.py.
         clause = _not_expired_clause()
@@ -78,8 +78,8 @@ class TestCreateRoutePropagatesTtl:
 class TestCreateServiceComputesExpiresAt:
     @pytest.mark.asyncio
     async def test_ttl_seconds_becomes_expires_at(self, monkeypatch):
-        from palace import memory_service as ms
-        from palace.memory_service import MemoryService
+        from mypalace import memory_service as ms
+        from mypalace.memory_service import MemoryService
 
         # Stub embedder + vector + graph + cache + broker so we exercise
         # only the create() arithmetic.
@@ -93,7 +93,7 @@ class TestCreateServiceComputesExpiresAt:
             def add(self, obj):
                 # Phase 7 slice 2 also writes MemoryVersion rows through the
                 # same patched session — capture only the Memory row.
-                from palace.models import Memory as _Memory
+                from mypalace.models import Memory as _Memory
                 if isinstance(obj, _Memory):
                     captured["row"] = obj
             async def commit(self):
@@ -114,9 +114,9 @@ class TestCreateServiceComputesExpiresAt:
         monkeypatch.setattr(ms.vector_store, "upsert", AsyncMock())
 
         # Disable graph + cache + broker so create() doesn't fan out.
-        from palace.config import settings
+        from mypalace.config import settings
         monkeypatch.setattr(settings, "redis_url", None)
-        from palace.graph.service import graph_service
+        from mypalace.graph.service import graph_service
         monkeypatch.setattr(graph_service, "_client",
                             MagicMock(enabled=False, url=None))
 
@@ -138,8 +138,8 @@ class TestCreateServiceComputesExpiresAt:
 
     @pytest.mark.asyncio
     async def test_no_ttl_means_null_expires_at(self, monkeypatch):
-        from palace import memory_service as ms
-        from palace.memory_service import MemoryService
+        from mypalace import memory_service as ms
+        from mypalace.memory_service import MemoryService
 
         fake_embedder = MagicMock()
         fake_embedder.embed = AsyncMock(return_value=[[0.0] * 384])
@@ -151,7 +151,7 @@ class TestCreateServiceComputesExpiresAt:
             def add(self, obj):
                 # Phase 7 slice 2 also writes MemoryVersion rows through the
                 # same patched session — capture only the Memory row.
-                from palace.models import Memory as _Memory
+                from mypalace.models import Memory as _Memory
                 if isinstance(obj, _Memory):
                     captured["row"] = obj
             async def commit(self):
@@ -170,9 +170,9 @@ class TestCreateServiceComputesExpiresAt:
         cm.__aexit__ = AsyncMock(return_value=None)
         monkeypatch.setattr(ms, "async_session", MagicMock(return_value=cm))
         monkeypatch.setattr(ms.vector_store, "upsert", AsyncMock())
-        from palace.config import settings
+        from mypalace.config import settings
         monkeypatch.setattr(settings, "redis_url", None)
-        from palace.graph.service import graph_service
+        from mypalace.graph.service import graph_service
         monkeypatch.setattr(graph_service, "_client",
                             MagicMock(enabled=False, url=None))
 
@@ -186,8 +186,8 @@ class TestCreateServiceComputesExpiresAt:
 class TestCleanupExpiredService:
     @pytest.mark.asyncio
     async def test_cleanup_returns_count_and_deletes_vectors(self, monkeypatch):
-        from palace import memory_service as ms
-        from palace.memory_service import MemoryService
+        from mypalace import memory_service as ms
+        from mypalace.memory_service import MemoryService
 
         # Stub the SQL DELETE returning two ids.
         deleted_rows = MagicMock()
@@ -203,7 +203,7 @@ class TestCleanupExpiredService:
         vector_delete = AsyncMock()
         monkeypatch.setattr(ms.vector_store, "delete", vector_delete)
         # Cache disabled
-        from palace.config import settings
+        from mypalace.config import settings
         monkeypatch.setattr(settings, "redis_url", None)
 
         svc = MemoryService()
@@ -219,8 +219,8 @@ class TestCleanupExpiredService:
 
     @pytest.mark.asyncio
     async def test_cleanup_with_no_expired_returns_zero(self, monkeypatch):
-        from palace import memory_service as ms
-        from palace.memory_service import MemoryService
+        from mypalace import memory_service as ms
+        from mypalace.memory_service import MemoryService
 
         empty = MagicMock()
         empty.all.return_value = []
@@ -242,14 +242,14 @@ class TestCleanupExpiredService:
 
 class TestCleanupHandler:
     def test_cleanup_handler_registered(self):
-        from palace.workers.handlers import HANDLER_REGISTRY
+        from mypalace.workers.handlers import HANDLER_REGISTRY
         assert "cleanup" in HANDLER_REGISTRY
 
     @pytest.mark.asyncio
     async def test_cleanup_handler_calls_service(self, monkeypatch):
-        from palace.workers.handlers import _cleanup_handler
+        from mypalace.workers.handlers import _cleanup_handler
 
-        with patch("palace.memory_service.memory_service.cleanup_expired",
+        with patch("mypalace.memory_service.memory_service.cleanup_expired",
                    new=AsyncMock(return_value=42)) as mock_cleanup:
             result = await _cleanup_handler(
                 {"batch_size": 100}, tenant_id="acme",

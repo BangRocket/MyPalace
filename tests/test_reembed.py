@@ -25,7 +25,7 @@ class TestReembedRoute:
         assert r.status_code == 422
 
     def test_enqueues_reembed_job(self, client, monkeypatch):
-        from palace.api import reembed as mod
+        from mypalace.api import reembed as mod
 
         fake_job = MagicMock()
         fake_job.id = "job-reembed-1"
@@ -49,7 +49,7 @@ class TestReembedRoute:
         assert kwargs["payload"]["batch_size"] == 50
 
     def test_token_only_in_payload_when_provided(self, client, monkeypatch):
-        from palace.api import reembed as mod
+        from mypalace.api import reembed as mod
         fake_job = MagicMock()
         fake_job.id = "job-1"
 
@@ -64,12 +64,12 @@ class TestReembedRoute:
 
 class TestReembedHandler:
     def test_handler_registered(self):
-        from palace.workers.handlers import HANDLER_REGISTRY
+        from mypalace.workers.handlers import HANDLER_REGISTRY
         assert "reembed" in HANDLER_REGISTRY
 
     @pytest.mark.asyncio
     async def test_empty_tenant_returns_zero(self, monkeypatch):
-        from palace.workers.handlers import _reembed_handler
+        from mypalace.workers.handlers import _reembed_handler
 
         fake_embedder = MagicMock()
         fake_embedder.embed = AsyncMock(return_value=[])
@@ -77,17 +77,17 @@ class TestReembedHandler:
 
         # Stub make_embedder so we don't load a real model.
         monkeypatch.setattr(
-            "palace.workers.handlers.make_embedder",
+            "mypalace.workers.handlers.make_embedder",
             lambda *a, **kw: fake_embedder,
         ) if False else None
         # The above contortion doesn't take because the import is local.
         # Instead, patch make_embedder where it's used inside the handler.
-        import palace.embeddings as emb
+        import mypalace.embeddings as emb
         monkeypatch.setattr(emb, "HuggingFaceProvider",
                             lambda *a, **kw: fake_embedder)
 
         # Stub vector_store.ensure_collection
-        from palace.vector import vector_store
+        from mypalace.vector import vector_store
         monkeypatch.setattr(
             vector_store, "ensure_collection", AsyncMock(),
         )
@@ -101,10 +101,10 @@ class TestReembedHandler:
         cm.__aenter__ = AsyncMock(return_value=db_mock)
         cm.__aexit__ = AsyncMock(return_value=None)
         monkeypatch.setattr(
-            "palace.workers.handlers.async_session", MagicMock(return_value=cm),
+            "mypalace.workers.handlers.async_session", MagicMock(return_value=cm),
         ) if False else None
         # Patch where the handler imports it.
-        import palace.database as dbmod
+        import mypalace.database as dbmod
         monkeypatch.setattr(dbmod, "async_session", MagicMock(return_value=cm))
 
         result = await _reembed_handler(
@@ -118,12 +118,12 @@ class TestReembedHandler:
 
 class TestMakeEmbedder:
     def test_unknown_provider_raises(self):
-        from palace.embeddings import make_embedder
+        from mypalace.embeddings import make_embedder
         with pytest.raises(ValueError, match="unknown embedding provider"):
             make_embedder("cohere", "x")
 
     def test_huggingface_dispatch(self, monkeypatch):
-        from palace import embeddings as emb
+        from mypalace import embeddings as emb
         captured: dict = {}
 
         class FakeHF:
@@ -137,7 +137,7 @@ class TestMakeEmbedder:
         assert captured["token"] == "tok"
 
     def test_openai_dispatch(self, monkeypatch):
-        from palace import embeddings as emb
+        from mypalace import embeddings as emb
         captured: dict = {}
 
         class FakeOAI:

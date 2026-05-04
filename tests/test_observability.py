@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from prometheus_client.parser import text_string_to_metric_families
 
-from palace.observability.metrics import (
+from mypalace.observability.metrics import (
     cache_hits,
     cache_misses,
     http_requests,
@@ -84,14 +84,14 @@ class TestObservabilityMiddleware:
 
 class TestStructlogConfiguration:
     def test_configure_logging_idempotent(self):
-        from palace.observability.logging import configure_logging
+        from mypalace.observability.logging import configure_logging
         configure_logging()
         configure_logging()  # second call should not raise
 
     def test_bind_clear_request_context(self):
         import structlog
 
-        from palace.observability.logging import (
+        from mypalace.observability.logging import (
             bind_request_context,
             clear_request_context,
         )
@@ -106,8 +106,8 @@ class TestStructlogConfiguration:
 class TestTracingNoop:
     def test_tracing_noop_when_endpoint_unset(self, monkeypatch):
         # Force-reset the module's _initialized flag for a clean assertion.
-        import palace.observability.tracing as t
-        from palace.observability.tracing import configure_tracing
+        import mypalace.observability.tracing as t
+        from mypalace.observability.tracing import configure_tracing
         monkeypatch.setattr(t, "_initialized", False)
         monkeypatch.setattr(t.settings, "otlp_endpoint", None)
 

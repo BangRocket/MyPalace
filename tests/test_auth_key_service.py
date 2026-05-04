@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from palace.auth.key_service import (
+from mypalace.auth.key_service import (
     KEY_PREFIX_LITERAL,
     PREFIX_INDEX_LEN,
     RANDOM_PART_LEN,
@@ -12,7 +12,7 @@ from palace.auth.key_service import (
     _validate_scopes,
     _verify,
 )
-from palace.auth.usage import UsageTracker
+from mypalace.auth.usage import UsageTracker
 
 
 class TestRandomGen:

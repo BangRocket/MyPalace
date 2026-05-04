@@ -1,4 +1,4 @@
-# Migrating mypalclara to palace-memory 0.6.0
+# Migrating mypalclara to mypalace 0.6.0
 
 This guide walks you through swapping mypalclara's embedded
 `ClaraMemory` + `MemoryManager` for a remote Palace 0.6.0 deployment.
@@ -15,12 +15,12 @@ config flag.
 - A Palace 0.6.0 deployment reachable from mypalclara. Quickstart in the
   Palace [README](../README.md#install). For most setups:
   ```bash
-  docker pull bangrocket/palace:0.6.0
+  docker pull bangrocket/mypalace:0.7.0
   docker run -d --name palace -p 8000:8000 \
     -e PALACE_DATABASE_URL=postgresql+asyncpg://palace:palace@HOST/palace \
     -e QDRANT_URL=http://HOST:6333 \
     -e PALACE_BOOTSTRAP_ADMIN_KEY=pk_live_$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32) \
-    bangrocket/palace:0.6.0
+    bangrocket/mypalace:0.7.0
   ```
   Save the `PALACE_BOOTSTRAP_ADMIN_KEY` value — you'll need it once.
 - (Optional but recommended) Worker process for background reflection /
@@ -30,7 +30,7 @@ config flag.
     -e PALACE_DATABASE_URL=... \
     -e QDRANT_URL=... \
     -e PALACE_WORKER_QUEUE_ENABLED=true \
-    bangrocket/palace:0.6.0 \
+    bangrocket/mypalace:0.7.0 \
     python -m palace.workers.runner
   ```
 
@@ -74,21 +74,21 @@ curl -X POST http://palace:8000/v1/admin/keys \
 
 ---
 
-## 2. Install palace-client in mypalclara
+## 2. Install mypalace-client in mypalclara
 
 ```bash
-pip install palace-client==0.6.0
+pip install mypalace-client==0.6.0
 ```
 
 The HTTP client only — gRPC is optional via `pip install
-"palace-client[grpc]"` but mypalclara doesn't need it for migration.
+"mypalace-client[grpc]"` but mypalclara doesn't need it for migration.
 
 ---
 
 ## 3. Drop in the routed memory module
 
 mypalclara has a router pattern documented in
-`palace-memory/examples/mypalclara_router.py` that delegates between
+`mypalace/examples/mypalclara_router.py` that delegates between
 the embedded path and a remote Palace via per-method pass-throughs.
 
 Copy that file into mypalclara as `mypalclara/core/memory/routed.py`,

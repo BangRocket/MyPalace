@@ -17,17 +17,17 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
-          # The standalone palace_client subpackage is imported at module
+          # The standalone mypalace_client subpackage is imported at module
           # top in tests/integration/test_client_e2e.py, so collection
           # fails without it (even though the integration tests themselves
           # are deselected by the default -m 'not integration' filter).
-          pip install -e ./palace_client
+          pip install -e ./mypalace_client
       - name: Lint
-        run: ruff check palace/ tests/ palace_client/
+        run: ruff check mypalace/ tests/ mypalace_client/
       - name: Test
         run: pytest tests/
-      - name: Test palace_client
-        run: pytest palace_client/tests/
+      - name: Test mypalace_client
+        run: pytest mypalace_client/tests/
 
   build-and-publish:
     needs: test
@@ -44,33 +44,33 @@ jobs:
           python-version: "3.12"
       - name: Install build tooling
         run: pip install build twine
-      - name: Build palace-memory
+      - name: Build mypalace
         run: python -m build --outdir dist-server .
-      - name: Build palace-client
-        working-directory: palace_client
+      - name: Build mypalace-client
+        working-directory: mypalace_client
         run: python -m build --outdir ../dist-client .
       - name: Inspect artifacts
         run: |
           ls -lh dist-server dist-client
           twine check dist-server/* dist-client/*
-      - name: Publish palace-memory to TestPyPI
+      - name: Publish mypalace to TestPyPI
         if: contains(github.ref, 'rc') || contains(github.ref, 'beta')
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
           packages-dir: dist-server/
-      - name: Publish palace-client to TestPyPI
+      - name: Publish mypalace-client to TestPyPI
         if: contains(github.ref, 'rc') || contains(github.ref, 'beta')
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
           packages-dir: dist-client/
-      - name: Publish palace-memory to PyPI
+      - name: Publish mypalace to PyPI
         if: ${{ !contains(github.ref, 'rc') && !contains(github.ref, 'beta') }}
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist-server/
-      - name: Publish palace-client to PyPI
+      - name: Publish mypalace-client to PyPI
         if: ${{ !contains(github.ref, 'rc') && !contains(github.ref, 'beta') }}
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
@@ -111,8 +111,8 @@ jobs:
           context: .
           push: true
           tags: |
-            bangrocket/palace:${{ steps.version.outputs.version }}
-            bangrocket/palace:latest
+            bangrocket/mypalace:${{ steps.version.outputs.version }}
+            bangrocket/mypalace:latest
 
   github-release:
     needs: [build-and-publish]

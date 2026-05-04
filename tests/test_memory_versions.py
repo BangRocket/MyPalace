@@ -11,8 +11,8 @@ import pytest
 class TestRecordVersion:
     @pytest.mark.asyncio
     async def test_record_version_inserts_row(self, monkeypatch):
-        from palace import memory_service as ms
-        from palace.memory_service import _record_version
+        from mypalace import memory_service as ms
+        from mypalace.memory_service import _record_version
 
         captured: dict = {}
         db_mock = MagicMock()
@@ -45,8 +45,8 @@ class TestRecordVersion:
 
     @pytest.mark.asyncio
     async def test_record_version_failure_swallowed(self, monkeypatch):
-        from palace import memory_service as ms
-        from palace.memory_service import _record_version
+        from mypalace import memory_service as ms
+        from mypalace.memory_service import _record_version
 
         monkeypatch.setattr(
             ms, "async_session",
@@ -63,8 +63,8 @@ class TestRecordVersion:
 class TestNextVersionNumber:
     @pytest.mark.asyncio
     async def test_first_version_returns_one(self, monkeypatch):
-        from palace import memory_service as ms
-        from palace.memory_service import _next_version_number
+        from mypalace import memory_service as ms
+        from mypalace.memory_service import _next_version_number
 
         result_mock = MagicMock()
         result_mock.scalar_one_or_none.return_value = None
@@ -80,8 +80,8 @@ class TestNextVersionNumber:
 
     @pytest.mark.asyncio
     async def test_increments_existing_max(self, monkeypatch):
-        from palace import memory_service as ms
-        from palace.memory_service import _next_version_number
+        from mypalace import memory_service as ms
+        from mypalace.memory_service import _next_version_number
 
         result_mock = MagicMock()
         result_mock.scalar_one_or_none.return_value = 7
@@ -97,8 +97,8 @@ class TestNextVersionNumber:
 
     @pytest.mark.asyncio
     async def test_failure_returns_safe_fallback(self, monkeypatch):
-        from palace import memory_service as ms
-        from palace.memory_service import _next_version_number
+        from mypalace import memory_service as ms
+        from mypalace.memory_service import _next_version_number
 
         monkeypatch.setattr(
             ms, "async_session",
@@ -110,7 +110,7 @@ class TestNextVersionNumber:
 
 class TestHistoryRoute:
     def test_returns_chronological_versions(self, client, monkeypatch):
-        from palace.models import MemoryVersion
+        from mypalace.models import MemoryVersion
 
         rows = [
             MemoryVersion(
@@ -141,7 +141,7 @@ class TestHistoryRoute:
         cm.__aexit__ = AsyncMock(return_value=None)
         # The history route imports async_session lazily, patch at source.
         with patch(
-            "palace.database.async_session",
+            "mypalace.database.async_session",
             MagicMock(return_value=cm),
         ):
             r = client.get("/v1/memories/m1/history")
@@ -163,7 +163,7 @@ class TestHistoryRoute:
         cm.__aenter__ = _AsyncMock(return_value=db_mock)
         cm.__aexit__ = _AsyncMock(return_value=None)
         with patch(
-            "palace.database.async_session",
+            "mypalace.database.async_session",
             MagicMock(return_value=cm),
         ):
             r = client.get("/v1/memories/missing/history")

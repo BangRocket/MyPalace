@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from palace.grpc._generated import palace_pb2
-from palace.grpc.session_servicer import SessionServicer
+from mypalace.grpc._generated import mypalace_pb2
+from mypalace.grpc.session_servicer import SessionServicer
 
 
 def _fake_session(**overrides):
@@ -36,9 +36,9 @@ def _fake_message(**overrides):
 async def test_create_session_calls_service():
     svc = SessionServicer()
     fake = _fake_session(id="new-1", title="hello")
-    with patch("palace.grpc.session_servicer.session_service.create",
+    with patch("mypalace.grpc.session_servicer.session_service.create",
                new=AsyncMock(return_value=fake)) as mock_create:
-        req = palace_pb2.CreateSessionRequest(user_id="u1", title="hello")
+        req = mypalace_pb2.CreateSessionRequest(user_id="u1", title="hello")
         ctx = MagicMock()
         resp = await svc.CreateSession(req, ctx)
         assert resp.session.id == "new-1"
@@ -62,9 +62,9 @@ async def test_get_session_returns_with_messages():
              "created_at": "2026-05-04T00:00:00+00:00"},
         ],
     }
-    with patch("palace.grpc.session_servicer.session_service.get",
+    with patch("mypalace.grpc.session_servicer.session_service.get",
                new=AsyncMock(return_value=data)):
-        req = palace_pb2.GetSessionRequest(session_id="s1")
+        req = mypalace_pb2.GetSessionRequest(session_id="s1")
         ctx = MagicMock()
         resp = await svc.GetSession(req, ctx)
         assert resp.data.session.id == "s1"
@@ -75,9 +75,9 @@ async def test_get_session_returns_with_messages():
 @pytest.mark.asyncio
 async def test_get_session_404():
     svc = SessionServicer()
-    with patch("palace.grpc.session_servicer.session_service.get",
+    with patch("mypalace.grpc.session_servicer.session_service.get",
                new=AsyncMock(return_value=None)):
-        req = palace_pb2.GetSessionRequest(session_id="missing")
+        req = mypalace_pb2.GetSessionRequest(session_id="missing")
         ctx = MagicMock()
         ctx.abort = AsyncMock(side_effect=Exception("aborted"))
         with pytest.raises(Exception, match="aborted"):
@@ -88,9 +88,9 @@ async def test_get_session_404():
 async def test_add_message_returns_proto():
     svc = SessionServicer()
     fake = _fake_message(id="m9", content="hello")
-    with patch("palace.grpc.session_servicer.session_service.add_message",
+    with patch("mypalace.grpc.session_servicer.session_service.add_message",
                new=AsyncMock(return_value=fake)):
-        req = palace_pb2.AddMessageRequest(
+        req = mypalace_pb2.AddMessageRequest(
             session_id="s1", user_id="u1", role="user", content="hello",
         )
         ctx = MagicMock()
@@ -102,9 +102,9 @@ async def test_add_message_returns_proto():
 @pytest.mark.asyncio
 async def test_update_session_404():
     svc = SessionServicer()
-    with patch("palace.grpc.session_servicer.session_service.update",
+    with patch("mypalace.grpc.session_servicer.session_service.update",
                new=AsyncMock(return_value=None)):
-        req = palace_pb2.UpdateSessionRequest(session_id="missing", title="new")
+        req = mypalace_pb2.UpdateSessionRequest(session_id="missing", title="new")
         ctx = MagicMock()
         ctx.abort = AsyncMock(side_effect=Exception("aborted"))
         with pytest.raises(Exception, match="aborted"):
@@ -115,9 +115,9 @@ async def test_update_session_404():
 async def test_update_session_ok():
     svc = SessionServicer()
     fake = _fake_session(id="s1", title="updated")
-    with patch("palace.grpc.session_servicer.session_service.update",
+    with patch("mypalace.grpc.session_servicer.session_service.update",
                new=AsyncMock(return_value=fake)):
-        req = palace_pb2.UpdateSessionRequest(session_id="s1", title="updated")
+        req = mypalace_pb2.UpdateSessionRequest(session_id="s1", title="updated")
         ctx = MagicMock()
         resp = await svc.UpdateSession(req, ctx)
         assert resp.session.title == "updated"
@@ -126,9 +126,9 @@ async def test_update_session_ok():
 @pytest.mark.asyncio
 async def test_delete_session_returns_deleted_true():
     svc = SessionServicer()
-    with patch("palace.grpc.session_servicer.session_service.delete",
+    with patch("mypalace.grpc.session_servicer.session_service.delete",
                new=AsyncMock(return_value=True)):
-        req = palace_pb2.DeleteSessionRequest(session_id="s1")
+        req = mypalace_pb2.DeleteSessionRequest(session_id="s1")
         ctx = MagicMock()
         resp = await svc.DeleteSession(req, ctx)
         assert resp.deleted is True
@@ -137,9 +137,9 @@ async def test_delete_session_returns_deleted_true():
 @pytest.mark.asyncio
 async def test_delete_session_404():
     svc = SessionServicer()
-    with patch("palace.grpc.session_servicer.session_service.delete",
+    with patch("mypalace.grpc.session_servicer.session_service.delete",
                new=AsyncMock(return_value=False)):
-        req = palace_pb2.DeleteSessionRequest(session_id="missing")
+        req = mypalace_pb2.DeleteSessionRequest(session_id="missing")
         ctx = MagicMock()
         ctx.abort = AsyncMock(side_effect=Exception("aborted"))
         with pytest.raises(Exception, match="aborted"):

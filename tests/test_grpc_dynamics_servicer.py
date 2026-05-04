@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from palace.grpc._generated import palace_pb2
-from palace.grpc.dynamics_servicer import DynamicsServicer
+from mypalace.grpc._generated import mypalace_pb2
+from mypalace.grpc.dynamics_servicer import DynamicsServicer
 
 
 def _fake_dynamics(**overrides):
@@ -34,9 +34,9 @@ def _fake_dynamics(**overrides):
 async def test_promote_memory():
     svc = DynamicsServicer()
     fake = _fake_dynamics(memory_id="m1", access_count=1)
-    with patch("palace.grpc.dynamics_servicer.dynamics_service.promote",
+    with patch("mypalace.grpc.dynamics_servicer.dynamics_service.promote",
                new=AsyncMock(return_value=fake)) as mock_promote:
-        req = palace_pb2.PromoteMemoryRequest(
+        req = mypalace_pb2.PromoteMemoryRequest(
             memory_id="m1", user_id="u1", grade=3, signal_type="used",
         )
         ctx = MagicMock()
@@ -49,7 +49,7 @@ async def test_promote_memory():
 @pytest.mark.asyncio
 async def test_promote_invalid_grade():
     svc = DynamicsServicer()
-    req = palace_pb2.PromoteMemoryRequest(memory_id="m1", user_id="u1", grade=99)
+    req = mypalace_pb2.PromoteMemoryRequest(memory_id="m1", user_id="u1", grade=99)
     ctx = MagicMock()
     ctx.abort = AsyncMock(side_effect=Exception("aborted"))
     with pytest.raises(Exception, match="aborted"):
@@ -60,9 +60,9 @@ async def test_promote_invalid_grade():
 async def test_demote_memory():
     svc = DynamicsServicer()
     fake = _fake_dynamics(memory_id="m1")
-    with patch("palace.grpc.dynamics_servicer.dynamics_service.demote",
+    with patch("mypalace.grpc.dynamics_servicer.dynamics_service.demote",
                new=AsyncMock(return_value=fake)):
-        req = palace_pb2.DemoteMemoryRequest(memory_id="m1", user_id="u1", reason="oops")
+        req = mypalace_pb2.DemoteMemoryRequest(memory_id="m1", user_id="u1", reason="oops")
         ctx = MagicMock()
         resp = await svc.DemoteMemory(req, ctx)
         assert resp.dynamics.memory_id == "m1"
@@ -71,9 +71,9 @@ async def test_demote_memory():
 @pytest.mark.asyncio
 async def test_get_dynamics_404():
     svc = DynamicsServicer()
-    with patch("palace.grpc.dynamics_servicer.dynamics_service.get_dynamics",
+    with patch("mypalace.grpc.dynamics_servicer.dynamics_service.get_dynamics",
                new=AsyncMock(return_value=None)):
-        req = palace_pb2.GetDynamicsRequest(memory_id="missing", user_id="u1")
+        req = mypalace_pb2.GetDynamicsRequest(memory_id="missing", user_id="u1")
         ctx = MagicMock()
         ctx.abort = AsyncMock(side_effect=Exception("aborted"))
         with pytest.raises(Exception, match="aborted"):
@@ -84,9 +84,9 @@ async def test_get_dynamics_404():
 async def test_get_dynamics_ok():
     svc = DynamicsServicer()
     fake = _fake_dynamics(memory_id="m1")
-    with patch("palace.grpc.dynamics_servicer.dynamics_service.get_dynamics",
+    with patch("mypalace.grpc.dynamics_servicer.dynamics_service.get_dynamics",
                new=AsyncMock(return_value=fake)):
-        req = palace_pb2.GetDynamicsRequest(memory_id="m1", user_id="u1")
+        req = mypalace_pb2.GetDynamicsRequest(memory_id="m1", user_id="u1")
         ctx = MagicMock()
         resp = await svc.GetDynamics(req, ctx)
         assert resp.dynamics.memory_id == "m1"
@@ -101,9 +101,9 @@ async def test_score_memory():
         "retrievability": 0.9,
         "storage_strength": 0.6,
     }
-    with patch("palace.grpc.dynamics_servicer.dynamics_service.score",
+    with patch("mypalace.grpc.dynamics_servicer.dynamics_service.score",
                new=AsyncMock(return_value=breakdown)):
-        req = palace_pb2.ScoreMemoryRequest(
+        req = mypalace_pb2.ScoreMemoryRequest(
             memory_id="m1", user_id="u1", semantic_score=0.8,
         )
         ctx = MagicMock()

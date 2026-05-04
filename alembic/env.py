@@ -1,4 +1,4 @@
-"""Alembic env.py — async-aware, reads URL from palace.config.settings.
+"""Alembic env.py — async-aware, reads URL from mypalace.config.settings.
 
 Why async-aware: every other DB call in Palace uses asyncpg + an async
 engine. We want to keep that consistent so we don't accidentally introduce
@@ -16,11 +16,11 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlmodel import SQLModel  # noqa: E402
 
 # Load all SQLModel tables so autogenerate sees them.
-import palace.models  # noqa: E402, F401
+import mypalace.models  # noqa: E402, F401
 from alembic import context
 
 # Project on sys.path (alembic.ini sets prepend_sys_path = .)
-from palace.config import settings  # noqa: E402
+from mypalace.config import settings  # noqa: E402
 
 config = context.config
 if config.config_file_name is not None:

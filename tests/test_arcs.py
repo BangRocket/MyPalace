@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from palace.arc_service import ArcService
+from mypalace.arc_service import ArcService
 
 
 @pytest.mark.asyncio
@@ -48,8 +48,8 @@ async def test_synthesize_creates_new_arcs():
             return arc
 
     with (
-        patch("palace.arc_service.episode_service.get_recent", new=AsyncMock(return_value=fake_recent_episodes)),  # noqa: E501
-        patch("palace.arc_service.llm.complete", new=AsyncMock(return_value=fake_llm_response)),
+        patch("mypalace.arc_service.episode_service.get_recent", new=AsyncMock(return_value=fake_recent_episodes)),  # noqa: E501
+        patch("mypalace.arc_service.llm.complete", new=AsyncMock(return_value=fake_llm_response)),
         patch.object(svc, "get_active", new=AsyncMock(return_value=[])),
         patch.object(svc, "create", new=FakeArcServiceCreate()),
     ):
@@ -91,8 +91,8 @@ async def test_synthesize_updates_existing_arcs():
         return a
 
     with (
-        patch("palace.arc_service.episode_service.get_recent", new=AsyncMock(return_value=[])),
-        patch("palace.arc_service.llm.complete", new=AsyncMock(return_value=fake_llm_response)),
+        patch("mypalace.arc_service.episode_service.get_recent", new=AsyncMock(return_value=[])),
+        patch("mypalace.arc_service.llm.complete", new=AsyncMock(return_value=fake_llm_response)),
         patch.object(svc, "get_active", new=AsyncMock(return_value=[])),
         patch.object(svc, "update", new=fake_update),
         patch.object(svc, "create", new=AsyncMock()) as mock_create,
@@ -110,8 +110,8 @@ async def test_synthesize_updates_existing_arcs():
 async def test_synthesize_raises_on_garbage_llm():
     svc = ArcService()
     with (
-        patch("palace.arc_service.episode_service.get_recent", new=AsyncMock(return_value=[])),
-        patch("palace.arc_service.llm.complete", new=AsyncMock(return_value="not json")),
+        patch("mypalace.arc_service.episode_service.get_recent", new=AsyncMock(return_value=[])),
+        patch("mypalace.arc_service.llm.complete", new=AsyncMock(return_value="not json")),
         patch.object(svc, "get_active", new=AsyncMock(return_value=[])),
         pytest.raises(ValueError, match="(?i)json|parse"),
     ):
@@ -188,8 +188,8 @@ async def test_synthesize_strips_json_markdown_fence():
         return a
 
     with (
-        patch("palace.arc_service.episode_service.get_recent", new=AsyncMock(return_value=[])),
-        patch("palace.arc_service.llm.complete", new=AsyncMock(return_value=fenced)),
+        patch("mypalace.arc_service.episode_service.get_recent", new=AsyncMock(return_value=[])),
+        patch("mypalace.arc_service.llm.complete", new=AsyncMock(return_value=fenced)),
         patch.object(svc, "get_active", new=AsyncMock(return_value=[])),
         patch.object(svc, "create", new=fake_create),
     ):

@@ -32,7 +32,7 @@ from __future__ import annotations
 import asyncio
 import os
 
-from palace_client import PalaceClient
+from mypalace_client import PalaceClient
 
 # ---------------------------------------------------------------------------
 # Configuration

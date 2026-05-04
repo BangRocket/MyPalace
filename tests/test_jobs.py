@@ -6,7 +6,7 @@ import asyncio
 
 import pytest
 
-from palace.job_service import JobService
+from mypalace.job_service import JobService
 
 
 @pytest.mark.asyncio
@@ -31,7 +31,7 @@ async def test_create_persists_pending_job():
         async def __aenter__(self): return fake_db
         async def __aexit__(self, *args): return None
 
-    with patch("palace.job_service.async_session", lambda: FakeAsyncSession()):
+    with patch("mypalace.job_service.async_session", lambda: FakeAsyncSession()):
         await svc.create(kind="reflection", user_id="u1")
 
     fake_db.add.assert_called_once()

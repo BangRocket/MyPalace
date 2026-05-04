@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from palace.grpc._generated import palace_pb2
-from palace.grpc.retrieval_servicer import RetrievalServicer
+from mypalace.grpc._generated import mypalace_pb2
+from mypalace.grpc.retrieval_servicer import RetrievalServicer
 
 
 def _empty_layered_result():
@@ -26,10 +26,10 @@ def _empty_layered_result():
 async def test_assemble_layered_empty():
     svc = RetrievalServicer()
     with patch(
-        "palace.grpc.retrieval_servicer.layered_retrieval_service.assemble",
+        "mypalace.grpc.retrieval_servicer.layered_retrieval_service.assemble",
         new=AsyncMock(return_value=_empty_layered_result()),
     ):
-        req = palace_pb2.AssembleLayeredRequest(user_id="u1", query="hi")
+        req = mypalace_pb2.AssembleLayeredRequest(user_id="u1", query="hi")
         ctx = MagicMock()
         resp = await svc.AssembleLayered(req, ctx)
         ctx_msg = resp.context
@@ -61,10 +61,10 @@ async def test_assemble_layered_with_data():
         "char_counts": {"l1": 100, "l2": 200},
     }
     with patch(
-        "palace.grpc.retrieval_servicer.layered_retrieval_service.assemble",
+        "mypalace.grpc.retrieval_servicer.layered_retrieval_service.assemble",
         new=AsyncMock(return_value=payload),
     ):
-        req = palace_pb2.AssembleLayeredRequest(
+        req = mypalace_pb2.AssembleLayeredRequest(
             user_id="u1", query="hi", include_graph=True,
         )
         ctx = MagicMock()

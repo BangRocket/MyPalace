@@ -1,6 +1,6 @@
-# Palace Memory Service
+# MyPalace Memory Service
 
-[![PyPI version](https://img.shields.io/pypi/v/palace-memory)](https://pypi.org/project/palace-memory/)
+[![PyPI version](https://img.shields.io/pypi/v/mypalace)](https://pypi.org/project/mypalace/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 
@@ -149,10 +149,10 @@ Routes are normalized — UUIDs and long IDs become `{id}` so Prometheus label c
 Optional. Set `PALACE_OTLP_ENDPOINT=http://otel-collector:4317` and install the optional extra:
 
 ```bash
-pip install "palace-memory[otel]"
+pip install "mypalace[otel]"
 ```
 
-Auto-instruments FastAPI + httpx. Service name defaults to `palace-memory` (override via `PALACE_OTLP_SERVICE_NAME`). No-op if either the env var is unset or the SDK isn't installed.
+Auto-instruments FastAPI + httpx. Service name defaults to `mypalace` (override via `PALACE_OTLP_SERVICE_NAME`). No-op if either the env var is unset or the SDK isn't installed.
 
 ### Structured logs
 
@@ -331,26 +331,26 @@ python -m grpc_tools.protoc -I=proto \
 ### From PyPI (server)
 
 ```bash
-pip install palace-memory
+pip install mypalace
 ```
 
 ### From PyPI (client only — for AI apps that talk to a remote Palace)
 
 ```bash
-pip install palace-client
+pip install mypalace-client
 # Optional gRPC transport:
-pip install "palace-client[grpc]"
+pip install "mypalace-client[grpc]"
 ```
 
 ### Docker
 
 ```bash
-docker pull bangrocket/palace:latest
+docker pull bangrocket/mypalace:latest
 docker run -p 8000:8000 \
   -e PALACE_DATABASE_URL=postgresql+asyncpg://palace:palace@host/palace \
   -e QDRANT_URL=http://host:6333 \
   -e PALACE_BOOTSTRAP_ADMIN_KEY=pk_live_$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32) \
-  bangrocket/palace:latest
+  bangrocket/mypalace:latest
 ```
 
 ## Quick start (development)
@@ -536,7 +536,7 @@ falling back to the embedded `ClaraMemory` for everything not yet routable.
 Install the client into mypalclara's environment:
 
 ```bash
-pip install "git+https://github.com/BangRocket/palace-memory.git@<sha>#subdirectory=palace_client"
+pip install "git+https://github.com/BangRocket/mypalace.git@<sha>#subdirectory=palace_client"
 ```
 
 Copy `examples/mypalclara_router.py` into mypalclara as
@@ -704,8 +704,8 @@ Tagging `vX.Y.Z` triggers `.github/workflows/release.yml` which runs tests, buil
 ### One-time setup
 
 **1. PyPI trusted publishing.** For each project at https://pypi.org/manage/account/publishing/, add a "GitHub" publisher pointing at this repo + workflow `release.yml`. Leave the environment field empty. Do this for both:
-- `palace-memory`
-- `palace-client`
+- `mypalace`
+- `mypalace-client`
 
 Once configured, the `pypa/gh-action-pypi-publish@release/v1` step OIDC-authenticates and uploads with no API token to manage. Repeat the same for https://test.pypi.org if you want rc/beta rehearsals to publish.
 
@@ -722,7 +722,7 @@ Without `vars.PUBLISH_DOCKER=true`, the docker job is skipped and the GitHub rel
 # Rehearse on TestPyPI first
 git tag -a v0.5.0-rc1 -m "rehearsal"
 git push origin v0.5.0-rc1
-# Watch https://github.com/BangRocket/palace-memory/actions
+# Watch https://github.com/BangRocket/mypalace/actions
 
 # Once green, cut the real tag
 git tag -a v0.5.0 -m "0.5.0 — see CHANGELOG.md"

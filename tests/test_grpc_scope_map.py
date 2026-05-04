@@ -7,19 +7,19 @@ from __future__ import annotations
 
 import pytest
 
-from palace.grpc._generated import palace_pb2_grpc
-from palace.grpc.auth_interceptor import RPC_SCOPE
+from mypalace.grpc._generated import mypalace_pb2_grpc
+from mypalace.grpc.auth_interceptor import RPC_SCOPE
 
 SERVICES = [
-    ("MemoryService", palace_pb2_grpc.MemoryServiceServicer),
-    ("SessionService", palace_pb2_grpc.SessionServiceServicer),
-    ("EpisodeService", palace_pb2_grpc.EpisodeServiceServicer),
-    ("ArcService", palace_pb2_grpc.ArcServiceServicer),
-    ("IntentionService", palace_pb2_grpc.IntentionServiceServicer),
-    ("DynamicsService", palace_pb2_grpc.DynamicsServiceServicer),
-    ("RetrievalService", palace_pb2_grpc.RetrievalServiceServicer),
-    ("IngestionService", palace_pb2_grpc.IngestionServiceServicer),
-    ("JobService", palace_pb2_grpc.JobServiceServicer),
+    ("MemoryService", mypalace_pb2_grpc.MemoryServiceServicer),
+    ("SessionService", mypalace_pb2_grpc.SessionServiceServicer),
+    ("EpisodeService", mypalace_pb2_grpc.EpisodeServiceServicer),
+    ("ArcService", mypalace_pb2_grpc.ArcServiceServicer),
+    ("IntentionService", mypalace_pb2_grpc.IntentionServiceServicer),
+    ("DynamicsService", mypalace_pb2_grpc.DynamicsServiceServicer),
+    ("RetrievalService", mypalace_pb2_grpc.RetrievalServiceServicer),
+    ("IngestionService", mypalace_pb2_grpc.IngestionServiceServicer),
+    ("JobService", mypalace_pb2_grpc.JobServiceServicer),
 ]
 
 

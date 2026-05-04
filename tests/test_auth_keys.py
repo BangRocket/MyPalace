@@ -5,8 +5,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
-from palace.auth.key_service import CreatedKey
-from palace.models import ApiKey
+from mypalace.auth.key_service import CreatedKey
+from mypalace.models import ApiKey
 
 
 def _row(

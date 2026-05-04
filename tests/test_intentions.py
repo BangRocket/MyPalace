@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from palace.intentions.triggers import (
+from mypalace.intentions.triggers import (
     _check_context_trigger,
     _check_keyword_trigger,
     _check_time_trigger,

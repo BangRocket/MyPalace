@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from palace.dynamics.fsrs import (
+from mypalace.dynamics.fsrs import (
     FsrsParams,
     Grade,
     MemoryState,

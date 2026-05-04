@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from palace.episode_service import EpisodeService
+from mypalace.episode_service import EpisodeService
 
 
 @pytest.mark.asyncio
@@ -36,9 +36,11 @@ async def test_reflect_session_calls_llm_and_writes_episodes():
 
     fake_embedder = MagicMock(embed=AsyncMock(return_value=[[0.1] * 384]))
     with (
-        patch("palace.episode_service.llm.complete", new=AsyncMock(return_value=fake_llm_response)),
+        patch("mypalace.episode_service.llm.complete",
+              new=AsyncMock(return_value=fake_llm_response)),
         patch.object(svc, "_embedder", create=True, new=fake_embedder),
-        patch("palace.episode_service.episode_vector_store.upsert", new=AsyncMock()) as mock_upsert,
+        patch("mypalace.episode_service.episode_vector_store.upsert",
+              new=AsyncMock()) as mock_upsert,
     ):
         episodes = await svc.reflect_session(
             messages=messages, user_id="u1", agent_id="clara", session_id="s-123",
@@ -63,7 +65,8 @@ async def test_reflect_session_raises_on_llm_returns_garbage():
     svc = EpisodeService()
 
     with (
-        patch("palace.episode_service.llm.complete", new=AsyncMock(return_value="not json at all")),
+        patch("mypalace.episode_service.llm.complete",
+              new=AsyncMock(return_value="not json at all")),
         patch.object(svc, "_embedder", create=True, new=MagicMock(embed=AsyncMock())),
         pytest.raises(ValueError, match="(?i)json|parse"),
     ):
@@ -96,7 +99,7 @@ async def test_search_episodes_filters_by_significance():
         ])
 
     fake_embedder = MagicMock(embed=AsyncMock(return_value=[[0.1] * 384]))
-    qp_path = "palace.episode_service.episode_vector_store.client.query_points"
+    qp_path = "mypalace.episode_service.episode_vector_store.client.query_points"
     with (
         patch.object(svc, "_embedder", create=True, new=fake_embedder),
         patch(qp_path, new=fake_query_points),
@@ -125,7 +128,7 @@ async def test_get_recent_orders_by_timestamp_desc():
         points = [SimpleNamespace(id=p["id"], payload=p) for p in fake_payloads]
         return (points, None)  # qdrant scroll returns (points, next_offset)
 
-    with patch("palace.episode_service.episode_vector_store.client.scroll", new=fake_scroll):
+    with patch("mypalace.episode_service.episode_vector_store.client.scroll", new=fake_scroll):
         results = await svc.get_recent(user_id="u1", limit=5)
 
     assert len(results) == 2
@@ -241,9 +244,9 @@ async def test_reflect_strips_json_markdown_fence():
 
     fake_embedder = MagicMock(embed=AsyncMock(return_value=[[0.1] * 384]))
     with (
-        patch("palace.episode_service.llm.complete", new=AsyncMock(return_value=fenced_response)),
+        patch("mypalace.episode_service.llm.complete", new=AsyncMock(return_value=fenced_response)),
         patch.object(svc, "_embedder", create=True, new=fake_embedder),
-        patch("palace.episode_service.episode_vector_store.upsert", new=AsyncMock()),
+        patch("mypalace.episode_service.episode_vector_store.upsert", new=AsyncMock()),
     ):
         episodes = await svc.reflect_session(
             messages=[{"role": "user", "content": "x"}], user_id="u1",

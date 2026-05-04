@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from palace.grpc._generated import palace_pb2
-from palace.grpc.episode_servicer import EpisodeServicer
+from mypalace.grpc._generated import mypalace_pb2
+from mypalace.grpc.episode_servicer import EpisodeServicer
 
 
 def _fake_episode(**overrides):
@@ -30,11 +30,11 @@ def _fake_episode(**overrides):
 @pytest.mark.asyncio
 async def test_reflect_session_sync_returns_episodes():
     svc = EpisodeServicer()
-    with patch("palace.grpc.episode_servicer.episode_service.reflect_session",
+    with patch("mypalace.grpc.episode_servicer.episode_service.reflect_session",
                new=AsyncMock(return_value=[_fake_episode(id="e1")])):
-        req = palace_pb2.ReflectSessionRequest(
+        req = mypalace_pb2.ReflectSessionRequest(
             user_id="u1",
-            messages=[palace_pb2.ReflectionMessage(role="user", content="hi")],
+            messages=[mypalace_pb2.ReflectionMessage(role="user", content="hi")],
             mode="sync",
         )
         ctx = MagicMock()
@@ -48,15 +48,15 @@ async def test_reflect_session_sync_returns_episodes():
 async def test_reflect_session_async_returns_pending(monkeypatch):
     svc = EpisodeServicer()
     monkeypatch.setattr(
-        "palace.grpc.episode_servicer.settings.worker_queue_enabled", False,
+        "mypalace.grpc.episode_servicer.settings.worker_queue_enabled", False,
     )
     fake_job = MagicMock()
     fake_job.id = "job-1"
-    with patch("palace.grpc.episode_servicer.job_service.run_async",
+    with patch("mypalace.grpc.episode_servicer.job_service.run_async",
                new=AsyncMock(return_value=fake_job)):
-        req = palace_pb2.ReflectSessionRequest(
+        req = mypalace_pb2.ReflectSessionRequest(
             user_id="u1",
-            messages=[palace_pb2.ReflectionMessage(role="user", content="hi")],
+            messages=[mypalace_pb2.ReflectionMessage(role="user", content="hi")],
             mode="async",
         )
         ctx = MagicMock()
@@ -70,15 +70,15 @@ async def test_reflect_session_async_returns_pending(monkeypatch):
 async def test_reflect_session_async_with_worker_queue(monkeypatch):
     svc = EpisodeServicer()
     monkeypatch.setattr(
-        "palace.grpc.episode_servicer.settings.worker_queue_enabled", True,
+        "mypalace.grpc.episode_servicer.settings.worker_queue_enabled", True,
     )
     fake_job = MagicMock()
     fake_job.id = "job-q1"
-    with patch("palace.grpc.episode_servicer.enqueue_job",
+    with patch("mypalace.grpc.episode_servicer.enqueue_job",
                new=AsyncMock(return_value=fake_job)) as mock_enq:
-        req = palace_pb2.ReflectSessionRequest(
+        req = mypalace_pb2.ReflectSessionRequest(
             user_id="u1",
-            messages=[palace_pb2.ReflectionMessage(role="user", content="hi")],
+            messages=[mypalace_pb2.ReflectionMessage(role="user", content="hi")],
             mode="async",
         )
         ctx = MagicMock()
@@ -92,7 +92,7 @@ async def test_reflect_session_async_with_worker_queue(monkeypatch):
 @pytest.mark.asyncio
 async def test_reflect_session_invalid_mode():
     svc = EpisodeServicer()
-    req = palace_pb2.ReflectSessionRequest(user_id="u1", mode="bogus")
+    req = mypalace_pb2.ReflectSessionRequest(user_id="u1", mode="bogus")
     ctx = MagicMock()
     ctx.abort = AsyncMock(side_effect=Exception("aborted"))
     with pytest.raises(Exception, match="aborted"):
@@ -102,9 +102,9 @@ async def test_reflect_session_invalid_mode():
 @pytest.mark.asyncio
 async def test_search_episodes():
     svc = EpisodeServicer()
-    with patch("palace.grpc.episode_servicer.episode_service.search",
+    with patch("mypalace.grpc.episode_servicer.episode_service.search",
                new=AsyncMock(return_value=[_fake_episode(id="e2", score=0.8)])):
-        req = palace_pb2.SearchEpisodesRequest(query="q", user_id="u1", limit=5)
+        req = mypalace_pb2.SearchEpisodesRequest(query="q", user_id="u1", limit=5)
         ctx = MagicMock()
         resp = await svc.SearchEpisodes(req, ctx)
         assert len(resp.episodes) == 1
@@ -115,9 +115,9 @@ async def test_search_episodes():
 async def test_get_recent_episodes():
     svc = EpisodeServicer()
     items = [_fake_episode(id="e1"), _fake_episode(id="e2")]
-    with patch("palace.grpc.episode_servicer.episode_service.get_recent",
+    with patch("mypalace.grpc.episode_servicer.episode_service.get_recent",
                new=AsyncMock(return_value=items)):
-        req = palace_pb2.GetRecentEpisodesRequest(user_id="u1", limit=5)
+        req = mypalace_pb2.GetRecentEpisodesRequest(user_id="u1", limit=5)
         ctx = MagicMock()
         resp = await svc.GetRecentEpisodes(req, ctx)
         assert [e.id for e in resp.episodes] == ["e1", "e2"]

@@ -4,7 +4,7 @@ Verifies the client and server agree on the wire contract."""
 import pytest
 import pytest_asyncio
 
-from palace_client import PalaceClient
+from mypalace_client import PalaceClient
 
 pytestmark = pytest.mark.integration
 
@@ -51,7 +51,7 @@ async def test_client_full_memory_lifecycle(client: PalaceClient):
     await client.delete(mem.id)
 
     # get after delete → PalaceNotFound
-    from palace_client import PalaceNotFound
+    from mypalace_client import PalaceNotFound
     with pytest.raises(PalaceNotFound):
         await client.get(mem.id)
 

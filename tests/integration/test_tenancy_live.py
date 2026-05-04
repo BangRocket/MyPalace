@@ -10,9 +10,9 @@ pytestmark = pytest.mark.integration
 async def test_default_tenant_is_created_on_startup(palace_app):
     from sqlalchemy import select
 
-    from palace.config import settings
-    from palace.database import async_session
-    from palace.models import Tenant
+    from mypalace.config import settings
+    from mypalace.database import async_session
+    from mypalace.models import Tenant
 
     async with async_session() as db:
         result = await db.execute(
@@ -28,9 +28,9 @@ async def test_memory_create_persists_tenant_id(palace_app):
     settings.default_tenant_id ("test"). Memory rows should have tenant_id="test"."""
     from sqlalchemy import select
 
-    from palace.database import async_session
-    from palace.memory_service import memory_service
-    from palace.models import Memory
+    from mypalace.database import async_session
+    from mypalace.memory_service import memory_service
+    from mypalace.models import Memory
 
     mem = await memory_service.create(
         user_id="u1", content="hello", tenant_id="test",
@@ -43,7 +43,7 @@ async def test_memory_create_persists_tenant_id(palace_app):
 
 async def test_search_isolates_by_tenant(palace_app):
     """A memory created under tenant=A is not visible to tenant=B searches."""
-    from palace.memory_service import memory_service
+    from mypalace.memory_service import memory_service
 
     await memory_service.create(
         user_id="u1", content="alpha tenant secret", tenant_id="alpha",
@@ -75,7 +75,7 @@ async def test_search_isolates_by_tenant(palace_app):
 
 
 async def test_list_isolates_by_tenant(palace_app):
-    from palace.memory_service import memory_service
+    from mypalace.memory_service import memory_service
 
     await memory_service.create(
         user_id="user_x", content="alpha A", tenant_id="alpha",
@@ -95,8 +95,8 @@ async def test_list_isolates_by_tenant(palace_app):
 
 async def test_per_tenant_qdrant_collection_exists(palace_app):
     """After a write to a tenant, its Qdrant collection should exist."""
-    from palace.memory_service import memory_service
-    from palace.vector import vector_store
+    from mypalace.memory_service import memory_service
+    from mypalace.vector import vector_store
 
     await memory_service.create(
         user_id="u1", content="qdrant tenant test", tenant_id="qdrant_test",
@@ -107,7 +107,7 @@ async def test_per_tenant_qdrant_collection_exists(palace_app):
 
 
 async def test_delete_for_user_scoped_to_tenant(palace_app):
-    from palace.memory_service import memory_service
+    from mypalace.memory_service import memory_service
 
     await memory_service.create(user_id="u_del", content="alpha", tenant_id="alpha")
     await memory_service.create(user_id="u_del", content="beta", tenant_id="beta")

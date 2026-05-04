@@ -7,8 +7,8 @@ import json
 
 import pytest
 
-from palace.events.broker import EventBroker
-from palace.events.types import KNOWN_EVENT_TYPES, MEMORY_CREATED
+from mypalace.events.broker import EventBroker
+from mypalace.events.types import KNOWN_EVENT_TYPES, MEMORY_CREATED
 
 
 class TestEventTypes:
@@ -25,7 +25,7 @@ class TestEventTypes:
 class TestBrokerInProcess:
     @pytest.mark.asyncio
     async def test_publish_then_subscribe_receives(self, monkeypatch):
-        from palace.config import settings
+        from mypalace.config import settings
         monkeypatch.setattr(settings, "redis_url", None)  # force in-process
 
         broker = EventBroker()
@@ -45,7 +45,7 @@ class TestBrokerInProcess:
 
     @pytest.mark.asyncio
     async def test_other_tenant_events_not_received(self, monkeypatch):
-        from palace.config import settings
+        from mypalace.config import settings
         monkeypatch.setattr(settings, "redis_url", None)
 
         broker = EventBroker()
@@ -56,7 +56,7 @@ class TestBrokerInProcess:
 
     @pytest.mark.asyncio
     async def test_two_subscribers_both_receive(self, monkeypatch):
-        from palace.config import settings
+        from mypalace.config import settings
         monkeypatch.setattr(settings, "redis_url", None)
 
         broker = EventBroker()
@@ -70,7 +70,7 @@ class TestBrokerInProcess:
 
     @pytest.mark.asyncio
     async def test_subscribe_unregisters_on_exit(self, monkeypatch):
-        from palace.config import settings
+        from mypalace.config import settings
         monkeypatch.setattr(settings, "redis_url", None)
 
         broker = EventBroker()
@@ -82,7 +82,7 @@ class TestBrokerInProcess:
     async def test_full_queue_drops_event(self, monkeypatch):
         """A slow subscriber whose queue is full should not block publishers
         (events drop, log warning)."""
-        from palace.config import settings
+        from mypalace.config import settings
         monkeypatch.setattr(settings, "redis_url", None)
 
         broker = EventBroker()
@@ -109,7 +109,7 @@ class TestEventsRoute:
 
         from starlette.websockets import WebSocketDisconnect
 
-        from palace.config import settings
+        from mypalace.config import settings
 
         with patch.object(settings, "auth_disabled", False), \
              pytest.raises(WebSocketDisconnect), \

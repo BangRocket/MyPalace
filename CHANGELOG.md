@@ -1,8 +1,52 @@
 # Changelog
 
-All notable changes to Palace are documented here. The format follows
-[Keep a Changelog](https://keepachangelog.com/) and Palace adheres to
+All notable changes to MyPalace are documented here. The format follows
+[Keep a Changelog](https://keepachangelog.com/) and MyPalace adheres to
 [Semantic Versioning](https://semver.org/).
+
+## [0.7.0] — 2026-05-04
+
+**Project rename: Palace → MyPalace.** Brand alignment with mypalclara.
+Plus a license correction.
+
+### Changed (BREAKING)
+
+- **PyPI distribution names** —
+  - `palace-memory` → `mypalace`
+  - `palace-client` → `mypalace-client`
+  - Operators upgrading should `pip uninstall palace-memory palace-client`
+    and `pip install mypalace mypalace-client` (versions sync at 0.7.0).
+- **Python import paths** —
+  - `from palace.X import Y` → `from mypalace.X import Y`
+  - `from palace_client import Y` → `from mypalace_client import Y`
+- **Docker image** — `bangrocket/palace:X.Y.Z` → `bangrocket/mypalace:X.Y.Z`
+- **gRPC proto package** — `palace.v1` → `mypalace.v1` (regenerate stubs
+  if you carry your own)
+- **License** — Project is **PolyForm Noncommercial 1.0.0**, NOT MIT as
+  prior pyproject metadata incorrectly claimed. License is now declared
+  via the `License :: Other/Proprietary License` classifier and the
+  `LICENSE.md` file at the repo root, which both wheels bundle.
+  *No license intent change* — this corrects metadata that never matched
+  the project's actual licensing.
+
+### Migration
+
+For most operators:
+
+```bash
+pip uninstall palace-memory palace-client
+pip install mypalace==0.7.0 mypalace-client==0.7.0
+# Then update your imports:
+sed -i '' 's/from palace\./from mypalace./g; s/from palace_client/from mypalace_client/g' your_code.py
+```
+
+The HTTP API surface (paths, request/response shapes, headers) is
+**unchanged** — only the package and import names changed. Existing
+clients hitting `/v1/...` keep working.
+
+The gRPC proto package change `palace.v1 → mypalace.v1` is on the wire,
+so existing gRPC clients need to regenerate their stubs from the new
+`proto/mypalace.proto`.
 
 ## [0.6.0] — 2026-05-04
 

@@ -1,15 +1,14 @@
 [project]
-name = "palace-memory"
-version = "0.6.0"
-description = "Standalone memory service for AI assistants — full HTTP + gRPC surface, multi-tenancy, graph, cache, workers, rate limits, websockets, observability, analytics, bulk import/export, TTL, embedding migration, audit log, memory versioning"
+name = "mypalace"
+version = "0.7.0"
+description = "MyPalace — standalone memory service for AI assistants. Full HTTP + gRPC surface, multi-tenancy, graph, cache, workers, rate limits, websockets, observability, analytics, bulk import/export, TTL, embedding migration, audit log, memory versioning."
 requires-python = ">=3.12"
-license = { text = "MIT" }
 authors = [{ name = "BangRocket" }]
 readme = "README.md"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: Other/Proprietary License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Libraries :: Application Frameworks",
@@ -67,9 +66,9 @@ select = ["E", "F", "I", "W", "N", "UP", "B", "C4", "SIM"]
 ignore = ["UP046"]  # Generic[T] is the canonical Pydantic v2 idiom
 
 [tool.ruff.lint.per-file-ignores]
-"palace_client/palace_client/exceptions.py" = ["N818"]  # PalaceNotFound, PalaceTransport are deliberate public API names
-"palace/grpc/_generated/*.py" = ["ALL"]  # protoc-generated stubs; do not lint
-"palace/grpc/memory_servicer.py" = ["N802"]  # gRPC servicer methods must match proto (PascalCase)
+"mypalace_client/mypalace_client/exceptions.py" = ["N818"]  # PalaceNotFound, PalaceTransport are deliberate public API names
+"mypalace/grpc/_generated/*.py" = ["ALL"]  # protoc-generated stubs; do not lint
+"mypalace/grpc/*_servicer.py" = ["N802"]  # gRPC servicer methods must match proto (PascalCase)
 
 [project.urls]
 Homepage = "https://github.com/BangRocket/palace-memory"
@@ -81,11 +80,11 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["palace*"]
-exclude = ["palace_client*"]
+include = ["mypalace*"]
+exclude = ["palace_client*", "mypalace_client*"]
 
 [tool.setuptools.package-data]
-"palace.grpc._generated" = ["*.py"]
+"mypalace.grpc._generated" = ["*.py"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

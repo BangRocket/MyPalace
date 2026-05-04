@@ -6,14 +6,14 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from palace.retrieval.layered import LayeredRetrievalService
+from mypalace.retrieval.layered import LayeredRetrievalService
 
 
 class TestFetchGraphContext:
     @pytest.mark.asyncio
     async def test_returns_none_when_graph_disabled(self):
         svc = LayeredRetrievalService()
-        with patch("palace.graph.service.graph_service") as mock_graph:
+        with patch("mypalace.graph.service.graph_service") as mock_graph:
             mock_graph.enabled = False
             result = await svc._fetch_graph_context(
                 memory_ids=["m1", "m2"], tenant_id="t1",
@@ -24,7 +24,7 @@ class TestFetchGraphContext:
     @pytest.mark.asyncio
     async def test_returns_none_when_no_l2_memory_ids(self):
         svc = LayeredRetrievalService()
-        with patch("palace.graph.service.graph_service") as mock_graph:
+        with patch("mypalace.graph.service.graph_service") as mock_graph:
             mock_graph.enabled = True
             result = await svc._fetch_graph_context(
                 memory_ids=[], tenant_id="t1", depth=1, max_neighbors=50,
@@ -34,7 +34,7 @@ class TestFetchGraphContext:
     @pytest.mark.asyncio
     async def test_dedupes_neighbors_and_skips_l2_memories(self):
         svc = LayeredRetrievalService()
-        with patch("palace.graph.service.graph_service") as mock_graph:
+        with patch("mypalace.graph.service.graph_service") as mock_graph:
             mock_graph.enabled = True
             # m1's neighbors include m2 (already in L2 — skip), m3, m4.
             # m2's neighbors include m3 (dup) and m5.
@@ -81,7 +81,7 @@ class TestFetchGraphContext:
             ],
             "edges": [],
         }
-        with patch("palace.graph.service.graph_service") as mock_graph:
+        with patch("mypalace.graph.service.graph_service") as mock_graph:
             mock_graph.enabled = True
             mock_graph.neighbors = AsyncMock(return_value=big_neighborhood)
             result = await svc._fetch_graph_context(
@@ -94,7 +94,7 @@ class TestFetchGraphContext:
     async def test_swallows_per_node_exceptions(self):
         """A graph error for one memory shouldn't kill the whole walk."""
         svc = LayeredRetrievalService()
-        with patch("palace.graph.service.graph_service") as mock_graph:
+        with patch("mypalace.graph.service.graph_service") as mock_graph:
             mock_graph.enabled = True
             mock_graph.neighbors = AsyncMock(side_effect=[
                 RuntimeError("boom"),

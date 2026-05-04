@@ -6,25 +6,25 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from palace.cache.client import Cache, cache
-from palace.cache.decorator import _to_jsonable, cached_call
+from mypalace.cache.client import Cache, cache
+from mypalace.cache.decorator import _to_jsonable, cached_call
 
 
 class TestEnabledGate:
     def test_disabled_when_no_redis_url(self):
         # In test env settings.redis_url defaults to None
-        from palace.config import settings
+        from mypalace.config import settings
         with patch.object(settings, "redis_url", None):
             assert cache.enabled is False
 
     def test_disabled_when_explicitly_disabled(self):
-        from palace.config import settings
+        from mypalace.config import settings
         with patch.object(settings, "redis_url", "redis://localhost"), \
              patch.object(settings, "cache_disabled", True):
             assert cache.enabled is False
 
     def test_enabled_with_url_and_not_disabled(self):
-        from palace.config import settings
+        from mypalace.config import settings
         with patch.object(settings, "redis_url", "redis://localhost"), \
              patch.object(settings, "cache_disabled", False):
             assert cache.enabled is True
@@ -53,13 +53,13 @@ class TestKeyDerivation:
 class TestCacheGetSetNoOp:
     @pytest.mark.asyncio
     async def test_get_returns_none_when_disabled(self):
-        from palace.config import settings
+        from mypalace.config import settings
         with patch.object(settings, "redis_url", None):
             assert await cache.get("any_key") is None
 
     @pytest.mark.asyncio
     async def test_set_swallowed_when_disabled(self):
-        from palace.config import settings
+        from mypalace.config import settings
         with patch.object(settings, "redis_url", None):
             await cache.set("k", {"a": 1}, ttl=60)  # no-op, no exception
 

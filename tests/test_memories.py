@@ -206,7 +206,7 @@ def test_batch_create_per_message_keys_win(client, mock_memory_service):
 async def test_create_batch_merges_metadata_per_message_keys_win():
     """Direct unit test of MemoryService.create_batch: per-message keys
     must win over request-level metadata when keys collide."""
-    from palace.memory_service import MemoryService
+    from mypalace.memory_service import MemoryService
 
     svc = MemoryService()
     captured_calls = []

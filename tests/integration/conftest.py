@@ -124,46 +124,46 @@ async def palace_app(palace_settings: dict[str, str]):
 
     import importlib
 
-    from palace import config as palace_config
+    from mypalace import config as palace_config
     importlib.reload(palace_config)
-    from palace import database, memory_service, session_service, vector
+    from mypalace import database, memory_service, session_service, vector
     importlib.reload(database)
     importlib.reload(vector)
     importlib.reload(memory_service)
     importlib.reload(session_service)
-    from palace import context_service
+    from mypalace import context_service
     importlib.reload(context_service)
     # API router modules close over the singletons via `from ... import`
     # — reload them so routes pick up the new memory_service / vector_store.
-    from palace.api import common as api_common
+    from mypalace.api import common as api_common
     importlib.reload(api_common)
-    from palace.api import context as api_context
-    from palace.api import memories as api_memories
-    from palace.api import sessions as api_sessions
+    from mypalace.api import context as api_context
+    from mypalace.api import memories as api_memories
+    from mypalace.api import sessions as api_sessions
     importlib.reload(api_memories)
     importlib.reload(api_sessions)
     importlib.reload(api_context)
     # Slice 3: dynamics + maintenance routers close over dynamics_service.
-    from palace.dynamics import service as dynamics_service_mod
+    from mypalace.dynamics import service as dynamics_service_mod
     importlib.reload(dynamics_service_mod)
     # Slice 4: intentions service + router close over async_session.
-    from palace.intentions import service as intentions_service_mod
+    from mypalace.intentions import service as intentions_service_mod
     importlib.reload(intentions_service_mod)
-    from palace.api import dynamics as api_dynamics
-    from palace.api import intentions as api_intentions
-    from palace.api import maintenance as api_maintenance
+    from mypalace.api import dynamics as api_dynamics
+    from mypalace.api import intentions as api_intentions
+    from mypalace.api import maintenance as api_maintenance
     importlib.reload(api_dynamics)
     importlib.reload(api_intentions)
     importlib.reload(api_maintenance)
     # Slice 5: layered retrieval + smart ingestion routers close over services.
-    from palace.retrieval import ingestion as ingestion_mod
-    from palace.retrieval import layered as layered_mod
+    from mypalace.retrieval import ingestion as ingestion_mod
+    from mypalace.retrieval import layered as layered_mod
     importlib.reload(layered_mod)
     importlib.reload(ingestion_mod)
-    from palace.api import retrieval as api_retrieval
+    from mypalace.api import retrieval as api_retrieval
     importlib.reload(api_retrieval)
     importlib.reload(api_memories)  # picks up the new smart_ingestion_service
-    from palace import main as palace_main
+    from mypalace import main as palace_main
     importlib.reload(palace_main)
 
     # Run lifespan startup (creates tables + Qdrant collection + default tenant)
@@ -188,8 +188,8 @@ async def _truncate_tables(palace_app):
     """Truncate tables and clear Qdrant points between tests."""
     from sqlalchemy import delete
 
-    from palace.database import async_session
-    from palace.models import (
+    from mypalace.database import async_session
+    from mypalace.models import (
         ApiKey,
         AuditLog,
         Intention,
@@ -203,8 +203,8 @@ async def _truncate_tables(palace_app):
         ReflectionJob,
         Tenant,
     )
-    from palace.models import Session as SessionModel
-    from palace.vector import episode_vector_store, vector_store
+    from mypalace.models import Session as SessionModel
+    from mypalace.vector import episode_vector_store, vector_store
 
     async with async_session() as db:
         # Access logs first — they FK to memory_dynamics with CASCADE, but
@@ -243,8 +243,8 @@ async def _truncate_tables(palace_app):
     vector_store._ensured.clear()
     episode_vector_store._ensured.clear()
 
-    from palace.episode_service import episode_service
-    from palace.memory_service import memory_service
+    from mypalace.episode_service import episode_service
+    from mypalace.memory_service import memory_service
     await memory_service.init(tenant_id="test")
     await episode_service.init(tenant_id="test")
     yield
@@ -257,7 +257,7 @@ async def stub_llm(palace_app):
 
     from unittest.mock import AsyncMock
 
-    from palace import llm as llm_module
+    from mypalace import llm as llm_module
 
     holder = type("Holder", (), {"next_response": ""})()
     original = llm_module.llm.complete

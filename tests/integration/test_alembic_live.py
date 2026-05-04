@@ -79,7 +79,7 @@ async def test_init_db_stamps_revision(palace_app):
     """After lifespan startup, alembic_version should hold the latest revision."""
     from sqlalchemy import text
 
-    from palace.database import LATEST_ALEMBIC_REVISION, async_session
+    from mypalace.database import LATEST_ALEMBIC_REVISION, async_session
 
     async with async_session() as db:
         result = await db.execute(text("SELECT version_num FROM alembic_version"))

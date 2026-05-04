@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from sqlmodel import SQLModel
 
-import palace.models  # noqa: F401 — ensure tables are registered
+import mypalace.models  # noqa: F401 — ensure tables are registered
 
 
 def test_memory_supersession_table_registered():

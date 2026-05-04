@@ -20,7 +20,7 @@ def _make_key() -> str:
 @pytest_asyncio.fixture
 async def auth_enabled_app(palace_app):
     """Flip auth on for the duration of one test, then back off."""
-    from palace.config import settings
+    from mypalace.config import settings
 
     original = settings.auth_disabled
     settings.auth_disabled = False
@@ -57,7 +57,7 @@ async def test_protected_endpoint_rejects_no_key(auth_http_client):
 
 async def test_full_lifecycle_admin_then_write_key(auth_http_client):
     """Mint admin key via service, use it to issue a write key, exercise both."""
-    from palace.auth.key_service import key_service
+    from mypalace.auth.key_service import key_service
 
     # Bootstrap an admin key directly via the service (simulating env bootstrap)
     admin_plaintext = _make_key()
@@ -131,7 +131,7 @@ async def test_malformed_key_rejected(auth_http_client):
 
 async def test_bootstrap_idempotent(palace_app):
     """Calling bootstrap_if_needed twice with admin existing is a no-op."""
-    from palace.auth.key_service import key_service
+    from mypalace.auth.key_service import key_service
 
     p1 = _make_key()
     inserted_first = await key_service.bootstrap_if_needed(p1)
@@ -146,7 +146,7 @@ async def test_bootstrap_with_none_when_no_admin(palace_app, caplog):
     """No env var + no existing admin → warn and return False."""
     import logging
 
-    from palace.auth.key_service import key_service
+    from mypalace.auth.key_service import key_service
 
     with caplog.at_level(logging.WARNING):
         result = await key_service.bootstrap_if_needed(None)
