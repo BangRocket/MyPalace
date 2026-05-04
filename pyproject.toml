@@ -71,9 +71,9 @@ ignore = ["UP046"]  # Generic[T] is the canonical Pydantic v2 idiom
 "mypalace/grpc/*_servicer.py" = ["N802"]  # gRPC servicer methods must match proto (PascalCase)
 
 [project.urls]
-Homepage = "https://github.com/BangRocket/palace-memory"
-Repository = "https://github.com/BangRocket/palace-memory"
-Issues = "https://github.com/BangRocket/palace-memory/issues"
+Homepage = "https://github.com/BangRocket/MyPalace"
+Repository = "https://github.com/BangRocket/MyPalace"
+Issues = "https://github.com/BangRocket/MyPalace/issues"
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]
