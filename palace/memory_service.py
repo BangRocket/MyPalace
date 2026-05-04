@@ -63,6 +63,18 @@ class MemoryService:
             {"user_id": user_id, "agent_id": agent_id, "memory_type": memory_type},
             tenant_id=tenant_id,
         )
+
+        # Phase 3 slice 3: fire-and-forget graph upsert.
+        from palace.graph.service import graph_service
+        graph_service.schedule(graph_service.upsert_memory_node(
+            memory_id=memory.id,
+            user_id=user_id,
+            agent_id=agent_id,
+            content=content,
+            memory_type=memory_type,
+            importance=importance,
+            tenant_id=tenant_id,
+        ))
         return memory
 
     async def create_batch(

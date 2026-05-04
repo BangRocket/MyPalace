@@ -334,6 +334,15 @@ class SmartIngestionService:
                 tenant_id=tenant_id,
             )
 
+        # Phase 3 slice 3: fire-and-forget SUPERSEDES edge.
+        from palace.graph.service import graph_service
+        graph_service.schedule(graph_service.add_supersedes_edge(
+            new_memory_id=new_id,
+            old_memory_id=superseded_id,
+            tenant_id=tenant_id,
+            reason=reason,
+        ))
+
         return row
 
     # ------------------------------------------------------------------ #

@@ -108,6 +108,41 @@ There is no Alembic yet — `init_db()` creates the schema on startup. Slice 6 (
 
 ---
 
+## Graph layer (phase 3 slice 3)
+
+Optional FalkorDB integration. When `PALACE_FALKORDB_URL` is set, every memory / episode / arc create writes a node into the per-tenant graph (`palace_<tenant_id>`), and every supersession writes a `SUPERSEDES` edge. Writes are fire-and-forget — graph failures never break the primary write.
+
+```bash
+# FalkorDB ships as a Redis module:
+podman run -d --name palace-falkor -p 6379:6379 docker.io/falkordb/falkordb:latest
+export PALACE_FALKORDB_URL=redis://localhost:6379
+```
+
+Without the env var, the graph layer is a no-op and `/v1/graph/*` returns 503.
+
+### Schema
+
+```
+(:Memory {id, user_id, agent_id, content, memory_type, importance})
+(:Episode {id, user_id, summary, significance, timestamp})
+(:Arc {id, user_id, title, status})
+
+(Memory)-[:SUPERSEDES]->(Memory)
+(Episode)-[:PARTICIPATES_IN]->(Arc)
+```
+
+### Querying neighbors
+
+```bash
+curl "http://localhost:8000/v1/graph/neighbors?node_id=<memory_id>&depth=2&edge_type=SUPERSEDES" \
+  -H "X-Palace-Key: $KEY"
+# → {"data": {"nodes": [...], "edges": [...]}, "meta": {...}}
+```
+
+Depth is capped at 3 hops; edge_type filter is optional. No raw Cypher passthrough — the only graph API surface is `/v1/graph/neighbors`.
+
+---
+
 ## Quick start
 
 ```bash

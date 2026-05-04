@@ -39,5 +39,10 @@ class Settings(BaseSettings):
         default="default", validation_alias="PALACE_DEFAULT_TENANT_ID",
     )
 
+    # Graph (slice 3) — FalkorDB. Unset = no-op.
+    falkordb_url: str | None = Field(
+        default=None, validation_alias="PALACE_FALKORDB_URL",
+    )
+
 
 settings = Settings()
