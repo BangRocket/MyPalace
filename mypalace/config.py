@@ -68,6 +68,9 @@ class Settings(BaseSettings):
     log_format: str = Field(
         default="pretty", validation_alias="PALACE_LOG_FORMAT",
     )  # "pretty" or "json"
+    db_slow_query_threshold_ms: int = Field(
+        default=200, validation_alias="PALACE_DB_SLOW_QUERY_MS",
+    )
 
     # Background workers (phase 4 slice 3)
     worker_poll_interval: float = Field(

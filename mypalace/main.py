@@ -34,6 +34,7 @@ from mypalace.database import async_session, init_db
 from mypalace.episode_service import episode_service
 from mypalace.memory_service import memory_service
 from mypalace.models import Tenant
+from mypalace.observability.db import install as install_db_metrics
 from mypalace.observability.logging import configure_logging
 from mypalace.observability.metrics import metrics_response
 from mypalace.observability.middleware import ObservabilityMiddleware
@@ -72,6 +73,11 @@ async def lifespan(app: FastAPI):
         _log.warning(warning)
 
     configure_tracing(app)
+    # Phase 8 slice 2: install per-query timing + slow-query log on the
+    # async engine. Idempotent — re-installation on the same engine is a
+    # no-op.
+    from mypalace.database import engine as _engine
+    install_db_metrics(_engine)
     await init_db()
     await _ensure_default_tenant()
     await memory_service.init(tenant_id=settings.default_tenant_id)

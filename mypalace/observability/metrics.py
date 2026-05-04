@@ -70,6 +70,29 @@ job_total = Counter(
     registry=registry,
 )
 
+# Phase 8 slice 2: DB query observability.
+db_query_duration = Histogram(
+    "palace_db_query_duration_seconds",
+    "DB query duration in seconds, bucketed by operation kind.",
+    ["operation"],  # SELECT / INSERT / UPDATE / DELETE / OTHER
+    buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0),
+    registry=registry,
+)
+
+db_queries_total = Counter(
+    "palace_db_queries_total",
+    "Total DB queries issued, by operation kind.",
+    ["operation"],
+    registry=registry,
+)
+
+db_slow_queries_total = Counter(
+    "palace_db_slow_queries_total",
+    "DB queries that exceeded PALACE_DB_SLOW_QUERY_MS, by operation.",
+    ["operation"],
+    registry=registry,
+)
+
 
 def metrics_response() -> Response:
     """FastAPI/Starlette response carrying the Prometheus exposition payload."""
