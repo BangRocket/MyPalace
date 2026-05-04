@@ -106,9 +106,26 @@ curl -X POST http://localhost:8000/v1/admin/keys \
 
 The bootstrap admin key (from `PALACE_BOOTSTRAP_ADMIN_KEY`) is a cross-tenant key by default.
 
-### Migration story
+### Migrations (phase 4 slice 1)
 
-There is no Alembic yet — `init_db()` creates the schema on startup. Slice 6 (publish) introduces Alembic with one consolidated phase-3 migration. If you have a pre-phase-3 Palace deployment with data, contact the maintainers.
+Alembic now manages schema. `init_db()` still creates tables on first boot for zero-config dev, AND stamps the latest revision so future `alembic upgrade head` calls know where to start.
+
+```bash
+# Fresh install — nothing to do; lifespan startup handles it.
+.venv/bin/uvicorn palace.main:app
+
+# Pre-phase-4 install with existing data — stamp once, then upgrade as usual:
+.venv/bin/alembic stamp 2026_05_04_0001_baseline
+.venv/bin/alembic upgrade head
+
+# Day-to-day after a new migration lands:
+.venv/bin/alembic upgrade head
+
+# Generate a new migration from model changes:
+.venv/bin/alembic revision --autogenerate -m "add foo column"
+```
+
+DB URL is read from `PALACE_DATABASE_URL` (no need to set `sqlalchemy.url` in `alembic.ini`).
 
 ---
 
