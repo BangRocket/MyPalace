@@ -71,6 +71,14 @@ class SearchMemoriesRequest(BaseModel):
     memory_type: str | None = None
     limit: int = 10
     min_score: float = 0.0
+    # Phase 7 slice 3: optional tenant_id override.
+    # - None: tenant-bound key uses its tenant; cross-tenant admin uses
+    #   settings.default_tenant_id
+    # - "<tenant_id>": tenant-bound key must match its binding (or 403);
+    #   cross-tenant admin can target any tenant
+    # - "ALL": cross-tenant admin only; searches every tenant's
+    #   collection and tags results with their tenant_id
+    tenant_id: str | None = None
 
 
 class CreateSessionRequest(BaseModel):
@@ -145,6 +153,9 @@ class SearchedMemoryOut(BaseModel):
     importance: float
     score: float
     created_at: str | None
+    # Phase 7 slice 3: present iff tenant_id="ALL" search; null otherwise
+    # to keep existing single-tenant payloads unchanged.
+    tenant_id: str | None = None
 
 
 class SessionOut(BaseModel):

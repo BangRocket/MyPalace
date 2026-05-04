@@ -110,8 +110,54 @@ async def search_memories(
     req: SearchMemoriesRequest,
     auth: Annotated[AuthContext, Depends(get_auth_context)],
 ):
-    tenant_id = auth.resolve_tenant()
+    """Semantic search.
+
+    ``tenant_id`` overrides:
+      - None / omitted: tenant-bound key uses its tenant; cross-tenant
+        admin uses settings.default_tenant_id
+      - "<tenant_id>": tenant-bound key must match its binding (or 403);
+        cross-tenant admin can target any tenant
+      - "ALL": cross-tenant admin only — searches every tenant's
+        collection and tags each result with its tenant_id (phase 7
+        slice 3)
+    """
     start = time.time()
+
+    # Cross-tenant fanout path
+    if req.tenant_id == "ALL":
+        if auth.tenant_id is not None:
+            raise HTTPException(
+                status_code=403,
+                detail="cross-tenant search requires a cross-tenant admin key",
+            )
+        results = await memory_service.search_all_tenants(
+            query=req.query,
+            user_id=req.user_id,
+            agent_id=req.agent_id,
+            memory_type=req.memory_type,
+            limit=req.limit,
+            min_score=req.min_score,
+        )
+        took = int((time.time() - start) * 1000)
+        memories = [
+            SearchedMemoryOut(
+                id=m.id,
+                content=m.content,
+                memory_type=m.memory_type,
+                importance=m.importance,
+                score=round(score, 4),
+                created_at=m.created_at.isoformat() if m.created_at else None,
+                tenant_id=t_id,
+            )
+            for m, score, t_id in results
+        ]
+        return ApiResponse(
+            data=memories,
+            meta=Meta(count=len(memories), took_ms=took),
+        )
+
+    # Single-tenant path
+    tenant_id = auth.resolve_tenant(request_tenant=req.tenant_id)
 
     async def _load() -> list[dict]:
         results = await memory_service.search(
