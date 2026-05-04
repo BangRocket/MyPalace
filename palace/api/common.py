@@ -424,3 +424,75 @@ class FiredIntentionOut(BaseModel):
 
 class IntentionFormatOut(BaseModel):
     text: str
+
+
+# ---------------------------------------------------------------------------
+# Slice 5: layered retrieval + smart ingestion
+# ---------------------------------------------------------------------------
+
+class LayeredContextRequest(BaseModel):
+    user_id: str
+    query: str
+    agent_id: str | None = None
+    session_id: str | None = None
+    max_l1_chars: int = 3200
+    max_l2_chars: int = 12000
+    max_recent_messages: int = 20
+    use_fsrs: bool = True
+    memory_limit: int = 10
+    episode_limit: int = 5
+    min_episode_significance: float = 0.3
+
+
+class MemoryWithScoreOut(BaseModel):
+    """Memory with similarity score and optional FSRS composite score."""
+    id: str
+    user_id: str
+    agent_id: str | None = None
+    content: str
+    memory_type: str
+    importance: float
+    score: float
+    composite_score: float | None = None
+    fsrs_score: float | None = None
+    created_at: str | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class LayeredL1Out(BaseModel):
+    memories: list[dict[str, Any]] = []
+    recent_episodes: list[dict[str, Any]] = []
+    active_arcs: list[dict[str, Any]] = []
+
+
+class LayeredL2Out(BaseModel):
+    memories: list[dict[str, Any]] = []
+    episodes: list[dict[str, Any]] = []
+
+
+class LayeredCharCounts(BaseModel):
+    l1: int = 0
+    l2: int = 0
+
+
+class LayeredContextOut(BaseModel):
+    l1_user_profile: LayeredL1Out
+    l2_relevant_context: LayeredL2Out
+    recent_messages: list[dict[str, Any]] | None = None
+    summary: str | None = None
+    char_counts: LayeredCharCounts
+
+
+class SupersedeMemoryRequest(BaseModel):
+    user_id: str
+    new_content: str
+    reason: str = "manual_correction"
+    metadata: dict[str, Any] | None = None
+
+
+class SupersessionOut(BaseModel):
+    superseded_id: str
+    new_id: str
+    reason: str
+    similarity_score: float | None = None
+    created_at: str | None = None

@@ -1,0 +1,49 @@
+"""Layered retrieval route handler (slice 5)."""
+
+import time
+
+from fastapi import APIRouter
+
+from palace.api.common import (
+    ApiResponse,
+    LayeredCharCounts,
+    LayeredContextOut,
+    LayeredContextRequest,
+    LayeredL1Out,
+    LayeredL2Out,
+    Meta,
+)
+from palace.retrieval.layered import layered_retrieval_service
+
+router = APIRouter()
+
+
+@router.post("/layered", response_model=ApiResponse[LayeredContextOut])
+async def assemble_layered_context(req: LayeredContextRequest):
+    start = time.time()
+    result = await layered_retrieval_service.assemble(
+        user_id=req.user_id,
+        query=req.query,
+        agent_id=req.agent_id,
+        session_id=req.session_id,
+        max_l1_chars=req.max_l1_chars,
+        max_l2_chars=req.max_l2_chars,
+        max_recent_messages=req.max_recent_messages,
+        use_fsrs=req.use_fsrs,
+        memory_limit=req.memory_limit,
+        episode_limit=req.episode_limit,
+        min_episode_significance=req.min_episode_significance,
+    )
+    took = int((time.time() - start) * 1000)
+    out = LayeredContextOut(
+        l1_user_profile=LayeredL1Out(**result["l1_user_profile"]),
+        l2_relevant_context=LayeredL2Out(**result["l2_relevant_context"]),
+        recent_messages=result.get("recent_messages"),
+        summary=result.get("summary"),
+        char_counts=LayeredCharCounts(**result["char_counts"]),
+    )
+    count = (
+        len(result["l1_user_profile"]["memories"])
+        + len(result["l2_relevant_context"]["memories"])
+    )
+    return ApiResponse(data=out, meta=Meta(count=count, took_ms=took))
