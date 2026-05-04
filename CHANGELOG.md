@@ -4,6 +4,53 @@ All notable changes to Palace are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and Palace adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] — 2026-05-04
+
+Compliance + forensics + cross-tenant search. Three slices since 0.5.
+
+### Added — phase 7
+
+- **Admin audit log (slice 1)** — `audit_logs` table (alembic 0005)
+  records every `/v1/admin/*` and `/v1/maintenance/*` call:
+  `key_id`, `tenant_id`, `method`, `path`, `status_class`,
+  `request_body_hash`, `response_ms`. Body is hashed (SHA256), not
+  stored, so audit answers "did this happen" without leaking
+  bootstrap-key plaintext. AuditMiddleware runs innermost (after
+  auth) and inserts fire-and-forget so audit failures never break
+  the actual request. `GET /v1/admin/audit?since=...&until=...&key_id=...&path_prefix=...`
+  exposes the trail; tenant-bound keys see only their tenant's rows,
+  cross-tenant admin sees all.
+- **Memory change history (slice 2)** — `memory_versions` table
+  (alembic 0006) snapshots every memory mutation as an append-only
+  row: `memory_id`, `version_number`, `content`, `metadata_json`,
+  `change_kind` (one of `created` / `updated` / `superseded`),
+  `actor_key_id`. Snapshots happen on `memory_service.create` (v1),
+  `memory_service.update` (vN+1), and the supersession path (snapshot
+  of OLD memory's content). All best-effort — version-table failures
+  log + swallow; primary writes stay correct.
+  `GET /v1/memories/{id}/history` returns chronological trail,
+  tenant-scoped.
+- **Cross-tenant search (slice 3)** —
+  `POST /v1/memories/search` accepts an optional `tenant_id` field:
+  null = bound key's tenant, `"<id>"` = explicit (admin-only for
+  others), `"ALL"` = cross-tenant fanout (cross-tenant admin only).
+  Embedding happens once; per-tenant Qdrant searches run in parallel
+  and merge by score. Results in ALL mode carry a `tenant_id` field;
+  single-tenant payloads unchanged (field is null).
+- **Migration guide (this release)** —
+  `docs/migrating-mypalclara.md` walks operators through swapping
+  mypalclara's embedded ClaraMemory + MemoryManager for a remote
+  Palace 0.6.0 deployment. Covers mint-keys, point-the-router,
+  data-replay-via-existing-script, validation, and rollback.
+
+### Notes
+
+- Worker-path event publishers (deferred from phase 5 slice 5) are
+  already correct: `episode_service.reflect_session` and
+  `arc_service.synthesize_narratives` publish events at the bottom of
+  their bodies, and the worker handlers call those same functions —
+  no separate worker-path wire-up needed.
+
 ## [0.5.0] — 2026-05-04
 
 Operations + DR + lifecycle features. Four slices since 0.4.
