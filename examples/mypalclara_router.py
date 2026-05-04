@@ -64,6 +64,29 @@ _EmbeddedMM = _EmbeddedStub()
 
 
 # ---------------------------------------------------------------------------
+# Remote proxies for sub-objects
+# ---------------------------------------------------------------------------
+
+class RemoteEpisodeStore:
+    """Proxy that exposes ClaraMemory.episode_store's surface (search, get_recent,
+    get_active_arcs) but routes to a remote PalaceClient."""
+
+    def __init__(self, client: PalaceClient) -> None:
+        self._client = client
+
+    async def search(self, query: str, user_id: str, limit: int = 5, min_significance: float = 0.0):
+        return await self._client.search_episodes(
+            query=query, user_id=user_id, limit=limit, min_significance=min_significance,
+        )
+
+    async def get_recent(self, user_id: str, limit: int = 5):
+        return await self._client.get_recent_episodes(user_id=user_id, limit=limit)
+
+    async def get_active_arcs(self, user_id: str, limit: int = 10):
+        return await self._client.get_active_arcs(user_id=user_id, limit=limit)
+
+
+# ---------------------------------------------------------------------------
 # Remote client (lazy)
 # ---------------------------------------------------------------------------
 
@@ -170,6 +193,8 @@ class RoutedPalace:
 
     @property
     def episode_store(self):
+        if USE_PALACE_SERVICE:
+            return RemoteEpisodeStore(_remote())
         return _EMBEDDED_PALACE.episode_store
 
 
@@ -306,6 +331,13 @@ class RoutedMemoryManager:
     # ---- Reflection (slice 4) ----
 
     async def reflect_on_session(self, messages, user_id, session_id):
+        if USE_PALACE_SERVICE:
+            # Use sync mode so the call shape (returns list of episodes) matches
+            # the embedded ClaraMemory contract. Async mode would change the
+            # return type and break callers.
+            return await _remote().reflect_session(
+                messages=messages, user_id=user_id, session_id=session_id, mode="sync",
+            )
         return await _maybe_await(
             _EmbeddedMM.get_instance().reflect_on_session(
                 messages, user_id, session_id,
@@ -313,6 +345,8 @@ class RoutedMemoryManager:
         )
 
     async def run_narrative_synthesis(self, user_id):
+        if USE_PALACE_SERVICE:
+            return await _remote().synthesize_narratives(user_id=user_id, mode="sync")
         return await _maybe_await(
             _EmbeddedMM.get_instance().run_narrative_synthesis(user_id),
         )

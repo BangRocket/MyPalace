@@ -401,3 +401,166 @@ async def test_4xx_with_html_body_still_raises_palace_error():
     with pytest.raises(PalaceError) as exc_info:
         await client.get("any-id")
     assert exc_info.value.status_code == 502
+
+
+# ---- episodes / reflection ----
+
+def fake_episode(id: str = "ep1", **overrides) -> dict:
+    base = {
+        "id": id, "user_id": "u1", "agent_id": None,
+        "content": "x", "summary": "s",
+        "participants": [], "topics": [],
+        "emotional_tone": "neutral", "significance": 0.5,
+        "timestamp": "2026-05-03T19:33:40.210487+00:00",
+        "session_id": None, "message_count": 0,
+    }
+    base.update(overrides)
+    return base
+
+
+@pytest.mark.asyncio
+async def test_reflect_session_sync():
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["body"] = json.loads(request.content)
+        captured["params"] = dict(request.url.params)
+        return httpx.Response(200, json=make_envelope(
+            [fake_episode("ep-new")], count=1,
+        ))
+
+    client = make_client(handler)
+    result = await client.reflect_session(
+        messages=[{"role": "user", "content": "hi"}],
+        user_id="u1", agent_id="clara", session_id="s-1",
+        mode="sync",
+    )
+    assert captured["url"].startswith("http://palace.test/v1/reflection/session")
+    assert captured["params"] == {"mode": "sync"}
+    assert captured["body"]["user_id"] == "u1"
+    assert captured["body"]["agent_id"] == "clara"
+    assert captured["body"]["session_id"] == "s-1"
+    assert isinstance(result, list)
+    assert result[0].id == "ep-new"
+
+
+@pytest.mark.asyncio
+async def test_reflect_session_async_returns_job_pending():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(202, json=make_envelope(
+            {"job_id": "j1", "status": "pending"},
+        ))
+
+    client = make_client(handler)
+    result = await client.reflect_session(
+        messages=[{"role": "user", "content": "hi"}], user_id="u1",
+    )
+    from palace_client import JobPending
+    assert isinstance(result, JobPending)
+    assert result.job_id == "j1"
+
+
+@pytest.mark.asyncio
+async def test_search_episodes():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=make_envelope(
+            [fake_episode("ep-1", score=0.95)], count=1,
+        ))
+
+    client = make_client(handler)
+    results = await client.search_episodes("career", user_id="u1", min_significance=0.3)
+    assert results[0].score == 0.95
+
+
+@pytest.mark.asyncio
+async def test_get_recent_episodes():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v1/users/u1/episodes/recent"
+        return httpx.Response(200, json=make_envelope(
+            [fake_episode("a"), fake_episode("b")], count=2,
+        ))
+
+    client = make_client(handler)
+    eps = await client.get_recent_episodes("u1", limit=5)
+    assert len(eps) == 2
+
+
+# ---- arcs / synthesis ----
+
+def fake_arc(id: str = "arc1", **overrides) -> dict:
+    base = {
+        "id": id, "user_id": "u1", "agent_id": None,
+        "title": "T", "summary": "S", "status": "active",
+        "key_episode_ids": [], "emotional_trajectory": "",
+        "created_at": "2026-05-03T19:33:40.210487+00:00",
+        "updated_at": "2026-05-03T19:33:40.210487+00:00",
+    }
+    base.update(overrides)
+    return base
+
+
+@pytest.mark.asyncio
+async def test_synthesize_narratives_sync():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=make_envelope([fake_arc("arc-new")]))
+
+    client = make_client(handler)
+    result = await client.synthesize_narratives(user_id="u1", mode="sync")
+    assert isinstance(result, list)
+    assert result[0].id == "arc-new"
+
+
+@pytest.mark.asyncio
+async def test_synthesize_narratives_async():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(202, json=make_envelope(
+            {"job_id": "j-syn", "status": "pending"},
+        ))
+
+    client = make_client(handler)
+    result = await client.synthesize_narratives(user_id="u1")
+    from palace_client import JobPending
+    assert isinstance(result, JobPending)
+
+
+@pytest.mark.asyncio
+async def test_get_active_arcs():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v1/users/u1/arcs/active"
+        return httpx.Response(200, json=make_envelope([fake_arc("a1")]))
+
+    client = make_client(handler)
+    arcs = await client.get_active_arcs("u1", limit=10)
+    assert len(arcs) == 1
+    assert arcs[0].id == "a1"
+
+
+# ---- jobs ----
+
+@pytest.mark.asyncio
+async def test_get_job():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=make_envelope({
+            "id": "j-1", "kind": "reflection", "user_id": "u1",
+            "status": "completed",
+            "created_at": "2026-05-03T19:33:40.210487+00:00",
+            "completed_at": "2026-05-03T19:34:00.000000+00:00",
+            "result": [{"x": 1}], "error": None,
+        }))
+
+    client = make_client(handler)
+    job = await client.get_job("j-1")
+    assert job.status == "completed"
+    assert job.result == [{"x": 1}]
+
+
+@pytest.mark.asyncio
+async def test_get_job_404_raises_not_found():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"detail": "Job not found"})
+
+    from palace_client import PalaceNotFound
+    client = make_client(handler)
+    with pytest.raises(PalaceNotFound):
+        await client.get_job("missing")

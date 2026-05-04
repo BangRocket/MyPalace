@@ -190,7 +190,7 @@ The embedder is loaded lazily, so importing the app no longer triggers a model d
 
 ---
 
-## Drop-in mode for mypalclara (phase 2, slice 1)
+## Drop-in mode for mypalclara (phase 2)
 
 Palace ships an async Python client (`palace_client/`) that mypalclara can
 use to delegate per-method memory calls to a remote Palace instance,
@@ -221,6 +221,24 @@ embedded until later slices land.
 
 See `docs/superpowers/specs/2026-05-03-palace-phase-2-design.md` for the
 full design and slice roadmap.
+
+### Slice 2 additions: episodes + narrative arcs
+
+Six more endpoints that mypalclara's `episode_store.*` and `MM.reflect_on_session` /
+`MM.run_narrative_synthesis` callers can route to remote Palace:
+
+- `POST /v1/reflection/session?mode={sync,async}` — extract episodes from a message list. Default async returns 202 + job id; sync returns the extracted episodes inline.
+- `POST /v1/synthesis/narratives?mode={sync,async}` — roll recent episodes into narrative arcs.
+- `POST /v1/episodes/search` — semantic search over episodes with `min_significance` filter.
+- `GET /v1/users/{user_id}/episodes/recent?limit=5` — recent episodes, newest first.
+- `GET /v1/users/{user_id}/arcs/active?limit=10` — active narrative arcs.
+- `GET /v1/jobs/{job_id}` — poll async job status (`pending` / `completed` / `failed`) and retrieve the result.
+
+Storage: episodes in a separate `palace_episodes` Qdrant collection; arcs in a `narrative_arcs` Postgres table with a JSONB `key_episode_ids` array. Async mode uses pure asyncio (no Celery/arq); jobs in flight don't survive process restarts (caller can re-POST).
+
+LLM extraction uses `palace/llm.py`'s OpenAI-compatible chat-completion client (works against OpenRouter, OpenAI, Anthropic-via-OpenRouter, or any compatible endpoint). Set `LLM_API_KEY` in `.env`.
+
+The `examples/mypalclara_router.py` reference now routes `episode_store`, `reflect_on_session`, and `run_narrative_synthesis` when `USE_PALACE_SERVICE=true`, falling back to embedded otherwise.
 
 ## Integration tests
 

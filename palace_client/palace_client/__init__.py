@@ -4,8 +4,12 @@ from palace_client.client import PalaceClient
 from palace_client.exceptions import PalaceError, PalaceNotFound, PalaceTransport
 from palace_client.models import (
     Context,
+    Episode,
+    Job,
+    JobPending,
     Memory,
     Message,
+    NarrativeArc,
     ScoredMemory,
     Session,
     SessionWithMessages,
@@ -22,4 +26,8 @@ __all__ = [
     "Message",
     "SessionWithMessages",
     "Context",
+    "Episode",
+    "NarrativeArc",
+    "Job",
+    "JobPending",
 ]

@@ -63,3 +63,41 @@ class Message(SQLModel, table=True):
     role: str
     content: str
     created_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
+
+
+class NarrativeArc(SQLModel, table=True):
+    """A narrative arc rolling up multiple Episodes into a storyline."""
+
+    __tablename__ = "narrative_arcs"
+
+    id: str = Field(primary_key=True, default_factory=lambda: str(uuid4()))
+    user_id: str = Field(index=True)
+    agent_id: str | None = Field(default=None, index=True)
+    title: str
+    summary: str
+    status: str = Field(default="active", index=True)  # active | resolved | dormant
+    key_episode_ids: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSONB, nullable=False, server_default="[]"),
+    )
+    emotional_trajectory: str = ""
+    created_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
+    updated_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
+
+
+class ReflectionJob(SQLModel, table=True):
+    """Tracks status of background reflection/synthesis jobs."""
+
+    __tablename__ = "reflection_jobs"
+
+    id: str = Field(primary_key=True, default_factory=lambda: str(uuid4()))
+    kind: str = Field(index=True)  # "reflection" | "synthesis"
+    user_id: str = Field(index=True)
+    status: str = Field(default="pending", index=True)  # pending | completed | failed
+    created_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
+    completed_at: datetime | None = Field(default=None, sa_column=_ts_column(nullable=True))
+    result_json: list | dict | None = Field(
+        default=None,
+        sa_column=Column(JSONB, nullable=True),
+    )
+    error: str | None = None
