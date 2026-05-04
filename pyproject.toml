@@ -1,6 +1,7 @@
 [project]
 name = "mypalace"
-version = "0.7.0"
+version = "0.7.1"
+license = "PolyForm-Noncommercial-1.0.0"
 description = "MyPalace — standalone memory service for AI assistants. Full HTTP + gRPC surface, multi-tenancy, graph, cache, workers, rate limits, websockets, observability, analytics, bulk import/export, TTL, embedding migration, audit log, memory versioning."
 requires-python = ">=3.12"
 authors = [{ name = "BangRocket" }]
@@ -8,7 +9,6 @@ readme = "README.md"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: Other/Proprietary License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Libraries :: Application Frameworks",

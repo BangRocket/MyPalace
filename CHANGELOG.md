@@ -4,6 +4,27 @@ All notable changes to MyPalace are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and MyPalace adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.7.1] — 2026-05-04
+
+License metadata correction follow-up to 0.7.0.
+
+### Fixed
+
+- **`license` field now uses the SPDX expression form**
+  `"PolyForm-Noncommercial-1.0.0"` (PEP 639 / setuptools 77+). 0.7.0
+  declared the license only via the (mismatched MIT) classifier and the
+  LICENSE.md file. Wheels now show the canonical
+  `License-Expression: PolyForm-Noncommercial-1.0.0` in METADATA.
+- **Removed the `License :: Other/Proprietary License` classifier.**
+  setuptools 77+ rejects mixing the structured `license =` field with a
+  `License :: ...` classifier (PEP 639 says they're alternatives, not
+  combinable). The license-expression field is the canonical signal now.
+- **README license badge** updated from MIT (legacy mistake) to
+  PolyForm Noncommercial 1.0.0 in both server and client READMEs.
+
+No code changes. v0.7.0's PyPI publish never succeeded (pending-publisher
+mismatch), so this is the first version to actually reach PyPI.
+
 ## [0.7.0] — 2026-05-04
 
 **Project rename: Palace → MyPalace.** Brand alignment with mypalclara.
