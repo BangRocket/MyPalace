@@ -180,3 +180,26 @@ class MemoryAccessLog(SQLModel, table=True):
         sa_column=Column(JSONB, nullable=True),
     )
     accessed_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
+
+
+class MemorySupersession(SQLModel, table=True):
+    """Audit log linking a superseded memory to its replacement (slice 5).
+
+    Not a hard FK because memories may be deleted; this is an append-only
+    audit log of memory replacement decisions (manual or auto via the
+    smart-ingestion contradiction heuristic).
+    """
+
+    __tablename__ = "memory_supersessions"
+    __table_args__ = (
+        Index("ix_supersession_superseded", "superseded_id"),
+        Index("ix_supersession_new", "new_id"),
+    )
+
+    id: str = Field(primary_key=True, default_factory=lambda: str(uuid4()))
+    superseded_id: str
+    new_id: str
+    user_id: str = Field(index=True)
+    reason: str
+    similarity_score: float | None = None
+    created_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
