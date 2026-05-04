@@ -23,6 +23,7 @@ from palace.observability.logging import configure_logging
 from palace.observability.metrics import metrics_response
 from palace.observability.middleware import ObservabilityMiddleware
 from palace.observability.tracing import configure_tracing
+from palace.ratelimit.middleware import RateLimitMiddleware
 
 
 async def _ensure_default_tenant() -> None:
@@ -70,9 +71,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Order matters: AuthMiddleware runs FIRST (added LAST in Starlette's
-# inside-out semantics) so it sees decorated requests; ObservabilityMiddleware
-# wraps it so 401 responses still get counted + request-id-tagged.
+# Order matters (Starlette is inside-out: last added = outermost):
+#   ObservabilityMiddleware (outermost) — counts/timing/request_id even on 401/429
+#   AuthMiddleware                       — populates request.state.auth
+#   RateLimitMiddleware (innermost)      — needs auth context to bucket
+app.add_middleware(RateLimitMiddleware)
 app.add_middleware(AuthMiddleware)
 app.add_middleware(ObservabilityMiddleware)
 

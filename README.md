@@ -201,6 +201,41 @@ The runner picks up `my_kind` automatically once the registry is populated.
 
 ---
 
+## Rate limits (phase 4 slice 4)
+
+Optional sliding-window rate limiter, scoped to (tenant, key, user). Requires Redis.
+
+```bash
+export PALACE_RATE_LIMIT_ENABLED=true
+export PALACE_REDIS_URL=redis://localhost:6379
+export PALACE_RATE_LIMIT_DEFAULT=120     # req/min for most endpoints
+export PALACE_RATE_LIMIT_SEARCH=60       # tighter bucket for /search + /context
+```
+
+Disabled by default. When disabled, the middleware is a fast no-op. When enabled but Redis is unreachable, it **fails open** (logs a warning, lets the request through) — Palace stays available even when the limiter can't.
+
+### Bypass with `unlimited` scope
+
+Trusted server-to-server keys can opt out by adding the `unlimited` scope at issuance time:
+
+```bash
+curl -X POST http://localhost:8000/v1/admin/keys \
+  -H "X-Palace-Key: $ADMIN_KEY" \
+  -d '{"label":"trusted-svc","scopes":["read","write","unlimited"]}'
+```
+
+### Response shape on 429
+
+```http
+HTTP/1.1 429 Too Many Requests
+Retry-After: 60
+Content-Type: application/json
+
+{"error": {"code": "rate_limited", "message": "Too many requests in 60s window: 121/120", "retry_after_seconds": 60}}
+```
+
+---
+
 ## Graph layer (phase 3 slice 3)
 
 Optional FalkorDB integration. When `PALACE_FALKORDB_URL` is set, every memory / episode / arc create writes a node into the per-tenant graph (`palace_<tenant_id>`), and every supersession writes a `SUPERSEDES` edge. Writes are fire-and-forget — graph failures never break the primary write.

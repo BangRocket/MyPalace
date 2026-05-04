@@ -80,5 +80,16 @@ class Settings(BaseSettings):
         default=3, validation_alias="PALACE_WORKER_MAX_ATTEMPTS",
     )
 
+    # Rate limits (phase 4 slice 4) — enabled = require Redis.
+    rate_limit_enabled: bool = Field(
+        default=False, validation_alias="PALACE_RATE_LIMIT_ENABLED",
+    )
+    rate_limit_default_per_min: int = Field(
+        default=120, validation_alias="PALACE_RATE_LIMIT_DEFAULT",
+    )
+    rate_limit_search_per_min: int = Field(
+        default=60, validation_alias="PALACE_RATE_LIMIT_SEARCH",
+    )
+
 
 settings = Settings()
