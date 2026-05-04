@@ -55,6 +55,7 @@ dev = [
     "ruff>=0.9",
     "testcontainers[postgres]>=4.9",
     "psycopg[binary]>=3",
+    "aiosqlite>=0.20",  # phase 8 slice 2: in-memory engine for DB observability tests
 ]
 
 [tool.ruff]
