@@ -69,5 +69,16 @@ class Settings(BaseSettings):
         default="pretty", validation_alias="PALACE_LOG_FORMAT",
     )  # "pretty" or "json"
 
+    # Background workers (phase 4 slice 3)
+    worker_poll_interval: float = Field(
+        default=1.0, validation_alias="PALACE_WORKER_POLL_INTERVAL",
+    )
+    worker_lease_seconds: int = Field(
+        default=60, validation_alias="PALACE_WORKER_LEASE_SECONDS",
+    )
+    worker_max_attempts: int = Field(
+        default=3, validation_alias="PALACE_WORKER_MAX_ATTEMPTS",
+    )
+
 
 settings = Settings()
