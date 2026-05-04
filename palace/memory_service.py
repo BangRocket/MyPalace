@@ -482,6 +482,78 @@ class MemoryService:
         memory_map = {m.id: m for m in memories}
         return [(memory_map[mid], scores[mid]) for mid in memory_ids if mid in memory_map]
 
+    async def search_all_tenants(
+        self,
+        query: str,
+        user_id: str | None = None,
+        agent_id: str | None = None,
+        memory_type: str | None = None,
+        limit: int = 10,
+        min_score: float = 0.0,
+    ) -> list[tuple[Memory, float, str]]:
+        """Phase 7 slice 3: search every tenant's collection, merge by score.
+
+        Returns ``[(memory, score, tenant_id), ...]`` sorted by descending
+        score and capped at ``limit``. Used only by cross-tenant admin keys
+        via /v1/memories/search?tenant_id=ALL.
+
+        Embedding happens once; per-tenant Qdrant searches happen in
+        parallel. Empty per-tenant lists are skipped.
+        """
+        from palace.models import Tenant
+
+        # One embedding pass shared across all tenants.
+        vectors = await self.embedder.embed([query])
+        vec = vectors[0]
+
+        async with async_session() as db:
+            tenants_result = await db.execute(select(Tenant.id))
+            tenant_ids = [row[0] for row in tenants_result.all()]
+        if not tenant_ids:
+            return []
+
+        # Parallel per-tenant vector search; tag with tenant id.
+        import asyncio as _asyncio
+
+        async def _one(t_id: str) -> list[tuple[str, float, str]]:
+            try:
+                rows = await vector_store.search(
+                    vec,
+                    limit=limit,
+                    user_id=user_id,
+                    agent_id=agent_id,
+                    memory_type=memory_type,
+                    min_score=min_score,
+                    tenant_id=t_id,
+                )
+                return [(rid, score, t_id) for rid, score in rows]
+            except Exception:
+                # Per-tenant search failures shouldn't poison the rest.
+                return []
+
+        per_tenant = await _asyncio.gather(*(_one(t) for t in tenant_ids))
+        flat: list[tuple[str, float, str]] = [r for sub in per_tenant for r in sub]
+        flat.sort(key=lambda r: r[1], reverse=True)
+        flat = flat[:limit]
+        if not flat:
+            return []
+
+        memory_ids = [r[0] for r in flat]
+        async with async_session() as db:
+            mem_result = await db.execute(
+                select(Memory).where(
+                    Memory.id.in_(memory_ids),
+                    _not_expired_clause(),
+                ),
+            )
+            memories = mem_result.scalars().all()
+        mem_map = {m.id: m for m in memories}
+        return [
+            (mem_map[mid], score, t_id)
+            for mid, score, t_id in flat
+            if mid in mem_map
+        ]
+
     async def list_for_user(
         self,
         user_id: str,
