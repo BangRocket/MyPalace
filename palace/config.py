@@ -58,5 +58,16 @@ class Settings(BaseSettings):
     grpc_port: int | None = Field(default=None, validation_alias="PALACE_GRPC_PORT")
     grpc_host: str = Field(default="0.0.0.0", validation_alias="PALACE_GRPC_HOST")
 
+    # Observability (phase 4 slice 2)
+    otlp_endpoint: str | None = Field(
+        default=None, validation_alias="PALACE_OTLP_ENDPOINT",
+    )
+    otlp_service_name: str = Field(
+        default="palace-memory", validation_alias="PALACE_OTLP_SERVICE_NAME",
+    )
+    log_format: str = Field(
+        default="pretty", validation_alias="PALACE_LOG_FORMAT",
+    )  # "pretty" or "json"
+
 
 settings = Settings()

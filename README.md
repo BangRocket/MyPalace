@@ -129,6 +129,41 @@ DB URL is read from `PALACE_DATABASE_URL` (no need to set `sqlalchemy.url` in `a
 
 ---
 
+## Observability (phase 4 slice 2)
+
+### Prometheus metrics
+
+`/metrics` exposes Prometheus exposition format. Always on, always public (k8s scrapers need that — lock down via your ingress if necessary).
+
+Counters:
+- `palace_http_requests_total{method, route, status_class}`
+- `palace_http_request_duration_seconds{method, route}` (histogram)
+- `palace_cache_hits_total{namespace}`, `palace_cache_misses_total{namespace}`
+- `palace_graph_writes_total{kind}`, `palace_graph_failures_total`
+- `palace_jobs_total{kind, outcome}` (populated by phase-4 slice 3)
+
+Routes are normalized — UUIDs and long IDs become `{id}` so Prometheus label cardinality stays bounded.
+
+### OpenTelemetry traces
+
+Optional. Set `PALACE_OTLP_ENDPOINT=http://otel-collector:4317` and install the optional extra:
+
+```bash
+pip install "palace-memory[otel]"
+```
+
+Auto-instruments FastAPI + httpx. Service name defaults to `palace-memory` (override via `PALACE_OTLP_SERVICE_NAME`). No-op if either the env var is unset or the SDK isn't installed.
+
+### Structured logs
+
+`structlog` configured at lifespan startup. Two modes via `PALACE_LOG_FORMAT`:
+- `pretty` (default) — colored console output, dev-friendly
+- `json` — newline-delimited JSON, production-ready
+
+Every request gets a `request_id` (read from `X-Request-ID` header if present, else a fresh uuid4). It's bound to structlog's contextvars so every log line in the request scope carries it. The same `X-Request-ID` is echoed back on the response.
+
+---
+
 ## Graph layer (phase 3 slice 3)
 
 Optional FalkorDB integration. When `PALACE_FALKORDB_URL` is set, every memory / episode / arc create writes a node into the per-tenant graph (`palace_<tenant_id>`), and every supersession writes a `SUPERSEDES` edge. Writes are fire-and-forget — graph failures never break the primary write.
