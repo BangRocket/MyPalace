@@ -18,13 +18,45 @@ Extracted from [mypalclara](https://github.com/BangRocket/mypalclara)'s Palace m
 - **Pluggable embeddings** — HuggingFace (local) or OpenAI (API)
 - **Pluggable LLM backend** — any OpenAI-compatible chat completion endpoint (OpenRouter, OpenAI, etc.)
 
-### What it does *not* do (v1, by design)
+### Project status — v0.7.1
 
-No graph memory, no FSRS spaced-repetition, no reflection workers, no gRPC, no multi-tenancy. See `docs/SPEC.md` for the v1 scope and `docs/plan.md` for the long-range vision.
+Released to PyPI as `mypalace` (server) and `mypalace-client`. Production-ready
+in scope; see the phase notes below for what's in and what's deliberately left
+out.
 
-Phase 2 added: episodes + reflection, narrative arcs, FSRS-6 dynamics, intentions, layered context, smart ingestion, supersede.
+**Capabilities** (built across phases 1–7):
+- **Phase 1** — memory CRUD + semantic search, sessions, context assembly,
+  pluggable embeddings (HuggingFace / OpenAI) and LLM backend.
+- **Phase 2** — episodes + LLM reflection, narrative arcs, FSRS-6 dynamics,
+  intentions with 4 trigger matchers, layered context, smart ingestion (LLM
+  extract + dedup + auto-supersede), manual supersede + audit history.
+- **Phase 3** — API-key auth with read/write/admin scopes, full multi-tenancy
+  (per-tenant Qdrant collections, key-bound + cross-tenant admin keys),
+  optional FalkorDB graph layer with async writes + neighbors endpoint,
+  optional Redis read-through cache, gRPC `MemoryService` transport,
+  PyPI/Docker release pipeline.
+- **Phase 4** — Alembic migrations with auto-stamp on first boot, Prometheus
+  `/metrics` + OpenTelemetry traces + structlog, Postgres-backed worker queue
+  with `SELECT … FOR UPDATE SKIP LOCKED`, per-(tenant, key, user) sliding-
+  window rate limits, WebSocket event subscriptions, graph-walked
+  `l3_graph_context` in layered retrieval.
+- **Phase 5** — Worker-queue routing for async reflection/synthesis, episode/
+  intention/arc event publishers, full gRPC mirror of remaining surfaces (22
+  RPCs / 8 services), cross-tenant admin analytics endpoint.
+- **Phase 6** — Bulk `/v1/admin/export` + `/v1/admin/import` (NDJSON) for DR
+  and tenant migration, memory TTL with worker-driven cleanup,
+  embedding-model migration via `/v1/admin/reembed`, release-pipeline fixes.
+- **Phase 7** — Admin operation audit log, append-only memory change history
+  with `/v1/memories/{id}/history`, cross-tenant search
+  (`POST /v1/memories/search?tenant_id=ALL`), mypalclara migration guide.
 
-Phase 3 in progress: API-key auth (slice 1, done) → multi-tenancy → graph (FalkorDB) → Redis cache → gRPC → PyPI publish.
+**In progress** (phase 8): production hardening — deep `/health` that pings
+each backend, boot-time config validation, DB-query observability via
+SQLAlchemy event hooks, production docker-compose + deployment guide.
+
+**Deliberately out of scope** (operators who need them should fork or
+deploy separately): per-tenant Postgres schemas, admin web UI, memory
+clustering / topic discovery, fine-grained per-key tenant-resource scoping.
 
 ---
 
@@ -112,7 +144,7 @@ Alembic now manages schema. `init_db()` still creates tables on first boot for z
 
 ```bash
 # Fresh install — nothing to do; lifespan startup handles it.
-.venv/bin/uvicorn palace.main:app
+.venv/bin/uvicorn mypalace.main:app
 
 # Pre-phase-4 install with existing data — stamp once, then upgrade as usual:
 .venv/bin/alembic stamp 2026_05_04_0001_baseline
@@ -170,10 +202,10 @@ Postgres-backed job queue using `SELECT ... FOR UPDATE SKIP LOCKED`. Built-in ha
 
 ```bash
 # In one terminal: the web server
-.venv/bin/uvicorn palace.main:app --port 8000
+.venv/bin/uvicorn mypalace.main:app --port 8000
 
 # In another: one or more workers
-.venv/bin/python -m palace.workers.runner
+.venv/bin/python -m mypalace.workers.runner
 # (Run multiple — SKIP LOCKED gives them safe concurrency)
 ```
 
@@ -187,14 +219,14 @@ Postgres-backed job queue using `SELECT ... FOR UPDATE SKIP LOCKED`. Built-in ha
 ### Custom handlers
 
 ```python
-from palace.workers import register_handler
+from mypalace.workers import register_handler
 
 async def my_handler(payload: dict, tenant_id: str) -> dict:
     return {"processed": payload}
 
 register_handler("my_kind", my_handler)
 # Then enqueue:
-from palace.workers import enqueue
+from mypalace.workers import enqueue
 await enqueue(kind="my_kind", user_id="u1", payload={"x": 1}, tenant_id="default")
 ```
 
@@ -292,20 +324,20 @@ Cache failures degrade to misses — Palace stays correct, just slower.
 
 ---
 
-## gRPC transport (phase 3 slice 5)
+## gRPC transport (phase 3 + phase 5)
 
-Optional second transport alongside REST. **Scope this release: MemoryService only** — Create / Get / Delete / Search / List. Other surfaces (sessions, episodes, arcs, etc.) ride HTTP via `PalaceClient`. Full mirror is a phase 4 follow-up.
+Optional second transport alongside REST. Phase 3 added `MemoryService`; phase 5 expanded to a full mirror — `SessionService`, `EpisodeService`, `ArcService`, `IntentionService`, `DynamicsService`, `RetrievalService`, `IngestionService`, `JobService`. Same auth (X-Palace-Key in metadata), same scope rules, same singleton services as the HTTP path.
 
 ```bash
 export PALACE_GRPC_PORT=50051
-.venv/bin/uvicorn palace.main:app --port 8000
+.venv/bin/uvicorn mymypalace.main:app --port 8000
 # → starts FastAPI on :8000 AND gRPC on :50051
 ```
 
 Auth uses the same X-Palace-Key, sent as gRPC metadata `x-palace-key`. Scope rules are identical to HTTP.
 
 ```python
-from palace_client.grpc import PalaceGrpcClient
+from mypalace_client.grpc import PalaceGrpcClient
 
 async with PalaceGrpcClient("localhost:50051", api_key="pk_live_...") as client:
     mem = await client.create(user_id="u1", content="hello via gRPC")
@@ -316,12 +348,12 @@ async with PalaceGrpcClient("localhost:50051", api_key="pk_live_...") as client:
 
 ```bash
 python -m grpc_tools.protoc -I=proto \
-    --python_out=palace/grpc/_generated \
-    --grpc_python_out=palace/grpc/_generated \
+    --python_out=mypalace/grpc/_generated \
+    --grpc_python_out=mypalace/grpc/_generated \
     proto/palace.proto
 # Then re-apply the local import fix in palace_pb2_grpc.py:
-#   sed -i '' 's/^import palace_pb2/from palace.grpc._generated import palace_pb2/' \
-#     palace/grpc/_generated/palace_pb2_grpc.py
+#   sed -i '' 's/^import mypalace_pb2/from mypalace.grpc._generated import palace_pb2/' \
+#     mypalace/grpc/_generated/palace_pb2_grpc.py
 ```
 
 ---
@@ -370,7 +402,7 @@ python3.12 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 cp .env.example .env
 
 # 4. Run
-.venv/bin/uvicorn palace.main:app --reload --port 8000
+.venv/bin/uvicorn mypalace.main:app --reload --port 8000
 ```
 
 Or fully containerized: `docker-compose up --build`.
@@ -523,43 +555,35 @@ The embedder is loaded lazily, so importing the app no longer triggers a model d
 
 ---
 
-## Drop-in mode for mypalclara (phase 2)
+## Drop-in mode for mypalclara
 
-**Phase 2 complete:** 5 slices, ~25 endpoints + 18 client methods. The
-mypalclara router routes ~12 of ~18 external callsites; the remaining are
-DB-bound or graph (phase 3).
+MyPalace is a strict superset of mypalclara's embedded Palace surface
+since end of phase 3. To swap mypalclara from embedded to remote MyPalace,
+follow the step-by-step guide at **`docs/migrating-mypalclara.md`**.
 
-Palace ships an async Python client (`palace_client/`) that mypalclara can
-use to delegate per-method memory calls to a remote Palace instance,
-falling back to the embedded `ClaraMemory` for everything not yet routable.
-
-Install the client into mypalclara's environment:
+The short version:
 
 ```bash
-pip install "git+https://github.com/BangRocket/mypalace.git@<sha>#subdirectory=palace_client"
-```
+# 1. install the client
+pip install mypalace-client==0.7.1   # or "mypalace-client[grpc]"
 
-Copy `examples/mypalclara_router.py` into mypalclara as
-`mypalclara/core/memory/routed.py`, adjust the embedded imports, then
-replace every `from mypalclara.core.memory import PALACE` with the routed
-version. Toggle behavior at runtime:
+# 2. copy examples/mypalclara_router.py into mypalclara as
+#    mypalclara/core/memory/routed.py and swap the imports
 
-```bash
+# 3. set the env and you're done
 export USE_PALACE_SERVICE=true
-export PALACE_SERVICE_URL=http://palace.local:8000
-export PALACE_API_KEY=  # optional, forward-compat for phase 3
+export PALACE_SERVICE_URL=http://mypalace:8000
+export PALACE_API_KEY=pk_live_...   # mint via /v1/admin/keys
 ```
 
 The router uses **explicit pass-throughs** — every public method of
 ClaraMemory + MemoryManager has its own entry, no `__getattr__`
-fallthrough. Slice-1 methods routed to remote: `add`, `search`,
-`get_all`, `delete_all`, `get`, `delete`, `update`. Everything else stays
-embedded until later slices land.
+fallthrough. mypalclara's existing Discord-transcript replay script writes
+through the router to remote MyPalace with no Palace-specific port — see
+the migration guide for replay + validation + rollback steps.
 
-See `docs/superpowers/specs/2026-05-03-palace-phase-2-design.md` for the
-full design and slice roadmap.
+### Legacy slice notes (kept for historical reference)
 
-### Slice 2 additions: episodes + narrative arcs
 
 Six more endpoints that mypalclara's `episode_store.*` and `MM.reflect_on_session` /
 `MM.run_narrative_synthesis` callers can route to remote Palace:
@@ -688,7 +712,7 @@ The memory's `expires_at` is set to now + ttl. Search/list/get already exclude e
 Garbage collection runs as a worker handler. Enqueue per-tenant:
 
 ```python
-from palace.workers import enqueue
+from mypalace.workers import enqueue
 await enqueue(kind="cleanup", user_id="system",
               payload={"batch_size": 500}, tenant_id="acme")
 ```
