@@ -303,7 +303,7 @@ def test_list_memories_no_filters(client, mock_memory_service):
     assert kwargs == {
         "user_id": None, "agent_id": None, "run_id": None,
         "memory_type": None, "metadata": None,
-        "limit": 50, "offset": 0,
+        "limit": 50, "offset": 0, "tenant_id": "test",
     }
 
 

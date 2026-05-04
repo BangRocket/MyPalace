@@ -34,5 +34,10 @@ class Settings(BaseSettings):
         default=None, validation_alias="PALACE_BOOTSTRAP_ADMIN_KEY",
     )
 
+    # Multi-tenancy (slice 2)
+    default_tenant_id: str = Field(
+        default="default", validation_alias="PALACE_DEFAULT_TENANT_ID",
+    )
+
 
 settings = Settings()

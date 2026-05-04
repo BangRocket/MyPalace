@@ -166,9 +166,10 @@ async def palace_app(palace_settings: dict[str, str]):
     from palace import main as palace_main
     importlib.reload(palace_main)
 
-    # Run lifespan startup (creates tables + Qdrant collection)
+    # Run lifespan startup (creates tables + Qdrant collection + default tenant)
     await palace_main.init_db()
-    await palace_main.memory_service.init()
+    await palace_main._ensure_default_tenant()
+    await palace_main.memory_service.init(tenant_id="test")
     yield palace_main.app
 
 
@@ -198,6 +199,7 @@ async def _truncate_tables(palace_app):
         Message,
         NarrativeArc,
         ReflectionJob,
+        Tenant,
     )
     from palace.models import Session as SessionModel
     from palace.vector import episode_vector_store, vector_store
@@ -215,18 +217,32 @@ async def _truncate_tables(palace_app):
         await db.execute(delete(NarrativeArc))
         await db.execute(delete(ReflectionJob))
         await db.execute(delete(ApiKey))
+        # Tenants table: only delete non-default rows so per-tenant collection
+        # creation in tests doesn't have to re-bootstrap the row each time.
+        await db.execute(delete(Tenant).where(Tenant.id != "test"))
         await db.commit()
 
-    # Clear all vector points by recreating the collections
+    # Clear all vector points by recreating the collections — phase 3 slice 2
+    # has per-tenant collections, so iterate every collection whose name starts
+    # with the base prefixes.
     with contextlib.suppress(Exception):
-        await vector_store.client.delete_collection(vector_store.collection)
-    with contextlib.suppress(Exception):
-        await episode_vector_store.client.delete_collection(episode_vector_store.collection)
+        all_collections = await vector_store.client.get_collections()
+        for c in all_collections.collections:
+            if c.name.startswith(vector_store.base_collection):
+                with contextlib.suppress(Exception):
+                    await vector_store.client.delete_collection(c.name)
+            if c.name.startswith(episode_vector_store.base_collection):
+                with contextlib.suppress(Exception):
+                    await episode_vector_store.client.delete_collection(c.name)
+    # Reset the per-store memo of "ensured" collections so the next test
+    # actually re-creates them.
+    vector_store._ensured.clear()
+    episode_vector_store._ensured.clear()
 
     from palace.episode_service import episode_service
     from palace.memory_service import memory_service
-    await memory_service.init()
-    await episode_service.init()
+    await memory_service.init(tenant_id="test")
+    await episode_service.init(tenant_id="test")
     yield
 
 

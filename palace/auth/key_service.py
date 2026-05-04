@@ -11,6 +11,7 @@ import bcrypt
 from sqlalchemy import select
 
 from palace.auth.context import VALID_SCOPES, AuthContext
+from palace.auth.tenant import is_valid_tenant_id
 from palace.auth.usage import usage_tracker
 from palace.database import async_session
 from palace.models import ApiKey, utcnow
@@ -66,8 +67,22 @@ def _validate_scopes(scopes: list[str]) -> frozenset[str]:
 class KeyService:
     """Business logic for API keys."""
 
-    async def create_key(self, label: str, scopes: list[str]) -> CreatedKey:
+    async def create_key(
+        self,
+        label: str,
+        scopes: list[str],
+        tenant_id: str | None = None,
+    ) -> CreatedKey:
+        """Create a key bound to ``tenant_id``.
+
+        ``tenant_id=None`` means cross-tenant admin (only admins should mint
+        these). Validation of the tenant_id format happens in the route layer
+        (which already raises 400); here we trust the caller has validated.
+        """
         valid = _validate_scopes(scopes)
+        if tenant_id is not None and not is_valid_tenant_id(tenant_id):
+            raise ValueError(f"invalid tenant_id: {tenant_id!r}")
+
         plaintext = KEY_PREFIX_LITERAL + _gen_random()
         split = _split(plaintext)
         assert split is not None  # we just generated it
@@ -77,6 +92,7 @@ class KeyService:
             key_prefix=prefix_index,
             key_hash=_hash(plaintext),
             label=label,
+            tenant_id=tenant_id,
             scopes=sorted(valid),
         )
         async with async_session() as db:
@@ -113,6 +129,7 @@ class KeyService:
                     key_id=key.id,
                     label=key.label,
                     scopes=frozenset(key.scopes or []),
+                    tenant_id=key.tenant_id,
                 )
         return None
 
@@ -183,6 +200,9 @@ class KeyService:
             key_prefix=prefix_index,
             key_hash=_hash(plaintext),
             label="bootstrap-admin",
+            # Bootstrap key is cross-tenant admin (tenant_id=None) so support
+            # operators can manage any tenant from day one.
+            tenant_id=None,
             scopes=["read", "write", "admin"],
         )
         async with async_session() as db:

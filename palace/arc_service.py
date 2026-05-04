@@ -10,7 +10,7 @@ from palace._llm_utils import strip_json_fences
 from palace.database import async_session
 from palace.episode_service import episode_service
 from palace.llm import llm
-from palace.models import NarrativeArc, utcnow
+from palace.models import DEFAULT_TENANT_ID, NarrativeArc, utcnow
 from palace.prompts.synthesis import NARRATIVE_SYNTHESIS_PROMPT
 
 
@@ -18,7 +18,10 @@ class ArcService:
     """Business logic for narrative arcs."""
 
     async def get_active(
-        self, user_id: str, limit: int = 10,
+        self,
+        user_id: str,
+        limit: int = 10,
+        tenant_id: str = DEFAULT_TENANT_ID,
     ) -> list[NarrativeArc]:
         """Active arcs for a user, most-recently-updated first."""
         async with async_session() as db:
@@ -26,6 +29,7 @@ class ArcService:
             stmt = (
                 select(NarrativeArc)
                 .where(NarrativeArc.user_id == user_id)
+                .where(NarrativeArc.tenant_id == tenant_id)
                 .where(NarrativeArc.status == "active")
                 .order_by(sa_desc(NarrativeArc.updated_at))
                 .limit(limit)
@@ -33,22 +37,45 @@ class ArcService:
             result = await db.execute(stmt)
             return list(result.scalars().all())
 
-    async def get(self, arc_id: str) -> NarrativeArc | None:
+    async def get(
+        self,
+        arc_id: str,
+        tenant_id: str = DEFAULT_TENANT_ID,
+    ) -> NarrativeArc | None:
         async with async_session() as db:
-            result = await db.execute(select(NarrativeArc).where(NarrativeArc.id == arc_id))
+            result = await db.execute(
+                select(NarrativeArc).where(
+                    NarrativeArc.id == arc_id,
+                    NarrativeArc.tenant_id == tenant_id,
+                ),
+            )
             return result.scalar_one_or_none()
 
-    async def create(self, **fields) -> NarrativeArc:
+    async def create(
+        self,
+        tenant_id: str = DEFAULT_TENANT_ID,
+        **fields,
+    ) -> NarrativeArc:
         async with async_session() as db:
-            arc = NarrativeArc(**fields)
+            arc = NarrativeArc(tenant_id=tenant_id, **fields)
             db.add(arc)
             await db.commit()
             await db.refresh(arc)
             return arc
 
-    async def update(self, arc_id: str, **fields) -> NarrativeArc | None:
+    async def update(
+        self,
+        arc_id: str,
+        tenant_id: str = DEFAULT_TENANT_ID,
+        **fields,
+    ) -> NarrativeArc | None:
         async with async_session() as db:
-            result = await db.execute(select(NarrativeArc).where(NarrativeArc.id == arc_id))
+            result = await db.execute(
+                select(NarrativeArc).where(
+                    NarrativeArc.id == arc_id,
+                    NarrativeArc.tenant_id == tenant_id,
+                ),
+            )
             arc = result.scalar_one_or_none()
             if not arc:
                 return None
@@ -64,15 +91,16 @@ class ArcService:
         user_id: str,
         agent_id: str | None = None,
         lookback_episodes: int = 20,
+        tenant_id: str = DEFAULT_TENANT_ID,
     ) -> list[NarrativeArc]:
         """Call the LLM with recent episodes + active arcs, parse arcs from
         the response, create new arcs or update existing ones.
 
         Raises ValueError if the LLM returns malformed JSON."""
         recent_episodes = await episode_service.get_recent(
-            user_id=user_id, limit=lookback_episodes,
+            user_id=user_id, limit=lookback_episodes, tenant_id=tenant_id,
         )
-        existing_arcs = await self.get_active(user_id=user_id)
+        existing_arcs = await self.get_active(user_id=user_id, tenant_id=tenant_id)
 
         episodes_text = "\n".join(
             f"[{e.get('id')}] ({e.get('timestamp', '')}) {e.get('summary', '')}"
@@ -114,12 +142,15 @@ class ArcService:
                 "emotional_trajectory": raw_arc.get("emotional_trajectory", ""),
             }
             if existing_id:
-                arc = await self.update(existing_id, **fields)
+                arc = await self.update(existing_id, tenant_id=tenant_id, **fields)
                 if arc:
                     results.append(arc)
             else:
                 arc = await self.create(
-                    user_id=user_id, agent_id=agent_id, **fields,
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    agent_id=agent_id,
+                    **fields,
                 )
                 results.append(arc)
         return results

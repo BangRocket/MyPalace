@@ -4,6 +4,7 @@ import os
 
 # Disable auth before any palace.* import — settings is a module-level singleton.
 os.environ.setdefault("PALACE_AUTH_DISABLED", "true")
+os.environ.setdefault("PALACE_DEFAULT_TENANT_ID", "test")
 
 from unittest.mock import AsyncMock, MagicMock, patch  # noqa: E402
 

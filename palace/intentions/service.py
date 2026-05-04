@@ -12,7 +12,7 @@ from sqlalchemy import delete, select
 
 from palace.database import async_session
 from palace.intentions.triggers import evaluate_trigger
-from palace.models import Intention, utcnow
+from palace.models import DEFAULT_TENANT_ID, Intention, utcnow
 
 
 def _now_naive() -> datetime:
@@ -41,9 +41,11 @@ class IntentionService:
         source_memory_id: str | None = None,
         priority: int = 0,
         fire_once: bool = True,
+        tenant_id: str = DEFAULT_TENANT_ID,
     ) -> Intention:
         async with async_session() as db:
             intention = Intention(
+                tenant_id=tenant_id,
                 user_id=user_id,
                 agent_id=agent_id,
                 content=content,
@@ -64,6 +66,7 @@ class IntentionService:
         message: str,
         context: dict | None = None,
         agent_id: str = "clara",
+        tenant_id: str = DEFAULT_TENANT_ID,
     ) -> list[dict]:
         """Evaluate all unfired+unexpired intentions and return fired matches.
 
@@ -76,6 +79,7 @@ class IntentionService:
                 select(Intention).where(
                     Intention.user_id == user_id,
                     Intention.agent_id == agent_id,
+                    Intention.tenant_id == tenant_id,
                     Intention.fired == False,  # noqa: E712
                 ),
             )
@@ -145,6 +149,7 @@ class IntentionService:
         fired_filter: str = "all",
         limit: int = 50,
         agent_id: str = "clara",
+        tenant_id: str = DEFAULT_TENANT_ID,
     ) -> list[Intention]:
         """List intentions for a user. ``fired_filter`` is "true" / "false" /
         "all"."""
@@ -152,6 +157,7 @@ class IntentionService:
             stmt = select(Intention).where(
                 Intention.user_id == user_id,
                 Intention.agent_id == agent_id,
+                Intention.tenant_id == tenant_id,
             )
             if fired_filter == "true":
                 stmt = stmt.where(Intention.fired == True)  # noqa: E712
@@ -162,10 +168,17 @@ class IntentionService:
             result = await db.execute(stmt)
             return list(result.scalars().all())
 
-    async def delete(self, intention_id: str) -> bool:
+    async def delete(
+        self,
+        intention_id: str,
+        tenant_id: str = DEFAULT_TENANT_ID,
+    ) -> bool:
         async with async_session() as db:
             result = await db.execute(
-                select(Intention).where(Intention.id == intention_id),
+                select(Intention).where(
+                    Intention.id == intention_id,
+                    Intention.tenant_id == tenant_id,
+                ),
             )
             intention = result.scalar_one_or_none()
             if intention is None:
@@ -174,7 +187,10 @@ class IntentionService:
             await db.commit()
             return True
 
-    async def cleanup_expired(self) -> int:
+    async def cleanup_expired(
+        self,
+        tenant_id: str = DEFAULT_TENANT_ID,
+    ) -> int:
         """Delete all intentions whose expires_at is in the past. Returns
         deleted count."""
         async with async_session() as db:
@@ -182,6 +198,7 @@ class IntentionService:
             stmt = delete(Intention).where(
                 Intention.expires_at.isnot(None),
                 Intention.expires_at < now,
+                Intention.tenant_id == tenant_id,
             )
             result = await db.execute(stmt)
             await db.commit()

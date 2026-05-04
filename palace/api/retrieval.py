@@ -1,8 +1,9 @@
 """Layered retrieval route handler (slice 5)."""
 
 import time
+from typing import Annotated
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from palace.api.common import (
     ApiResponse,
@@ -13,13 +14,18 @@ from palace.api.common import (
     LayeredL2Out,
     Meta,
 )
+from palace.auth.context import AuthContext, get_auth_context
 from palace.retrieval.layered import layered_retrieval_service
 
 router = APIRouter()
 
 
 @router.post("/layered", response_model=ApiResponse[LayeredContextOut])
-async def assemble_layered_context(req: LayeredContextRequest):
+async def assemble_layered_context(
+    req: LayeredContextRequest,
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
+):
+    tenant_id = auth.resolve_tenant()
     start = time.time()
     result = await layered_retrieval_service.assemble(
         user_id=req.user_id,
@@ -33,6 +39,7 @@ async def assemble_layered_context(req: LayeredContextRequest):
         memory_limit=req.memory_limit,
         episode_limit=req.episode_limit,
         min_episode_significance=req.min_episode_significance,
+        tenant_id=tenant_id,
     )
     took = int((time.time() - start) * 1000)
     out = LayeredContextOut(

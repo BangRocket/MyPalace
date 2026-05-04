@@ -16,11 +16,19 @@ class AuthContext:
     `scopes` is an explicit set — admin does NOT auto-include write/read.
     Callers must request all scopes they want when minting a key, which
     forces intentional issuance.
+
+    `tenant_id` (slice 2):
+      - For tenant-bound keys: set from the key row; cannot be overridden.
+      - For cross-tenant admin keys (key.tenant_id is None): None on the
+        AuthContext, and the route handler must accept tenant_id from the
+        request body/query (or fall back to settings.default_tenant_id).
+      - When auth is disabled (test bypass): set to settings.default_tenant_id.
     """
 
     key_id: str
     label: str
     scopes: frozenset[str]
+    tenant_id: str | None = None
 
     def has_scope(self, scope: str) -> bool:
         return scope in self.scopes
@@ -32,9 +40,41 @@ class AuthContext:
                 detail=f"forbidden: requires scope '{scope}'",
             )
 
+    def resolve_tenant(self, request_tenant: str | None = None) -> str:
+        """Return the effective tenant for this request.
+
+        - Tenant-bound key: key tenant wins; conflicting request_tenant → 403.
+        - Cross-tenant admin (tenant_id is None): use request_tenant;
+          fall back to settings.default_tenant_id if absent.
+        """
+        from palace.config import settings
+
+        if self.tenant_id is not None:
+            if request_tenant is not None and request_tenant != self.tenant_id:
+                raise HTTPException(
+                    status_code=403,
+                    detail=(
+                        f"cross-tenant access denied: key bound to "
+                        f"'{self.tenant_id}', request specified '{request_tenant}'"
+                    ),
+                )
+            return self.tenant_id
+        return request_tenant or settings.default_tenant_id
+
     @classmethod
-    def all_scopes(cls, key_id: str = "disabled", label: str = "auth-disabled") -> AuthContext:
-        return cls(key_id=key_id, label=label, scopes=frozenset(VALID_SCOPES))
+    def all_scopes(
+        cls,
+        key_id: str = "disabled",
+        label: str = "auth-disabled",
+        tenant_id: str | None = None,
+    ) -> AuthContext:
+        from palace.config import settings
+        return cls(
+            key_id=key_id,
+            label=label,
+            scopes=frozenset(VALID_SCOPES),
+            tenant_id=tenant_id if tenant_id is not None else settings.default_tenant_id,
+        )
 
 
 def get_auth_context(request: Request) -> AuthContext:

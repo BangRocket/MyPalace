@@ -22,6 +22,7 @@ from qdrant_client.models import (
 from palace._llm_utils import strip_json_fences
 from palace.embeddings import EmbeddingProvider, get_embedder
 from palace.llm import llm
+from palace.models import DEFAULT_TENANT_ID
 from palace.prompts.reflection import SESSION_REFLECTION_PROMPT
 from palace.vector import episode_vector_store
 
@@ -38,15 +39,16 @@ class EpisodeService:
             self._embedder = get_embedder()
         return self._embedder
 
-    async def init(self) -> None:
-        """Ensure Qdrant collection + payload indexes exist."""
-        await episode_vector_store.ensure_collection(self.embedder.dim)
+    async def init(self, tenant_id: str = DEFAULT_TENANT_ID) -> None:
+        """Ensure Qdrant collection + payload indexes exist for ``tenant_id``."""
+        await episode_vector_store.ensure_collection(self.embedder.dim, tenant_id=tenant_id)
         await episode_vector_store.ensure_payload_indexes({
             "user_id": "keyword",
             "agent_id": "keyword",
+            "tenant_id": "keyword",
             "significance": "float",
             "timestamp": "datetime",
-        })
+        }, tenant_id=tenant_id)
 
     async def reflect_session(
         self,
@@ -54,6 +56,7 @@ class EpisodeService:
         user_id: str,
         agent_id: str | None = None,
         session_id: str | None = None,
+        tenant_id: str = DEFAULT_TENANT_ID,
     ) -> list[dict]:
         """Call the LLM, parse extracted episodes, write each to Qdrant.
         Returns the list of episodes (as dicts) that were written.
@@ -92,6 +95,7 @@ class EpisodeService:
 
             ep = {
                 "id": str(uuid4()),
+                "tenant_id": tenant_id,
                 "user_id": user_id,
                 "agent_id": agent_id,
                 "content": content,
@@ -111,6 +115,7 @@ class EpisodeService:
                 memory_id=ep["id"],
                 vector=vectors[0],
                 payload={k: v for k, v in ep.items() if k != "id"},
+                tenant_id=tenant_id,
             )
             episodes.append(ep)
 
@@ -122,6 +127,7 @@ class EpisodeService:
         user_id: str,
         limit: int = 5,
         min_significance: float = 0.0,
+        tenant_id: str = DEFAULT_TENANT_ID,
     ) -> list[dict]:
         """Semantic search over episodes. Filters: user_id (required),
         significance >= min_significance."""
@@ -129,6 +135,7 @@ class EpisodeService:
 
         conditions: list[Any] = [
             FieldCondition(key="user_id", match=MatchValue(value=user_id)),
+            FieldCondition(key="tenant_id", match=MatchValue(value=tenant_id)),
         ]
         if min_significance > 0.0:
             conditions.append(
@@ -151,14 +158,22 @@ class EpisodeService:
             results.append(payload)
         return results
 
-    async def get_recent(self, user_id: str, limit: int = 5) -> list[dict]:
+    async def get_recent(
+        self,
+        user_id: str,
+        limit: int = 5,
+        tenant_id: str = DEFAULT_TENANT_ID,
+    ) -> list[dict]:
         """Recent episodes for a user, newest first."""
         # Qdrant scroll with payload filter; we sort client-side because OrderBy
         # on a payload field has uneven version support.
         points, _ = await episode_vector_store.client.scroll(
             collection_name=episode_vector_store.collection,
             scroll_filter=Filter(
-                must=[FieldCondition(key="user_id", match=MatchValue(value=user_id))],
+                must=[
+                    FieldCondition(key="user_id", match=MatchValue(value=user_id)),
+                    FieldCondition(key="tenant_id", match=MatchValue(value=tenant_id)),
+                ],
             ),
             limit=max(limit * 4, 50),  # over-fetch since we sort client-side
             with_payload=True,

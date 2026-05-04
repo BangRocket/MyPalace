@@ -16,12 +16,30 @@ def _ts_column(*, nullable: bool = False) -> Column:
     return Column(DateTime(timezone=True), nullable=nullable)
 
 
+DEFAULT_TENANT_ID = "default"
+
+
+class Tenant(SQLModel, table=True):
+    """A tenant: hard data-isolation boundary (phase 3 slice 2)."""
+
+    __tablename__ = "tenants"
+
+    id: str = Field(primary_key=True, max_length=32)
+    label: str = Field(max_length=100)
+    created_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
+    metadata_json: dict | None = Field(
+        default=None,
+        sa_column=Column(JSONB, nullable=True),
+    )
+
+
 class Memory(SQLModel, table=True):
     """A stored memory — fact, preference, episode, etc."""
 
     __tablename__ = "memories"
 
     id: str = Field(primary_key=True, default_factory=lambda: str(uuid4()))
+    tenant_id: str = Field(default=DEFAULT_TENANT_ID, index=True, max_length=32)
     user_id: str = Field(index=True)
     agent_id: str | None = Field(default=None, index=True)
     content: str
@@ -44,6 +62,7 @@ class Session(SQLModel, table=True):
     __tablename__ = "sessions"
 
     id: str = Field(primary_key=True, default_factory=lambda: str(uuid4()))
+    tenant_id: str = Field(default=DEFAULT_TENANT_ID, index=True, max_length=32)
     user_id: str = Field(index=True)
     title: str | None = None
     summary: str | None = None
@@ -58,6 +77,7 @@ class Message(SQLModel, table=True):
     __tablename__ = "messages"
 
     id: str = Field(primary_key=True, default_factory=lambda: str(uuid4()))
+    tenant_id: str = Field(default=DEFAULT_TENANT_ID, index=True, max_length=32)
     session_id: str = Field(foreign_key="sessions.id", index=True)
     user_id: str = Field(index=True)
     role: str
@@ -71,6 +91,7 @@ class NarrativeArc(SQLModel, table=True):
     __tablename__ = "narrative_arcs"
 
     id: str = Field(primary_key=True, default_factory=lambda: str(uuid4()))
+    tenant_id: str = Field(default=DEFAULT_TENANT_ID, index=True, max_length=32)
     user_id: str = Field(index=True)
     agent_id: str | None = Field(default=None, index=True)
     title: str
@@ -91,6 +112,7 @@ class ReflectionJob(SQLModel, table=True):
     __tablename__ = "reflection_jobs"
 
     id: str = Field(primary_key=True, default_factory=lambda: str(uuid4()))
+    tenant_id: str = Field(default=DEFAULT_TENANT_ID, index=True, max_length=32)
     kind: str = Field(index=True)  # "reflection" | "synthesis"
     user_id: str = Field(index=True)
     status: str = Field(default="pending", index=True)  # pending | completed | failed
@@ -112,6 +134,7 @@ class MemoryDynamics(SQLModel, table=True):
     )
 
     memory_id: str = Field(primary_key=True)
+    tenant_id: str = Field(default=DEFAULT_TENANT_ID, index=True, max_length=32)
     user_id: str = Field(index=True)
     stability: float = Field(default=1.0)
     difficulty: float = Field(default=5.0)
@@ -142,6 +165,7 @@ class Intention(SQLModel, table=True):
     )
 
     id: str = Field(primary_key=True, default_factory=lambda: str(uuid4()))
+    tenant_id: str = Field(default=DEFAULT_TENANT_ID, index=True, max_length=32)
     user_id: str = Field(index=True)
     agent_id: str = Field(default="clara")
     content: str
@@ -164,6 +188,7 @@ class MemoryAccessLog(SQLModel, table=True):
     )
 
     id: str = Field(primary_key=True, default_factory=lambda: str(uuid4()))
+    tenant_id: str = Field(default=DEFAULT_TENANT_ID, index=True, max_length=32)
     memory_id: str = Field(
         sa_column=Column(
             ForeignKey("memory_dynamics.memory_id", ondelete="CASCADE"),
@@ -191,6 +216,7 @@ class ApiKey(SQLModel, table=True):
     key_prefix: str = Field(index=True, unique=True, max_length=8)
     key_hash: str = Field(max_length=100)
     label: str = Field(max_length=100)
+    tenant_id: str | None = Field(default=None, index=True, max_length=32)
     scopes: list[str] = Field(
         default_factory=list,
         sa_column=Column(JSONB, nullable=False, server_default="[]"),
@@ -215,6 +241,7 @@ class MemorySupersession(SQLModel, table=True):
     )
 
     id: str = Field(primary_key=True, default_factory=lambda: str(uuid4()))
+    tenant_id: str = Field(default=DEFAULT_TENANT_ID, index=True, max_length=32)
     superseded_id: str
     new_id: str
     user_id: str = Field(index=True)

@@ -1,17 +1,23 @@
 """Context assembly route handlers."""
 
 import time
+from typing import Annotated
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from palace.api.common import ApiResponse, AssembleContextRequest, ContextOut, Meta
+from palace.auth.context import AuthContext, get_auth_context
 from palace.context_service import context_service
 
 router = APIRouter()
 
 
 @router.post("", response_model=ApiResponse[ContextOut])
-async def assemble_context(req: AssembleContextRequest):
+async def assemble_context(
+    req: AssembleContextRequest,
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
+):
+    tenant_id = auth.resolve_tenant()
     start = time.time()
     result = await context_service.assemble(
         user_id=req.user_id,
@@ -19,6 +25,7 @@ async def assemble_context(req: AssembleContextRequest):
         session_id=req.session_id,
         max_memories=req.max_memories,
         max_messages=req.max_messages,
+        tenant_id=tenant_id,
     )
     took = int((time.time() - start) * 1000)
     return ApiResponse(

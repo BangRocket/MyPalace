@@ -66,6 +66,48 @@ The mock test suite sets this automatically; live integration tests opt back in 
 
 ---
 
+## Multi-tenancy (phase 3 slice 2)
+
+Every row in every user-data table carries a `tenant_id`. API keys are bound to a tenant on creation; the middleware sets `request.state.auth.tenant_id` from the key, and every service query filters by it. Qdrant collections are per-tenant: `palace_memories_<tenant_id>`, `palace_episodes_<tenant_id>`.
+
+A `default` tenant is created on first boot (`PALACE_DEFAULT_TENANT_ID` to override). Single-tenant deployments work zero-config.
+
+### Tenant ID format
+
+`^[a-z0-9_]{1,32}$` — lowercase alphanumeric + underscore, max 32 chars. Anything else → 400.
+
+### Mint a tenant-bound key
+
+```bash
+# Create a tenant
+curl -X POST http://localhost:8000/v1/admin/tenants \
+  -H "X-Palace-Key: $ADMIN_KEY" \
+  -d '{"id": "acme", "label": "Acme Corp"}'
+
+# Issue a key bound to that tenant
+curl -X POST http://localhost:8000/v1/admin/keys \
+  -H "X-Palace-Key: $ADMIN_KEY" \
+  -d '{"label": "acme-prod", "scopes": ["read","write"], "tenant_id": "acme"}'
+```
+
+### Cross-tenant admin keys
+
+For migrations or support, mint a key with `cross_tenant: true`:
+
+```bash
+curl -X POST http://localhost:8000/v1/admin/keys \
+  -H "X-Palace-Key: $ADMIN_KEY" \
+  -d '{"label": "support", "scopes": ["read","write","admin"], "cross_tenant": true}'
+```
+
+The bootstrap admin key (from `PALACE_BOOTSTRAP_ADMIN_KEY`) is a cross-tenant key by default.
+
+### Migration story
+
+There is no Alembic yet — `init_db()` creates the schema on startup. Slice 6 (publish) introduces Alembic with one consolidated phase-3 migration. If you have a pre-phase-3 Palace deployment with data, contact the maintainers.
+
+---
+
 ## Quick start
 
 ```bash

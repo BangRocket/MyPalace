@@ -3,8 +3,10 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from palace.api import admin, arcs, context, episodes, jobs, memories, sessions
+from palace.api import admin, arcs, context, episodes, jobs, memories, sessions, tenants
 from palace.api import dynamics as dynamics_api
 from palace.api import intentions as intentions_api
 from palace.api import maintenance as maintenance_api
@@ -12,17 +14,34 @@ from palace.api import retrieval as retrieval_api
 from palace.auth.key_service import key_service
 from palace.auth.middleware import AuthMiddleware
 from palace.config import settings
-from palace.database import init_db
+from palace.database import async_session, init_db
 from palace.episode_service import episode_service
 from palace.memory_service import memory_service
+from palace.models import Tenant
+
+
+async def _ensure_default_tenant() -> None:
+    """Idempotent INSERT of the default tenant row."""
+    async with async_session() as db:
+        existing = await db.execute(
+            select(Tenant).where(Tenant.id == settings.default_tenant_id),
+        )
+        if existing.scalar_one_or_none() is None:
+            stmt = pg_insert(Tenant).values(
+                id=settings.default_tenant_id,
+                label="Default Tenant",
+            ).on_conflict_do_nothing(index_elements=["id"])
+            await db.execute(stmt)
+            await db.commit()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup: create tables and init vector collections."""
     await init_db()
-    await memory_service.init()
-    await episode_service.init()
+    await _ensure_default_tenant()
+    await memory_service.init(tenant_id=settings.default_tenant_id)
+    await episode_service.init(tenant_id=settings.default_tenant_id)
     await key_service.bootstrap_if_needed(settings.bootstrap_admin_key)
     yield
     # Shutdown
@@ -44,6 +63,7 @@ async def health():
 
 
 app.include_router(admin.router, prefix="/v1/admin", tags=["admin"])
+app.include_router(tenants.router, prefix="/v1/admin", tags=["admin"])
 app.include_router(memories.router, prefix="/v1/memories", tags=["memories"])
 app.include_router(memories.users_router, prefix="/v1/users", tags=["memories"])
 app.include_router(sessions.router, prefix="/v1/sessions", tags=["sessions"])

@@ -86,7 +86,7 @@ async def test_run_async_records_failure_when_coro_raises():
     fake_job = MagicMock()
     fake_job.id = "job-2"
 
-    async def fake_fail(job_id, error):
+    async def fake_fail(job_id, error, tenant_id="default"):
         captured_errors.append((job_id, error))
         failed_event.set()
 
