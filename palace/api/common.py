@@ -445,6 +445,10 @@ class LayeredContextRequest(BaseModel):
     memory_limit: int = 10
     episode_limit: int = 5
     min_episode_significance: float = 0.3
+    # Phase 4 slice 6: include 1-hop graph neighbors of L2 memories.
+    include_graph: bool = False
+    graph_depth: int = 1
+    graph_max_neighbors: int = 50
 
 
 class MemoryWithScoreOut(BaseModel):
@@ -478,9 +482,17 @@ class LayeredCharCounts(BaseModel):
     l2: int = 0
 
 
+class LayeredL3GraphOut(BaseModel):
+    """Phase 4 slice 6: 1-hop graph neighbors of the L2 memories. Null when
+    include_graph=False or the graph is disabled / empty for this query."""
+    related_memories: list[dict[str, Any]] = []
+    edges: list[dict[str, Any]] = []
+
+
 class LayeredContextOut(BaseModel):
     l1_user_profile: LayeredL1Out
     l2_relevant_context: LayeredL2Out
+    l3_graph_context: LayeredL3GraphOut | None = None
     recent_messages: list[dict[str, Any]] | None = None
     summary: str | None = None
     char_counts: LayeredCharCounts

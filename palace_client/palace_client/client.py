@@ -534,6 +534,9 @@ class PalaceClient:
         memory_limit: int = 10,
         episode_limit: int = 5,
         min_episode_significance: float = 0.3,
+        include_graph: bool = False,
+        graph_depth: int = 1,
+        graph_max_neighbors: int = 50,
     ) -> LayeredContext:
         body: dict[str, Any] = {
             "user_id": user_id,
@@ -545,6 +548,9 @@ class PalaceClient:
             "memory_limit": memory_limit,
             "episode_limit": episode_limit,
             "min_episode_significance": min_episode_significance,
+            "include_graph": include_graph,
+            "graph_depth": graph_depth,
+            "graph_max_neighbors": graph_max_neighbors,
         }
         if agent_id is not None:
             body["agent_id"] = agent_id
