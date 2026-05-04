@@ -165,19 +165,47 @@ async def _truncate_tables(palace_app):
     from sqlalchemy import delete
 
     from palace.database import async_session
-    from palace.models import Memory, Message
+    from palace.models import (
+        Memory,
+        Message,
+        NarrativeArc,
+        ReflectionJob,
+    )
     from palace.models import Session as SessionModel
-    from palace.vector import vector_store
+    from palace.vector import episode_vector_store, vector_store
 
     async with async_session() as db:
         await db.execute(delete(Message))
         await db.execute(delete(SessionModel))
         await db.execute(delete(Memory))
+        await db.execute(delete(NarrativeArc))
+        await db.execute(delete(ReflectionJob))
         await db.commit()
 
-    # Clear all vector points by recreating the collection
+    # Clear all vector points by recreating the collections
     with contextlib.suppress(Exception):
         await vector_store.client.delete_collection(vector_store.collection)
+    with contextlib.suppress(Exception):
+        await episode_vector_store.client.delete_collection(episode_vector_store.collection)
+
+    from palace.episode_service import episode_service
     from palace.memory_service import memory_service
     await memory_service.init()
+    await episode_service.init()
     yield
+
+
+@pytest_asyncio.fixture
+async def stub_llm(palace_app):
+    """Override palace.llm.llm.complete with a per-test stub.
+    Tests set `stub_llm.next_response = "..."` before triggering reflection."""
+
+    from unittest.mock import AsyncMock
+
+    from palace import llm as llm_module
+
+    holder = type("Holder", (), {"next_response": ""})()
+    original = llm_module.llm.complete
+    llm_module.llm.complete = AsyncMock(side_effect=lambda *a, **kw: holder.next_response)
+    yield holder
+    llm_module.llm.complete = original
