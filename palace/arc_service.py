@@ -6,6 +6,7 @@ import json
 
 from sqlalchemy import select
 
+from palace._llm_utils import strip_json_fences
 from palace.database import async_session
 from palace.episode_service import episode_service
 from palace.llm import llm
@@ -94,7 +95,7 @@ class ArcService:
         )
 
         try:
-            parsed = json.loads(raw)
+            parsed = json.loads(strip_json_fences(raw))
         except json.JSONDecodeError as e:
             raise ValueError(f"LLM returned non-JSON for synthesis: {e}") from e
 

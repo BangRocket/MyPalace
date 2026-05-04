@@ -159,3 +159,41 @@ def test_active_arcs(client, mock_arc_service):
     resp = client.get("/v1/users/u1/arcs/active?limit=5")
     assert resp.status_code == 200
     assert resp.json()["data"][0]["title"] == "Job search"
+
+
+@pytest.mark.asyncio
+async def test_synthesize_strips_json_markdown_fence():
+    """Same fence-stripping for synthesis path."""
+    svc = ArcService()
+
+    fenced = (
+        "```json\n"
+        + json.dumps({
+            "arcs": [{
+                "title": "T", "summary": "S", "status": "active",
+                "key_episode_ids": [], "emotional_trajectory": "",
+                "existing_id": None,
+            }]
+        })
+        + "\n```"
+    )
+
+    async def fake_create(**fields):
+        class FakeArc:
+            pass
+        a = FakeArc()
+        a.id = "arc-fenced"
+        for k, v in fields.items():
+            setattr(a, k, v)
+        return a
+
+    with (
+        patch("palace.arc_service.episode_service.get_recent", new=AsyncMock(return_value=[])),
+        patch("palace.arc_service.llm.complete", new=AsyncMock(return_value=fenced)),
+        patch.object(svc, "get_active", new=AsyncMock(return_value=[])),
+        patch.object(svc, "create", new=fake_create),
+    ):
+        arcs = await svc.synthesize_narratives(user_id="u1")
+
+    assert len(arcs) == 1
+    assert arcs[0].id == "arc-fenced"

@@ -217,3 +217,37 @@ def test_recent_episodes(client, mock_episode_service):
     resp = client.get("/v1/users/u1/episodes/recent?limit=10")
     assert resp.status_code == 200
     assert resp.json()["meta"]["count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_reflect_strips_json_markdown_fence():
+    """LLM that wraps response in ```json ... ``` should still parse cleanly."""
+    svc = EpisodeService()
+
+    fenced_response = (
+        "```json\n"
+        + json.dumps({
+            "episodes": [{
+                "summary": "fenced response",
+                "topics": ["x"],
+                "emotional_tone": "neutral",
+                "significance": 0.5,
+                "start_index": 0,
+                "end_index": 0,
+            }]
+        })
+        + "\n```"
+    )
+
+    fake_embedder = MagicMock(embed=AsyncMock(return_value=[[0.1] * 384]))
+    with (
+        patch("palace.episode_service.llm.complete", new=AsyncMock(return_value=fenced_response)),
+        patch.object(svc, "_embedder", create=True, new=fake_embedder),
+        patch("palace.episode_service.episode_vector_store.upsert", new=AsyncMock()),
+    ):
+        episodes = await svc.reflect_session(
+            messages=[{"role": "user", "content": "x"}], user_id="u1",
+        )
+
+    assert len(episodes) == 1
+    assert episodes[0]["summary"] == "fenced response"

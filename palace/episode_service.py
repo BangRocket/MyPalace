@@ -19,6 +19,7 @@ from qdrant_client.models import (
     Range,
 )
 
+from palace._llm_utils import strip_json_fences
 from palace.embeddings import EmbeddingProvider, get_embedder
 from palace.llm import llm
 from palace.prompts.reflection import SESSION_REFLECTION_PROMPT
@@ -70,7 +71,7 @@ class EpisodeService:
         )
 
         try:
-            parsed = json.loads(raw)
+            parsed = json.loads(strip_json_fences(raw))
         except json.JSONDecodeError as e:
             raise ValueError(f"LLM returned non-JSON for reflection: {e}") from e
 
