@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from palace.api import context, memories, sessions
+from palace.api import arcs, context, episodes, jobs, memories, sessions
 from palace.database import init_db
 from palace.episode_service import episode_service
 from palace.memory_service import memory_service
@@ -37,3 +37,9 @@ app.include_router(memories.router, prefix="/v1/memories", tags=["memories"])
 app.include_router(memories.users_router, prefix="/v1/users", tags=["memories"])
 app.include_router(sessions.router, prefix="/v1/sessions", tags=["sessions"])
 app.include_router(context.router, prefix="/v1/context", tags=["context"])
+app.include_router(episodes.router, prefix="/v1/episodes", tags=["episodes"])
+app.include_router(episodes.reflection_router, prefix="/v1/reflection", tags=["episodes"])
+app.include_router(episodes.users_episodes_router, prefix="/v1/users", tags=["episodes"])
+app.include_router(arcs.synthesis_router, prefix="/v1/synthesis", tags=["arcs"])
+app.include_router(arcs.users_arcs_router, prefix="/v1/users", tags=["arcs"])
+app.include_router(jobs.router, prefix="/v1/jobs", tags=["jobs"])
