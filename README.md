@@ -254,6 +254,26 @@ The FSRS-6 math (`palace/dynamics/fsrs.py`) is ported character-for-character fr
 
 `MM.get_last_retrieved_memory_ids` stays embedded (slice-3 design D4): the HTTP service is stateless between requests, so an in-process cache wouldn't survive across worker processes. The mypalclara router caches retrieved IDs client-side instead.
 
+### Slice 4 additions: intentions
+
+Six endpoints port mypalclara's intentions subsystem — deterministic-trigger reminders that fire when matching keywords, topics, times, or context conditions are detected. **No LLM** in this slice; all matching is purely structural (keyword regex, time comparison, context dict matching, word-overlap fallback for topic).
+
+- `POST   /v1/intentions` — set a new intention (`{user_id, content, trigger_conditions, ...}`).
+- `POST   /v1/intentions/check` — evaluate all unfired intentions for a user against a message + context. Returns the fired list (sorted by priority); marks fired and deletes any with `fire_once=true`.
+- `POST   /v1/intentions/format` — render fired intentions as a markdown bullet list for system-prompt injection.
+- `DELETE /v1/intentions/{id}` — delete a single intention. 404 if not found.
+- `GET    /v1/users/{user_id}/intentions?fired={true|false|all}&limit=50` — list intentions for a user.
+- `POST   /v1/maintenance/cleanup-intentions` — admin op; deletes intentions whose `expires_at` has passed.
+
+Four trigger types (set via `trigger_conditions["type"]`):
+
+- `keyword` — substring match against `keywords`; optional `regex` and `case_sensitive`.
+- `topic` — word-overlap fraction vs. `topic` >= `threshold`; optional `quick_keywords` pre-filter.
+- `time` — fires when current UTC time has reached `at` (specific) or `after` (open-ended).
+- `context` — matches a dict of `{channel_name, is_dm, time_of_day, day_of_week}`; all configured keys must match.
+
+The `mypalclara_router.py` reference now routes `MM.set_intention`, `MM.check_intentions`, and `MM.format_intentions_for_prompt` when `USE_PALACE_SERVICE=true`.
+
 ## Integration tests
 
 Default `pytest` runs only the fast mock-based suite (~2s). Live
