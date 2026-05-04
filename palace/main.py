@@ -6,14 +6,16 @@ from fastapi import FastAPI
 
 from palace.api import context, memories, sessions
 from palace.database import init_db
+from palace.episode_service import episode_service
 from palace.memory_service import memory_service
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup: create tables and init vector collection."""
+    """Startup: create tables and init vector collections."""
     await init_db()
     await memory_service.init()
+    await episode_service.init()
     yield
     # Shutdown
 

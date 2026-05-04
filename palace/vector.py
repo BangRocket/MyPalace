@@ -7,11 +7,11 @@ from palace.config import settings
 
 
 class VectorStore:
-    """Async Qdrant vector store for memory embeddings."""
+    """Async Qdrant vector store wrapper."""
 
-    def __init__(self) -> None:
+    def __init__(self, collection: str | None = None) -> None:
         self.client = AsyncQdrantClient(url=settings.qdrant_url)
-        self.collection = settings.qdrant_collection
+        self.collection = collection or settings.qdrant_collection
         self._dim: int | None = None
 
     async def ensure_collection(self, dim: int) -> None:
@@ -73,6 +73,30 @@ class VectorStore:
             points_selector=ids,
         )
 
+    async def ensure_payload_indexes(self, indexes: dict[str, str]) -> None:
+        """Create payload indexes if they don't exist.
+        indexes maps field name -> qdrant field type (e.g. 'keyword', 'float', 'datetime').
+        Idempotent — Qdrant raises if the index exists, we swallow that case."""
+        import contextlib
 
-# Singleton
+        from qdrant_client.http import models as qmodels
+
+        type_map = {
+            "keyword": qmodels.PayloadSchemaType.KEYWORD,
+            "float": qmodels.PayloadSchemaType.FLOAT,
+            "integer": qmodels.PayloadSchemaType.INTEGER,
+            "datetime": qmodels.PayloadSchemaType.DATETIME,
+        }
+        for field, typ in indexes.items():
+            with contextlib.suppress(Exception):
+                # Already exists — Qdrant raises 4xx; safe to ignore.
+                await self.client.create_payload_index(
+                    collection_name=self.collection,
+                    field_name=field,
+                    field_schema=type_map[typ],
+                )
+
+
+# Singletons — one for memories (the default collection), one for episodes
 vector_store = VectorStore()
+episode_vector_store = VectorStore(collection="palace_episodes")
