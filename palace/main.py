@@ -9,6 +9,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from palace.api import (
     admin,
     arcs,
+    audit,
     context,
     episodes,
     jobs,
@@ -25,6 +26,7 @@ from palace.api import graph as graph_api
 from palace.api import intentions as intentions_api
 from palace.api import maintenance as maintenance_api
 from palace.api import retrieval as retrieval_api
+from palace.audit.middleware import AuditMiddleware
 from palace.auth.key_service import key_service
 from palace.auth.middleware import AuthMiddleware
 from palace.config import settings
@@ -87,7 +89,9 @@ app = FastAPI(
 # Order matters (Starlette is inside-out: last added = outermost):
 #   ObservabilityMiddleware (outermost) — counts/timing/request_id even on 401/429
 #   AuthMiddleware                       — populates request.state.auth
-#   RateLimitMiddleware (innermost)      — needs auth context to bucket
+#   RateLimitMiddleware                  — needs auth context to bucket
+#   AuditMiddleware (innermost)          — needs auth + final response status
+app.add_middleware(AuditMiddleware)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(AuthMiddleware)
 app.add_middleware(ObservabilityMiddleware)
@@ -109,6 +113,7 @@ app.include_router(tenants.router, prefix="/v1/admin", tags=["admin"])
 app.include_router(stats.router, prefix="/v1/admin", tags=["admin"])
 app.include_router(portability.router, prefix="/v1/admin", tags=["admin"])
 app.include_router(reembed.router, prefix="/v1/admin", tags=["admin"])
+app.include_router(audit.router, prefix="/v1/admin", tags=["admin"])
 app.include_router(memories.router, prefix="/v1/memories", tags=["memories"])
 app.include_router(memories.users_router, prefix="/v1/users", tags=["memories"])
 app.include_router(sessions.router, prefix="/v1/sessions", tags=["sessions"])

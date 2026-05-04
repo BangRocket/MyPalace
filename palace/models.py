@@ -235,6 +235,31 @@ class ApiKey(SQLModel, table=True):
     revoked_at: datetime | None = Field(default=None, sa_column=_ts_column(nullable=True))
 
 
+class AuditLog(SQLModel, table=True):
+    """Append-only audit trail of /v1/admin/* and /v1/maintenance/* calls
+    (phase 7 slice 1). Recorded by AuditMiddleware, fire-and-forget, post-auth.
+
+    Body content is hashed (SHA256), not stored — audit answers
+    "did this happen" without leaking secrets like bootstrap key plaintext.
+    """
+
+    __tablename__ = "audit_logs"
+    __table_args__ = (
+        Index("ix_audit_logs_key_created", "key_id", "created_at"),
+        Index("ix_audit_logs_path_created", "path", "created_at"),
+    )
+
+    id: str = Field(primary_key=True, default_factory=lambda: str(uuid4()))
+    key_id: str = Field(index=True)
+    tenant_id: str | None = Field(default=None, index=True, max_length=32)
+    method: str = Field(max_length=10)
+    path: str = Field(max_length=500)
+    status_class: str = Field(max_length=4)
+    request_body_hash: str | None = Field(default=None, max_length=64)
+    response_ms: int = Field(default=0)
+    created_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
+
+
 class MemorySupersession(SQLModel, table=True):
     """Audit log linking a superseded memory to its replacement (slice 5).
 
