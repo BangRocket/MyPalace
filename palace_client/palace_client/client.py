@@ -7,8 +7,12 @@ import httpx
 from palace_client.exceptions import PalaceError, PalaceNotFound, PalaceTransport
 from palace_client.models import (
     Context,
+    Episode,
+    Job,
+    JobPending,
     Memory,
     Message,
+    NarrativeArc,
     ScoredMemory,
     Session,
     SessionWithMessages,
@@ -296,6 +300,79 @@ class PalaceClient:
             body["session_id"] = session_id
         envelope = await self._request("POST", "/v1/context", json=body)
         return Context.model_validate(self._data(envelope))
+
+    # ---- episodes / reflection ----
+
+    async def reflect_session(
+        self,
+        messages: list[dict],
+        user_id: str,
+        agent_id: str | None = None,
+        session_id: str | None = None,
+        mode: str = "async",
+    ) -> "list[Episode] | JobPending":
+        body: dict[str, Any] = {"user_id": user_id, "messages": messages}
+        if agent_id is not None:
+            body["agent_id"] = agent_id
+        if session_id is not None:
+            body["session_id"] = session_id
+        envelope = await self._request(
+            "POST", "/v1/reflection/session",
+            json=body, params={"mode": mode},
+        )
+        data = self._data(envelope)
+        if mode == "sync":
+            return [Episode.model_validate(e) for e in data or []]
+        return JobPending.model_validate(data)
+
+    async def search_episodes(
+        self, query: str, user_id: str,
+        limit: int = 5, min_significance: float = 0.0,
+    ) -> "list[Episode]":
+        body = {
+            "query": query, "user_id": user_id,
+            "limit": limit, "min_significance": min_significance,
+        }
+        envelope = await self._request("POST", "/v1/episodes/search", json=body)
+        return [Episode.model_validate(e) for e in self._data(envelope) or []]
+
+    async def get_recent_episodes(self, user_id: str, limit: int = 5) -> "list[Episode]":
+        envelope = await self._request(
+            "GET", f"/v1/users/{user_id}/episodes/recent",
+            params={"limit": limit},
+        )
+        return [Episode.model_validate(e) for e in self._data(envelope) or []]
+
+    # ---- arcs / synthesis ----
+
+    async def synthesize_narratives(
+        self, user_id: str, agent_id: str | None = None,
+        lookback_episodes: int = 20, mode: str = "async",
+    ) -> "list[NarrativeArc] | JobPending":
+        body: dict[str, Any] = {"user_id": user_id, "lookback_episodes": lookback_episodes}
+        if agent_id is not None:
+            body["agent_id"] = agent_id
+        envelope = await self._request(
+            "POST", "/v1/synthesis/narratives",
+            json=body, params={"mode": mode},
+        )
+        data = self._data(envelope)
+        if mode == "sync":
+            return [NarrativeArc.model_validate(a) for a in data or []]
+        return JobPending.model_validate(data)
+
+    async def get_active_arcs(self, user_id: str, limit: int = 10) -> "list[NarrativeArc]":
+        envelope = await self._request(
+            "GET", f"/v1/users/{user_id}/arcs/active",
+            params={"limit": limit},
+        )
+        return [NarrativeArc.model_validate(a) for a in self._data(envelope) or []]
+
+    # ---- jobs ----
+
+    async def get_job(self, job_id: str) -> "Job":
+        envelope = await self._request("GET", f"/v1/jobs/{job_id}")
+        return Job.model_validate(self._data(envelope))
 
     # ---- health ----
 
