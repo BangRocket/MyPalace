@@ -182,6 +182,7 @@ Postgres-backed job queue using `SELECT ... FOR UPDATE SKIP LOCKED`. Built-in ha
 - `PALACE_WORKER_POLL_INTERVAL=1.0` — seconds between polls when idle
 - `PALACE_WORKER_LEASE_SECONDS=60` — max time a worker holds a claim before another can re-take it
 - `PALACE_WORKER_MAX_ATTEMPTS=3` — failures past this mark `status=failed`
+- `PALACE_WORKER_QUEUE_ENABLED=true` (phase 5) — route async-mode `/v1/reflection/session` and `/v1/synthesis/narratives` through the worker queue instead of the in-process `asyncio.create_task` path. Requires at least one worker process; defaults False so single-process deployments without a worker keep working.
 
 ### Custom handlers
 
