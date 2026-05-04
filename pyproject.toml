@@ -1,7 +1,7 @@
 [project]
 name = "palace-memory"
-version = "0.3.0"
-description = "Standalone memory service for AI assistants — auth, multi-tenancy, graph, cache, gRPC, alembic, observability, workers, rate limits, websockets"
+version = "0.4.0"
+description = "Standalone memory service for AI assistants — full HTTP + gRPC surface, multi-tenancy, graph, cache, workers, rate limits, websockets, observability, analytics"
 requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [{ name = "BangRocket" }]
