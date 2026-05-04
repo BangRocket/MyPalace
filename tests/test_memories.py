@@ -154,7 +154,9 @@ def test_batch_create_memories(client, mock_memory_service):
         accessed_at=None, access_count=0,
         metadata_json={"role": "assistant", "session_id": "s1"},
     )
-    mock_memory_service.create_batch = AsyncMock(return_value=[m1, m2])
+    mock_memory_service.create_batch = AsyncMock(
+        return_value={"memories": [m1, m2], "supersessions": [], "skipped": []},
+    )
 
     resp = client.post("/v1/memories/batch", json={
         "user_id": "u1",
@@ -185,7 +187,9 @@ def test_batch_create_per_message_keys_win(client, mock_memory_service):
         accessed_at=None, access_count=0,
         metadata_json={"role": "user", "session_id": "from_message"},
     )
-    mock_memory_service.create_batch = AsyncMock(return_value=[m])
+    mock_memory_service.create_batch = AsyncMock(
+        return_value={"memories": [m], "supersessions": [], "skipped": []},
+    )
 
     resp = client.post("/v1/memories/batch", json={
         "user_id": "u1",
@@ -244,8 +248,10 @@ async def test_create_batch_merges_metadata_per_message_keys_win():
     }
 
 
-def test_batch_create_infer_ignored_in_slice_1(client, mock_memory_service):
-    """infer=True is accepted but doesn't change behavior in slice 1 (D7)."""
+def test_batch_create_infer_calls_smart_ingestion(client, mock_memory_service):
+    """Slice 5: ``infer=True`` activates the smart-ingestion path. The
+    service receives infer=True and returns a {memories, supersessions,
+    skipped} envelope; the route flattens that into data + meta."""
     m = FakeMemory(
         id="m-batch-4", user_id="u1", agent_id=None,
         content="hi", memory_type="episodic",
@@ -254,7 +260,14 @@ def test_batch_create_infer_ignored_in_slice_1(client, mock_memory_service):
         accessed_at=None, access_count=0,
         metadata_json={"role": "user"},
     )
-    mock_memory_service.create_batch = AsyncMock(return_value=[m])
+    mock_memory_service.create_batch = AsyncMock(return_value={
+        "memories": [m],
+        "supersessions": [
+            {"superseded_id": "old", "new_id": "m-batch-4",
+             "similarity": 0.78, "reason": "contradiction:negation:overlap"},
+        ],
+        "skipped": [{"reason": "duplicate", "similarity": 0.97}],
+    })
 
     resp = client.post("/v1/memories/batch", json={
         "user_id": "u1",
@@ -263,9 +276,12 @@ def test_batch_create_infer_ignored_in_slice_1(client, mock_memory_service):
     })
 
     assert resp.status_code == 200
-    # Verify the service was called with infer=True (forwarded but ignored impl-side)
+    # The route should pass infer=True through.
     kwargs = mock_memory_service.create_batch.call_args.kwargs
     assert kwargs.get("infer") is True
+    body = resp.json()
+    assert body["meta"]["supersessions"][0]["superseded_id"] == "old"
+    assert body["meta"]["skipped"][0]["reason"] == "duplicate"
 
 
 def test_list_memories_no_filters(client, mock_memory_service):

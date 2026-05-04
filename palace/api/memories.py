@@ -13,9 +13,12 @@ from palace.api.common import (
     Meta,
     SearchedMemoryOut,
     SearchMemoriesRequest,
+    SupersedeMemoryRequest,
+    SupersessionOut,
     UpdateMemoryRequest,
 )
 from palace.memory_service import memory_service
+from palace.retrieval.ingestion import smart_ingestion_service
 
 router = APIRouter()
 users_router = APIRouter()
@@ -41,7 +44,7 @@ async def create_memory(req: CreateMemoryRequest):
 async def batch_create_memories(req: BatchCreateMemoriesRequest):
     start = time.time()
     messages = [m.model_dump() for m in req.messages]
-    memories = await memory_service.create_batch(
+    result = await memory_service.create_batch(
         user_id=req.user_id,
         messages=messages,
         agent_id=req.agent_id,
@@ -51,8 +54,14 @@ async def batch_create_memories(req: BatchCreateMemoriesRequest):
         infer=req.infer,
     )
     took = int((time.time() - start) * 1000)
-    data = [MemoryOut.from_memory(m) for m in memories]
-    return ApiResponse(data=data, meta=Meta(count=len(data), took_ms=took))
+    data = [MemoryOut.from_memory(m) for m in result["memories"]]
+    meta = Meta(
+        count=len(data),
+        took_ms=took,
+        supersessions=result.get("supersessions", []),
+        skipped=result.get("skipped", []),
+    )
+    return ApiResponse(data=data, meta=meta)
 
 
 MAX_LIST_LIMIT = 500
@@ -130,6 +139,43 @@ async def delete_memory(memory_id: str):
     if not ok:
         raise HTTPException(status_code=404, detail="Memory not found")
     return ApiResponse(data={"deleted": True}, meta=Meta(count=1))
+
+
+@router.post(
+    "/{memory_id}/supersede",
+    response_model=ApiResponse[SupersessionOut],
+)
+async def supersede_memory(memory_id: str, req: SupersedeMemoryRequest):
+    """Manually replace a memory with new content. Records a
+    MemorySupersession audit row and demotes the old memory's FSRS state."""
+    start = time.time()
+    result = await smart_ingestion_service.supersede_memory(
+        old_memory_id=memory_id,
+        new_content=req.new_content,
+        user_id=req.user_id,
+        reason=req.reason,
+        metadata=req.metadata,
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="Memory not found")
+    took = int((time.time() - start) * 1000)
+    out = SupersessionOut(
+        superseded_id=result["superseded_id"],
+        new_id=result["new_id"],
+        reason=result["reason"],
+    )
+    return ApiResponse(data=out, meta=Meta(count=1, took_ms=took))
+
+
+@router.get(
+    "/{memory_id}/supersedes",
+    response_model=ApiResponse[list[SupersessionOut]],
+)
+async def get_memory_supersessions(memory_id: str):
+    """Return supersession history involving this memory_id (either side)."""
+    rows = await smart_ingestion_service.get_supersessions(memory_id)
+    data = [SupersessionOut(**r) for r in rows]
+    return ApiResponse(data=data, meta=Meta(count=len(data)))
 
 
 @users_router.get("/{user_id}/memories", response_model=ApiResponse[list[MemoryOut]])

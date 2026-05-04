@@ -12,6 +12,7 @@ from palace_client.models import (
     Intention,
     Job,
     JobPending,
+    LayeredContext,
     Memory,
     MemoryDynamics,
     Message,
@@ -20,6 +21,7 @@ from palace_client.models import (
     ScoredMemory,
     Session,
     SessionWithMessages,
+    Supersession,
 )
 
 
@@ -516,6 +518,66 @@ class PalaceClient:
         envelope = await self._request("POST", "/v1/maintenance/cleanup-intentions")
         data = self._data(envelope) or {}
         return int(data.get("deleted", 0))
+
+    # ---- layered retrieval + supersede (slice 5) ----
+
+    async def assemble_layered_context(
+        self,
+        user_id: str,
+        query: str,
+        agent_id: str | None = None,
+        session_id: str | None = None,
+        max_l1_chars: int = 3200,
+        max_l2_chars: int = 12000,
+        max_recent_messages: int = 20,
+        use_fsrs: bool = True,
+        memory_limit: int = 10,
+        episode_limit: int = 5,
+        min_episode_significance: float = 0.3,
+    ) -> LayeredContext:
+        body: dict[str, Any] = {
+            "user_id": user_id,
+            "query": query,
+            "max_l1_chars": max_l1_chars,
+            "max_l2_chars": max_l2_chars,
+            "max_recent_messages": max_recent_messages,
+            "use_fsrs": use_fsrs,
+            "memory_limit": memory_limit,
+            "episode_limit": episode_limit,
+            "min_episode_significance": min_episode_significance,
+        }
+        if agent_id is not None:
+            body["agent_id"] = agent_id
+        if session_id is not None:
+            body["session_id"] = session_id
+        envelope = await self._request("POST", "/v1/context/layered", json=body)
+        return LayeredContext.model_validate(self._data(envelope))
+
+    async def supersede_memory(
+        self,
+        memory_id: str,
+        user_id: str,
+        new_content: str,
+        reason: str = "manual_correction",
+        metadata: dict | None = None,
+    ) -> dict:
+        body: dict[str, Any] = {
+            "user_id": user_id,
+            "new_content": new_content,
+            "reason": reason,
+        }
+        if metadata is not None:
+            body["metadata"] = metadata
+        envelope = await self._request(
+            "POST", f"/v1/memories/{memory_id}/supersede", json=body,
+        )
+        return dict(self._data(envelope) or {})
+
+    async def get_supersessions(self, memory_id: str) -> list[Supersession]:
+        envelope = await self._request(
+            "GET", f"/v1/memories/{memory_id}/supersedes",
+        )
+        return [Supersession.model_validate(s) for s in self._data(envelope) or []]
 
     # ---- health ----
 

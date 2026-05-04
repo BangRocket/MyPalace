@@ -192,6 +192,10 @@ The embedder is loaded lazily, so importing the app no longer triggers a model d
 
 ## Drop-in mode for mypalclara (phase 2)
 
+**Phase 2 complete:** 5 slices, ~25 endpoints + 18 client methods. The
+mypalclara router routes ~12 of ~18 external callsites; the remaining are
+DB-bound or graph (phase 3).
+
 Palace ships an async Python client (`palace_client/`) that mypalclara can
 use to delegate per-method memory calls to a remote Palace instance,
 falling back to the embedded `ClaraMemory` for everything not yet routable.
@@ -273,6 +277,19 @@ Four trigger types (set via `trigger_conditions["type"]`):
 - `context` — matches a dict of `{channel_name, is_dm, time_of_day, day_of_week}`; all configured keys must match.
 
 The `mypalclara_router.py` reference now routes `MM.set_intention`, `MM.check_intentions`, and `MM.format_intentions_for_prompt` when `USE_PALACE_SERVICE=true`.
+
+### Slice 5 additions: layered retrieval + smart ingestion
+
+Three endpoints + an activated flag close out phase 2: multi-tier context assembly, LLM-driven memory extraction with vector dedup + heuristic supersede, and a manual supersede record:
+
+- `POST /v1/context/layered` — multi-tier context assembly. Parallel-fetches L1 (top semantic memories + recent episodes + active arcs) and L2 (query-filtered memories optionally FSRS-reranked + query-filtered episodes), char-budgets each layer, and optionally pulls `recent_messages` from a session. Returns a structured dict (caller composes into prompts; Palace stays generic).
+- `POST /v1/memories/{id}/supersede` — manually replace a memory. Creates a new memory and an audit row; demotes the old memory's FSRS state.
+- `GET  /v1/memories/{id}/supersedes` — supersession history involving this memory id (either side).
+- **Activated:** `infer=true` on `POST /v1/memories/batch` now runs the smart-ingestion pipeline: LLM extracts factual memories from the conversation block; for each candidate, embed + Qdrant-search the nearest existing memory; `score > 0.95` skip as duplicate, `score > 0.75` heuristic contradiction check (auto-supersede when confidence > 0.7, else skip as similar), else write fresh. Response `meta` carries `supersessions` and `skipped` arrays.
+
+The contradiction heuristic is intentionally simple (no LLM in the hot ingestion path): negation-asymmetry plus stemmed token overlap. The LLM extraction is the only LLM call.
+
+`MM.build_prompt_layered`, `MM.smart_ingest`, and `MM.supersede_memory` graduate to remote in `examples/mypalclara_router.py` when `USE_PALACE_SERVICE=true`. Note: the routed `build_prompt_layered` returns a structured `LayeredContext` dict instead of typed Messages — mypalclara's caller must adapt (the routed path drops Discord-specific persona/channel layers per phase-2 design D1).
 
 ## Integration tests
 

@@ -843,3 +843,92 @@ async def test_cleanup_expired_intentions():
     deleted = await client.cleanup_expired_intentions()
     assert "/v1/maintenance/cleanup-intentions" in captured["url"]
     assert deleted == 3
+
+
+# ---- layered retrieval + supersede (slice 5) ----
+
+@pytest.mark.asyncio
+async def test_assemble_layered_context():
+    from palace_client import LayeredContext
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(200, json=make_envelope({
+            "l1_user_profile": {
+                "memories": [{"id": "m1", "content": "fact"}],
+                "recent_episodes": [],
+                "active_arcs": [],
+            },
+            "l2_relevant_context": {"memories": [], "episodes": []},
+            "recent_messages": None,
+            "summary": None,
+            "char_counts": {"l1": 4, "l2": 0},
+        }))
+
+    client = make_client(handler)
+    ctx = await client.assemble_layered_context(
+        user_id="u1", query="career", use_fsrs=False, session_id="s-1",
+    )
+    assert "/v1/context/layered" in captured["url"]
+    assert captured["body"]["use_fsrs"] is False
+    assert captured["body"]["session_id"] == "s-1"
+    assert isinstance(ctx, LayeredContext)
+    assert ctx.char_counts["l1"] == 4
+    assert ctx.l1_user_profile["memories"][0]["id"] == "m1"
+
+
+@pytest.mark.asyncio
+async def test_supersede_memory():
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(200, json=make_envelope({
+            "superseded_id": "old", "new_id": "new", "reason": "manual_correction",
+        }))
+
+    client = make_client(handler)
+    result = await client.supersede_memory(
+        memory_id="old", user_id="u1", new_content="updated",
+    )
+    assert "/v1/memories/old/supersede" in captured["url"]
+    assert captured["body"]["new_content"] == "updated"
+    assert result["new_id"] == "new"
+
+
+@pytest.mark.asyncio
+async def test_get_supersessions():
+    from palace_client import Supersession
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        return httpx.Response(200, json=make_envelope([
+            {
+                "superseded_id": "a", "new_id": "b",
+                "reason": "manual_correction", "similarity_score": None,
+                "created_at": "2026-05-03T00:00:00+00:00",
+            },
+        ], count=1))
+
+    client = make_client(handler)
+    rows = await client.get_supersessions("a")
+    assert "/v1/memories/a/supersedes" in captured["url"]
+    assert len(rows) == 1
+    assert isinstance(rows[0], Supersession)
+    assert rows[0].new_id == "b"
+
+
+@pytest.mark.asyncio
+async def test_supersede_memory_404():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"detail": "Memory not found"})
+
+    client = make_client(handler)
+    with pytest.raises(PalaceNotFound):
+        await client.supersede_memory(
+            memory_id="missing", user_id="u1", new_content="x",
+        )

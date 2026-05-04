@@ -10,7 +10,9 @@ from fastapi.testclient import TestClient
 def mock_memory_service():
     mock = MagicMock()
     mock.create = AsyncMock()
-    mock.create_batch = AsyncMock()
+    mock.create_batch = AsyncMock(
+        return_value={"memories": [], "supersessions": [], "skipped": []},
+    )
     mock.list_filtered = AsyncMock(return_value=[])
     mock.get = AsyncMock()
     mock.update = AsyncMock()
@@ -87,6 +89,38 @@ def mock_dynamics_service():
 
 
 @pytest.fixture
+def mock_layered_service():
+    mock = MagicMock()
+    mock.assemble = AsyncMock(
+        return_value={
+            "l1_user_profile": {
+                "memories": [],
+                "recent_episodes": [],
+                "active_arcs": [],
+            },
+            "l2_relevant_context": {
+                "memories": [],
+                "episodes": [],
+            },
+            "recent_messages": None,
+            "summary": None,
+            "char_counts": {"l1": 0, "l2": 0},
+        },
+    )
+    return mock
+
+
+@pytest.fixture
+def mock_ingestion_service():
+    mock = MagicMock()
+    mock.extract_memories = AsyncMock(return_value=[])
+    mock.dedup_and_write = AsyncMock(return_value=([], [], []))
+    mock.supersede_memory = AsyncMock()
+    mock.get_supersessions = AsyncMock(return_value=[])
+    return mock
+
+
+@pytest.fixture
 def mock_intention_service():
     mock = MagicMock()
     mock.set = AsyncMock()
@@ -108,6 +142,8 @@ def client(
     mock_job_service,
     mock_dynamics_service,
     mock_intention_service,
+    mock_layered_service,
+    mock_ingestion_service,
 ):
     with (
         patch("palace.api.memories.memory_service", mock_memory_service),
@@ -122,6 +158,8 @@ def client(
         patch("palace.api.maintenance.dynamics_service", mock_dynamics_service),
         patch("palace.api.intentions.intention_service", mock_intention_service),
         patch("palace.api.maintenance.intention_service", mock_intention_service),
+        patch("palace.api.retrieval.layered_retrieval_service", mock_layered_service),
+        patch("palace.api.memories.smart_ingestion_service", mock_ingestion_service),
         patch("palace.memory_service.memory_service", mock_memory_service),
         patch("palace.episode_service.episode_service", mock_episode_service),
         patch("palace.database.init_db", AsyncMock()),

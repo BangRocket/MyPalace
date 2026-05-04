@@ -69,12 +69,45 @@ class MemoryService:
         memory_type: str = "episodic",
         metadata: dict | None = None,
         source: str | None = None,
-        infer: bool = False,  # accepted but ignored in slice 1
-    ) -> list[Memory]:
-        """One memory per message. Per-message keys (other than 'content')
-        merge into metadata, with per-message keys winning over request-level
-        metadata on key collision."""
+        infer: bool = False,
+    ) -> dict:
+        """Batch-create memories.
+
+        ``infer=False`` (default): one memory per message, verbatim. Per-message
+        keys (other than 'content') merge into metadata, with per-message keys
+        winning over request-level metadata on key collision.
+
+        ``infer=True`` (slice 5): runs the smart-ingestion pipeline — LLM
+        extraction + vector dedup + heuristic supersede.
+
+        Returns a dict ``{"memories": [...], "supersessions": [...],
+        "skipped": [...]}``. Caller flattens as appropriate.
+        """
         base_metadata = metadata or {}
+
+        if infer:
+            # Lazy import to avoid circular dependency at module load.
+            from palace.retrieval.ingestion import smart_ingestion_service
+
+            candidates = await smart_ingestion_service.extract_memories(
+                messages=messages,
+                user_id=user_id,
+                agent_id=agent_id,
+            )
+            written, supersessions, skipped = await smart_ingestion_service.dedup_and_write(
+                candidates=candidates,
+                user_id=user_id,
+                agent_id=agent_id,
+                memory_type=memory_type,
+                source=source,
+                base_metadata=base_metadata,
+            )
+            return {
+                "memories": written,
+                "supersessions": supersessions,
+                "skipped": skipped,
+            }
+
         results: list[Memory] = []
         for msg in messages:
             content = msg["content"]
@@ -90,7 +123,7 @@ class MemoryService:
                 metadata=merged or None,
             )
             results.append(mem)
-        return results
+        return {"memories": results, "supersessions": [], "skipped": []}
 
     async def get(self, memory_id: str) -> Memory | None:
         """Fetch a memory by ID and bump its access counter."""

@@ -169,3 +169,45 @@ class FiredIntention(BaseModel):
     priority: int = 0
     match_details: dict[str, Any] = Field(default_factory=dict)
     source_memory_id: str | None = None
+
+
+# --- slice 5: layered retrieval + smart ingestion ---
+
+class MemoryWithScore(BaseModel):
+    """Memory with similarity score and optional FSRS composite score."""
+
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    user_id: str
+    agent_id: str | None = None
+    content: str
+    memory_type: str
+    importance: float
+    score: float
+    composite_score: float | None = None
+    fsrs_score: float | None = None
+    created_at: datetime | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class LayeredContext(BaseModel):
+    """Structured response from /v1/context/layered. Caller composes
+    these tiers into prompts; the service does not return typed Messages."""
+
+    model_config = ConfigDict(extra="ignore")
+    l1_user_profile: dict[str, Any] = Field(default_factory=dict)
+    l2_relevant_context: dict[str, Any] = Field(default_factory=dict)
+    recent_messages: list[dict[str, Any]] | None = None
+    summary: str | None = None
+    char_counts: dict[str, int] = Field(default_factory=dict)
+
+
+class Supersession(BaseModel):
+    """A row from the memory_supersessions audit table."""
+
+    model_config = ConfigDict(extra="ignore")
+    superseded_id: str
+    new_id: str
+    reason: str
+    similarity_score: float | None = None
+    created_at: datetime | None = None
