@@ -649,6 +649,90 @@ Requires Docker or podman with a running machine. First run pulls
 postgres + qdrant images and downloads the small embedding model
 (`sentence-transformers/all-MiniLM-L6-v2`); subsequent runs are 30-60s.
 
+---
+
+## Bulk import / export (phase 6 slice 2)
+
+Disaster recovery + tenant migration. Streaming NDJSON, one record per line.
+
+```bash
+# Stream a tenant dump to a file
+curl "http://localhost:8000/v1/admin/export?tenant_id=acme" \
+  -H "X-Palace-Key: $ADMIN_KEY" \
+  -o palace-acme-export.ndjson
+
+# Re-import into a target tenant (creates the tenant if missing)
+curl -X POST "http://localhost:8000/v1/admin/import?tenant_id=acme-restored" \
+  -H "X-Palace-Key: $ADMIN_KEY" \
+  --data-binary @palace-acme-export.ndjson
+```
+
+Each line is one row prefixed by `_type` (one of `tenant`, `memory`, `session`, `narrative_arc`, `intention`, `memory_dynamics`, `memory_supersession`). Vector data is **not** included — re-embed on import keeps dumps portable across embedding models. The `tenant_id` query param **always wins** over any `tenant_id` field in the dump. Idempotent on primary keys via `db.merge()`. `api_keys` are excluded — set up auth on the new deployment separately.
+
+Pair with `/v1/admin/reembed` (slice 4) by passing `?reembed=false` for very large imports, then triggering re-embed afterward.
+
+---
+
+## Memory TTL (phase 6 slice 3)
+
+Optional time-to-live on memories. Pass `ttl_seconds` on create:
+
+```bash
+curl -X POST http://localhost:8000/v1/memories \
+  -H "X-Palace-Key: $KEY" \
+  -d '{"user_id":"u1","content":"login code: 482719","ttl_seconds":300,"memory_type":"session"}'
+```
+
+The memory's `expires_at` is set to now + ttl. Search/list/get already exclude expired rows even before cleanup runs (`WHERE expires_at IS NULL OR expires_at > now()`).
+
+Garbage collection runs as a worker handler. Enqueue per-tenant:
+
+```python
+from palace.workers import enqueue
+await enqueue(kind="cleanup", user_id="system",
+              payload={"batch_size": 500}, tenant_id="acme")
+```
+
+Or schedule it via cron / your orchestrator. Operators without a worker process can still delete expired memories via the regular DELETE endpoint — the index excludes them from reads regardless.
+
+---
+
+## Releasing (operator notes)
+
+Tagging `vX.Y.Z` triggers `.github/workflows/release.yml` which runs tests, builds both packages, and (when configured) publishes to PyPI + Docker Hub. Tags ending in `-rc*` or `-beta*` route to TestPyPI for rehearsal.
+
+### One-time setup
+
+**1. PyPI trusted publishing.** For each project at https://pypi.org/manage/account/publishing/, add a "GitHub" publisher pointing at this repo + workflow `release.yml`. Leave the environment field empty. Do this for both:
+- `palace-memory`
+- `palace-client`
+
+Once configured, the `pypa/gh-action-pypi-publish@release/v1` step OIDC-authenticates and uploads with no API token to manage. Repeat the same for https://test.pypi.org if you want rc/beta rehearsals to publish.
+
+**2. Docker Hub (optional).** If you want Docker images built on every tag, configure three repo settings (Settings → Secrets and variables → Actions):
+- Variable `PUBLISH_DOCKER` = `true`
+- Secret `DOCKERHUB_USERNAME` = your Docker Hub username
+- Secret `DOCKERHUB_TOKEN` = a [Docker Hub access token](https://hub.docker.com/settings/security)
+
+Without `vars.PUBLISH_DOCKER=true`, the docker job is skipped and the GitHub release still cuts.
+
+### Cutting a release
+
+```bash
+# Rehearse on TestPyPI first
+git tag -a v0.5.0-rc1 -m "rehearsal"
+git push origin v0.5.0-rc1
+# Watch https://github.com/BangRocket/palace-memory/actions
+
+# Once green, cut the real tag
+git tag -a v0.5.0 -m "0.5.0 — see CHANGELOG.md"
+git push origin v0.5.0
+```
+
+If a tag's workflow fails, fix the issue, delete the tag locally and remote (`git tag -d v0.5.0 && git push --delete origin v0.5.0`), then re-tag.
+
+---
+
 ## License
 
 PolyForm Noncommercial 1.0.0

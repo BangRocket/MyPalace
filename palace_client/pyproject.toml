@@ -1,6 +1,6 @@
 [project]
 name = "palace-client"
-version = "0.4.0"
+version = "0.5.0"
 description = "Async Python client for the Palace Memory Service"
 requires-python = ">=3.10"
 license = { text = "MIT" }

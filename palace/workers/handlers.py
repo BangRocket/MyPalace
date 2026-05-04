@@ -47,6 +47,105 @@ async def _synthesis_handler(payload: dict, tenant_id: str) -> Any:
     )
 
 
+async def _cleanup_handler(payload: dict, tenant_id: str) -> Any:
+    """Phase 6 slice 3: delete memories whose TTL has elapsed."""
+    from palace.memory_service import memory_service
+    deleted = await memory_service.cleanup_expired(
+        tenant_id=tenant_id,
+        batch_size=payload.get("batch_size", 500),
+    )
+    return {"tenant_id": tenant_id, "deleted": deleted}
+
+
+async def _reembed_handler(payload: dict, tenant_id: str) -> Any:
+    """Phase 6 slice 4: re-embed every memory in a tenant under a new model.
+
+    Payload:
+      provider: "openai" | "huggingface" (default: huggingface)
+      model:    str (required)
+      token:    str | None (HF auth token / OpenAI key)
+      batch_size: int (default 100)
+    """
+    from sqlalchemy import select
+
+    from palace.database import async_session
+    from palace.embeddings import make_embedder
+    from palace.models import Memory
+    from palace.vector import vector_store
+
+    log = logging.getLogger("palace.workers.reembed")
+    provider = payload.get("provider", "huggingface")
+    model = payload["model"]
+    token = payload.get("token")
+    batch_size = int(payload.get("batch_size", 100))
+
+    embedder = make_embedder(provider, model, token)
+    new_dim = embedder.dim
+
+    # Ensure the per-tenant collection exists at the new dim. If the dim
+    # changed from a previous embedding, this writes alongside the old
+    # vectors — operators should drop the old collection out-of-band when
+    # ready to fully cut over.
+    await vector_store.ensure_collection(new_dim, tenant_id=tenant_id)
+
+    total = 0
+    failures = 0
+    async with async_session() as db:
+        offset = 0
+        while True:
+            stmt = (
+                select(Memory)
+                .where(Memory.tenant_id == tenant_id)
+                .order_by(Memory.id)
+                .limit(batch_size)
+                .offset(offset)
+            )
+            result = await db.execute(stmt)
+            batch = list(result.scalars().all())
+            if not batch:
+                break
+
+            try:
+                vectors = await embedder.embed([m.content for m in batch])
+            except Exception:
+                failures += len(batch)
+                log.exception(
+                    "embedding batch failed (offset=%d, size=%d)",
+                    offset, len(batch),
+                )
+                offset += batch_size
+                continue
+
+            for m, vec in zip(batch, vectors, strict=False):
+                try:
+                    await vector_store.upsert(
+                        m.id,
+                        vec,
+                        {
+                            "user_id": m.user_id,
+                            "agent_id": m.agent_id,
+                            "memory_type": m.memory_type,
+                        },
+                        tenant_id=tenant_id,
+                    )
+                    total += 1
+                except Exception:
+                    failures += 1
+                    log.warning("upsert failed for memory_id=%s", m.id, exc_info=True)
+            offset += batch_size
+
+    return {
+        "tenant_id": tenant_id,
+        "provider": provider,
+        "model": model,
+        "reembedded": total,
+        "failures": failures,
+        "new_dim": new_dim,
+    }
+
+
 # Built-in handlers wired at import time.
 register_handler("reflection", _reflection_handler)
 register_handler("synthesis", _synthesis_handler)
+register_handler("cleanup", _cleanup_handler)
+register_handler("reembed", _reembed_handler)

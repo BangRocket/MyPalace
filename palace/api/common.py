@@ -25,6 +25,7 @@ class CreateMemoryRequest(BaseModel):
     source: str | None = None
     importance: float = 1.0
     metadata: dict[str, Any] | None = None
+    ttl_seconds: int | None = None  # phase 6 slice 3: optional TTL
 
 
 class BatchMessage(BaseModel):
@@ -112,6 +113,7 @@ class MemoryOut(BaseModel):
     updated_at: str | None
     accessed_at: str | None
     access_count: int
+    expires_at: str | None = None  # phase 6 slice 3
     metadata: dict[str, Any] | None
 
     @classmethod
@@ -128,6 +130,10 @@ class MemoryOut(BaseModel):
             updated_at=m.updated_at.isoformat() if m.updated_at else None,
             accessed_at=m.accessed_at.isoformat() if m.accessed_at else None,
             access_count=m.access_count,
+            expires_at=(
+                m.expires_at.isoformat()
+                if getattr(m, "expires_at", None) else None
+            ),
             metadata=m.metadata_json,
         )
 
