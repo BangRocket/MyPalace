@@ -164,6 +164,43 @@ Every request gets a `request_id` (read from `X-Request-ID` header if present, e
 
 ---
 
+## Background workers (phase 4 slice 3)
+
+Postgres-backed job queue using `SELECT ... FOR UPDATE SKIP LOCKED`. Built-in handlers cover `reflection` (episode reflection from a session) and `synthesis` (narrative arc rollup). The web process can opt to enqueue jobs and let a separate worker process pick them up.
+
+```bash
+# In one terminal: the web server
+.venv/bin/uvicorn palace.main:app --port 8000
+
+# In another: one or more workers
+.venv/bin/python -m palace.workers.runner
+# (Run multiple — SKIP LOCKED gives them safe concurrency)
+```
+
+### Knobs
+
+- `PALACE_WORKER_POLL_INTERVAL=1.0` — seconds between polls when idle
+- `PALACE_WORKER_LEASE_SECONDS=60` — max time a worker holds a claim before another can re-take it
+- `PALACE_WORKER_MAX_ATTEMPTS=3` — failures past this mark `status=failed`
+
+### Custom handlers
+
+```python
+from palace.workers import register_handler
+
+async def my_handler(payload: dict, tenant_id: str) -> dict:
+    return {"processed": payload}
+
+register_handler("my_kind", my_handler)
+# Then enqueue:
+from palace.workers import enqueue
+await enqueue(kind="my_kind", user_id="u1", payload={"x": 1}, tenant_id="default")
+```
+
+The runner picks up `my_kind` automatically once the registry is populated.
+
+---
+
 ## Graph layer (phase 3 slice 3)
 
 Optional FalkorDB integration. When `PALACE_FALKORDB_URL` is set, every memory / episode / arc create writes a node into the per-tenant graph (`palace_<tenant_id>`), and every supersession writes a `SUPERSEDES` edge. Writes are fire-and-forget — graph failures never break the primary write.
