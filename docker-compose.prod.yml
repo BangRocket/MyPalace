@@ -1,0 +1,144 @@
+# MyPalace production docker-compose
+#
+# Single-host deployment with web + worker + all five backends.
+# See docs/deployment.md for full setup, scaling, and operational notes.
+#
+# Quickstart:
+#   cp .env.example .env
+#   $EDITOR .env       # set PALACE_BOOTSTRAP_ADMIN_KEY
+#   docker compose -f docker-compose.prod.yml up -d
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mypalace-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mypalace}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-mypalace}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mypalace} -d ${POSTGRES_DB:-mypalace}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  qdrant:
+    image: qdrant/qdrant:v1.12.0
+    container_name: mypalace-qdrant
+    restart: unless-stopped
+    volumes:
+      - qdrant-data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:6333/healthz || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # FalkorDB ships as a Redis module — one instance covers graph,
+  # cache, and rate limiter. Split into separate Redis + FalkorDB
+  # containers if you need to scale the cache independently.
+  falkordb:
+    image: falkordb/falkordb:latest
+    container_name: mypalace-falkordb
+    restart: unless-stopped
+    command: ["--appendonly", "yes"]
+    volumes:
+      - falkordb-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  mypalace:
+    image: bangrocket/mypalace:${MYPALACE_VERSION:-0.7.1}
+    container_name: mypalace-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      falkordb:
+        condition: service_healthy
+    environment:
+      # --- core ---
+      PALACE_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-mypalace}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB:-mypalace}
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_COLLECTION: ${QDRANT_COLLECTION:-mypalace_memories}
+      # --- auth ---
+      PALACE_BOOTSTRAP_ADMIN_KEY: ${PALACE_BOOTSTRAP_ADMIN_KEY:?PALACE_BOOTSTRAP_ADMIN_KEY is required}
+      # --- embeddings + LLM ---
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-huggingface}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
+      HF_TOKEN: ${HF_TOKEN:-}
+      LLM_PROVIDER: ${LLM_PROVIDER:-openrouter}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-openai/gpt-4o-mini}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # --- production-default integrations (graph + cache + rate limit) ---
+      PALACE_FALKORDB_URL: redis://falkordb:6379
+      PALACE_REDIS_URL: redis://falkordb:6379
+      PALACE_RATE_LIMIT_ENABLED: "true"
+      PALACE_RATE_LIMIT_DEFAULT: ${PALACE_RATE_LIMIT_DEFAULT:-120}
+      PALACE_RATE_LIMIT_SEARCH: ${PALACE_RATE_LIMIT_SEARCH:-60}
+      PALACE_CACHE_TTL_SEARCH: ${PALACE_CACHE_TTL_SEARCH:-60}
+      PALACE_CACHE_TTL_GET: ${PALACE_CACHE_TTL_GET:-300}
+      # --- workers ---
+      PALACE_WORKER_QUEUE_ENABLED: "true"
+      # --- observability ---
+      PALACE_LOG_FORMAT: ${PALACE_LOG_FORMAT:-json}
+      PALACE_DB_SLOW_QUERY_MS: ${PALACE_DB_SLOW_QUERY_MS:-200}
+      PALACE_OTLP_ENDPOINT: ${PALACE_OTLP_ENDPOINT:-}
+      PALACE_OTLP_SERVICE_NAME: ${PALACE_OTLP_SERVICE_NAME:-mypalace}
+    ports:
+      - "${MYPALACE_HTTP_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8000/health/deep || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  worker:
+    image: bangrocket/mypalace:${MYPALACE_VERSION:-0.7.1}
+    container_name: mypalace-worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      falkordb:
+        condition: service_healthy
+    command: ["python", "-m", "mypalace.workers.runner"]
+    environment:
+      # Worker shares the same env as the web — same DB, same Qdrant,
+      # same auth bootstrap. Keep these in sync.
+      PALACE_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-mypalace}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB:-mypalace}
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_COLLECTION: ${QDRANT_COLLECTION:-mypalace_memories}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-huggingface}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
+      HF_TOKEN: ${HF_TOKEN:-}
+      LLM_PROVIDER: ${LLM_PROVIDER:-openrouter}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-openai/gpt-4o-mini}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      PALACE_FALKORDB_URL: redis://falkordb:6379
+      PALACE_REDIS_URL: redis://falkordb:6379
+      PALACE_LOG_FORMAT: ${PALACE_LOG_FORMAT:-json}
+      PALACE_WORKER_POLL_INTERVAL: ${PALACE_WORKER_POLL_INTERVAL:-1.0}
+      PALACE_WORKER_LEASE_SECONDS: ${PALACE_WORKER_LEASE_SECONDS:-60}
+      PALACE_WORKER_MAX_ATTEMPTS: ${PALACE_WORKER_MAX_ATTEMPTS:-3}
+
+volumes:
+  postgres-data:
+  qdrant-data:
+  falkordb-data:
