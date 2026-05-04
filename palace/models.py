@@ -50,6 +50,8 @@ class Memory(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
     accessed_at: datetime | None = Field(default=None, sa_column=_ts_column(nullable=True))
     access_count: int = Field(default=0)
+    # Phase 6 slice 3: optional TTL. Null = never expires (backwards compat).
+    expires_at: datetime | None = Field(default=None, sa_column=_ts_column(nullable=True))
     metadata_json: dict | None = Field(
         default=None,
         sa_column=Column(JSONB, nullable=True),
