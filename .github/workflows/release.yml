@@ -33,6 +33,9 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     permissions:
+      contents: read   # required by actions/checkout — declaring `permissions:`
+                       # otherwise strips this default and checkout fails with
+                       # "Repository not found".
       id-token: write  # for PyPI trusted publishing
     steps:
       - uses: actions/checkout@v4
@@ -76,8 +79,22 @@ jobs:
   docker:
     needs: test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # Skip cleanly if DOCKERHUB_USERNAME isn't configured. `secrets.X` can't
+    # be referenced directly in `if:` so we bridge through env first.
+    env:
+      DH_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+    if: ${{ vars.PUBLISH_DOCKER == 'true' }}
     steps:
       - uses: actions/checkout@v4
+      - name: Verify Docker Hub secrets present
+        if: env.DH_USER == ''
+        run: |
+          echo "::error::vars.PUBLISH_DOCKER=true but secrets.DOCKERHUB_USERNAME is empty."
+          echo "Set DOCKERHUB_USERNAME and DOCKERHUB_TOKEN in repo Secrets, or unset"
+          echo "vars.PUBLISH_DOCKER to skip the docker job."
+          exit 1
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Login to Docker Hub
@@ -98,7 +115,9 @@ jobs:
             bangrocket/palace:latest
 
   github-release:
-    needs: [build-and-publish, docker]
+    needs: [build-and-publish]
+    # docker is intentionally NOT a hard dep — operators without Docker Hub
+    # configured shouldn't be blocked from cutting a GitHub release.
     runs-on: ubuntu-latest
     permissions:
       contents: write

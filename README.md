@@ -649,6 +649,44 @@ Requires Docker or podman with a running machine. First run pulls
 postgres + qdrant images and downloads the small embedding model
 (`sentence-transformers/all-MiniLM-L6-v2`); subsequent runs are 30-60s.
 
+---
+
+## Releasing (operator notes)
+
+Tagging `vX.Y.Z` triggers `.github/workflows/release.yml` which runs tests, builds both packages, and (when configured) publishes to PyPI + Docker Hub. Tags ending in `-rc*` or `-beta*` route to TestPyPI for rehearsal.
+
+### One-time setup
+
+**1. PyPI trusted publishing.** For each project at https://pypi.org/manage/account/publishing/, add a "GitHub" publisher pointing at this repo + workflow `release.yml`. Leave the environment field empty. Do this for both:
+- `palace-memory`
+- `palace-client`
+
+Once configured, the `pypa/gh-action-pypi-publish@release/v1` step OIDC-authenticates and uploads with no API token to manage. Repeat the same for https://test.pypi.org if you want rc/beta rehearsals to publish.
+
+**2. Docker Hub (optional).** If you want Docker images built on every tag, configure three repo settings (Settings → Secrets and variables → Actions):
+- Variable `PUBLISH_DOCKER` = `true`
+- Secret `DOCKERHUB_USERNAME` = your Docker Hub username
+- Secret `DOCKERHUB_TOKEN` = a [Docker Hub access token](https://hub.docker.com/settings/security)
+
+Without `vars.PUBLISH_DOCKER=true`, the docker job is skipped and the GitHub release still cuts.
+
+### Cutting a release
+
+```bash
+# Rehearse on TestPyPI first
+git tag -a v0.5.0-rc1 -m "rehearsal"
+git push origin v0.5.0-rc1
+# Watch https://github.com/BangRocket/palace-memory/actions
+
+# Once green, cut the real tag
+git tag -a v0.5.0 -m "0.5.0 — see CHANGELOG.md"
+git push origin v0.5.0
+```
+
+If a tag's workflow fails, fix the issue, delete the tag locally and remote (`git tag -d v0.5.0 && git push --delete origin v0.5.0`), then re-tag.
+
+---
+
 ## License
 
 PolyForm Noncommercial 1.0.0
