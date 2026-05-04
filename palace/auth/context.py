@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from fastapi import HTTPException, Request
 
-VALID_SCOPES: frozenset[str] = frozenset({"read", "write", "admin"})
+VALID_SCOPES: frozenset[str] = frozenset({"read", "write", "admin", "unlimited"})
 
 
 @dataclass(frozen=True)
