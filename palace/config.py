@@ -28,5 +28,11 @@ class Settings(BaseSettings):
     llm_model: str = "openai/gpt-4o-mini"
     log_level: str = "INFO"
 
+    # Auth (slice 1)
+    auth_disabled: bool = Field(default=False, validation_alias="PALACE_AUTH_DISABLED")
+    bootstrap_admin_key: str | None = Field(
+        default=None, validation_alias="PALACE_BOOTSTRAP_ADMIN_KEY",
+    )
+
 
 settings = Settings()

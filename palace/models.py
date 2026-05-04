@@ -182,6 +182,24 @@ class MemoryAccessLog(SQLModel, table=True):
     accessed_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
 
 
+class ApiKey(SQLModel, table=True):
+    """API key for service-to-service auth (phase 3 slice 1)."""
+
+    __tablename__ = "api_keys"
+
+    id: str = Field(primary_key=True, default_factory=lambda: str(uuid4()))
+    key_prefix: str = Field(index=True, unique=True, max_length=8)
+    key_hash: str = Field(max_length=100)
+    label: str = Field(max_length=100)
+    scopes: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSONB, nullable=False, server_default="[]"),
+    )
+    created_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
+    last_used_at: datetime | None = Field(default=None, sa_column=_ts_column(nullable=True))
+    revoked_at: datetime | None = Field(default=None, sa_column=_ts_column(nullable=True))
+
+
 class MemorySupersession(SQLModel, table=True):
     """Audit log linking a superseded memory to its replacement (slice 5).
 

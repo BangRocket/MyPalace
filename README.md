@@ -16,7 +16,53 @@ Extracted from [mypalclara](https://github.com/BangRocket/mypalclara)'s Palace m
 
 ### What it does *not* do (v1, by design)
 
-No graph memory, no FSRS spaced-repetition, no reflection workers, no gRPC, no multi-tenancy, no auth. See `docs/SPEC.md` for the v1 scope and `docs/plan.md` for the long-range vision.
+No graph memory, no FSRS spaced-repetition, no reflection workers, no gRPC, no multi-tenancy. See `docs/SPEC.md` for the v1 scope and `docs/plan.md` for the long-range vision.
+
+Phase 2 added: episodes + reflection, narrative arcs, FSRS-6 dynamics, intentions, layered context, smart ingestion, supersede.
+
+Phase 3 in progress: API-key auth (slice 1, done) → multi-tenancy → graph (FalkorDB) → Redis cache → gRPC → PyPI publish.
+
+---
+
+## Auth (phase 3 slice 1)
+
+Every `/v1/*` endpoint requires a valid API key in the `X-Palace-Key` header. `/health`, `/docs`, `/redoc`, `/openapi.json` remain public.
+
+**Three scopes:**
+- `read` — `GET /v1/*`, `POST /v1/memories/search`, `/list`, `/episodes/search`, `/intentions/check`, `/intentions/format`, `/context/*`
+- `write` — everything else under `/v1/*`
+- `admin` — `/v1/admin/*` and `/v1/maintenance/*`
+
+Scopes are explicit: `admin` does **not** auto-grant `write` or `read`. When you mint a key, list every scope it should have.
+
+### Bootstrap an admin key
+
+Set `PALACE_BOOTSTRAP_ADMIN_KEY` to a value of the form `pk_live_<32 alphanumeric chars>`. On lifespan startup, if no admin key exists, Palace inserts a row with `read+write+admin` scopes. Idempotent.
+
+```bash
+export PALACE_BOOTSTRAP_ADMIN_KEY=pk_live_$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32)
+echo "$PALACE_BOOTSTRAP_ADMIN_KEY"   # save this — Palace doesn't log it
+```
+
+### Mint additional keys
+
+```bash
+curl -X POST http://localhost:8000/v1/admin/keys \
+  -H "X-Palace-Key: $PALACE_BOOTSTRAP_ADMIN_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"label": "mypalclara-prod", "scopes": ["read", "write"]}'
+# response: {"data": {"key_id": "...", "plaintext_key": "pk_live_...", ...}}
+```
+
+The plaintext is returned **once**. Palace stores only a bcrypt hash plus an 8-char prefix index for lookup.
+
+### Disable auth (development / tests only)
+
+```bash
+export PALACE_AUTH_DISABLED=true
+```
+
+The mock test suite sets this automatically; live integration tests opt back in per-test.
 
 ---
 

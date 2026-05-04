@@ -4,11 +4,14 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from palace.api import arcs, context, episodes, jobs, memories, sessions
+from palace.api import admin, arcs, context, episodes, jobs, memories, sessions
 from palace.api import dynamics as dynamics_api
 from palace.api import intentions as intentions_api
 from palace.api import maintenance as maintenance_api
 from palace.api import retrieval as retrieval_api
+from palace.auth.key_service import key_service
+from palace.auth.middleware import AuthMiddleware
+from palace.config import settings
 from palace.database import init_db
 from palace.episode_service import episode_service
 from palace.memory_service import memory_service
@@ -20,6 +23,7 @@ async def lifespan(app: FastAPI):
     await init_db()
     await memory_service.init()
     await episode_service.init()
+    await key_service.bootstrap_if_needed(settings.bootstrap_admin_key)
     yield
     # Shutdown
 
@@ -31,12 +35,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(AuthMiddleware)
+
 
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "palace-memory"}
 
 
+app.include_router(admin.router, prefix="/v1/admin", tags=["admin"])
 app.include_router(memories.router, prefix="/v1/memories", tags=["memories"])
 app.include_router(memories.users_router, prefix="/v1/users", tags=["memories"])
 app.include_router(sessions.router, prefix="/v1/sessions", tags=["sessions"])

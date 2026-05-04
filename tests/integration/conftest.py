@@ -103,6 +103,9 @@ def palace_settings(postgres_url: str, qdrant_url: str) -> dict[str, str]:
         "QDRANT_COLLECTION": f"palace_int_{uuid.uuid4().hex[:8]}",
         "EMBEDDING_PROVIDER": "huggingface",
         "EMBEDDING_MODEL": "sentence-transformers/all-MiniLM-L6-v2",
+        # Phase 3 slice 1: existing live tests run as if auth weren't there.
+        # The dedicated auth_live tests flip this back on per-test.
+        "PALACE_AUTH_DISABLED": "true",
     }
 
 
@@ -186,6 +189,7 @@ async def _truncate_tables(palace_app):
 
     from palace.database import async_session
     from palace.models import (
+        ApiKey,
         Intention,
         Memory,
         MemoryAccessLog,
@@ -210,6 +214,7 @@ async def _truncate_tables(palace_app):
         await db.execute(delete(Memory))
         await db.execute(delete(NarrativeArc))
         await db.execute(delete(ReflectionJob))
+        await db.execute(delete(ApiKey))
         await db.commit()
 
     # Clear all vector points by recreating the collections
