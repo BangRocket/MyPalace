@@ -169,6 +169,9 @@ class ContextOut(BaseModel):
 # ---------------------------------------------------------------------------
 
 class Meta(BaseModel):
+    """Response metadata. Extra keys allowed (e.g. slice-5 ``supersessions``
+    and ``skipped`` debug data appended to /v1/memories/batch responses)."""
+    model_config = {"extra": "allow"}
     count: int = 0
     took_ms: int = 0
 

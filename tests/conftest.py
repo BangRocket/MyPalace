@@ -10,7 +10,9 @@ from fastapi.testclient import TestClient
 def mock_memory_service():
     mock = MagicMock()
     mock.create = AsyncMock()
-    mock.create_batch = AsyncMock()
+    mock.create_batch = AsyncMock(
+        return_value={"memories": [], "supersessions": [], "skipped": []},
+    )
     mock.list_filtered = AsyncMock(return_value=[])
     mock.get = AsyncMock()
     mock.update = AsyncMock()
@@ -157,6 +159,7 @@ def client(
         patch("palace.api.intentions.intention_service", mock_intention_service),
         patch("palace.api.maintenance.intention_service", mock_intention_service),
         patch("palace.api.retrieval.layered_retrieval_service", mock_layered_service),
+        patch("palace.api.memories.smart_ingestion_service", mock_ingestion_service),
         patch("palace.memory_service.memory_service", mock_memory_service),
         patch("palace.episode_service.episode_service", mock_episode_service),
         patch("palace.database.init_db", AsyncMock()),
