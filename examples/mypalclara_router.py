@@ -274,9 +274,40 @@ class RoutedMemoryManager:
     def build_prompt(self, *args, **kw):
         return _EmbeddedMM.get_instance().build_prompt(*args, **kw)
 
-    def build_prompt_layered(self, *args, **kw):
-        # Slice 5 candidate.
-        return _EmbeddedMM.get_instance().build_prompt_layered(*args, **kw)
+    async def build_prompt_layered(self, *args, **kw):
+        """Slice 5: routes to /v1/context/layered when toggle is on.
+
+        IMPORTANT: the routed return type is a structured dict (LayeredContext
+        with l1_user_profile / l2_relevant_context / recent_messages /
+        char_counts), NOT the typed Messages list returned by the embedded
+        PromptBuilder.build_prompt_layered. Consumers must adapt — the routed
+        path drops Discord-specific layers (L0 SOUL.md, channel_context, vault
+        snapshots) per Palace phase-2 design D1, and the caller is
+        responsible for composing the dict into the actual prompt Messages.
+
+        Common kwargs accepted by both: ``user_id`` (positional or kw),
+        ``query``/``user_message`` (the message text), ``session_id``,
+        ``use_fsrs``, ``memory_limit``, ``episode_limit``.
+        """
+        if USE_PALACE_SERVICE:
+            user_id = kw.pop("user_id", None) or (args[0] if args else None)
+            query = (
+                kw.pop("query", None)
+                or kw.pop("user_message", None)
+                or (args[1] if len(args) > 1 else "")
+            )
+            return await _remote().assemble_layered_context(
+                user_id=user_id,
+                query=query,
+                agent_id=kw.pop("agent_id", None),
+                session_id=kw.pop("session_id", None),
+                use_fsrs=kw.pop("use_fsrs", True),
+                memory_limit=kw.pop("memory_limit", 10),
+                episode_limit=kw.pop("episode_limit", 5),
+            )
+        return await _maybe_await(
+            _EmbeddedMM.get_instance().build_prompt_layered(*args, **kw),
+        )
 
     def fetch_topic_recurrence(self, *args, **kw):
         return _EmbeddedMM.get_instance().fetch_topic_recurrence(*args, **kw)
@@ -423,11 +454,52 @@ class RoutedMemoryManager:
 
     # ---- Smart ingestion (slice 5) ----
 
-    def smart_ingest(self, *args, **kw):
-        return _EmbeddedMM.get_instance().smart_ingest(*args, **kw)
+    async def smart_ingest(self, messages, user_id, agent_id=None, **kw):
+        """Routes to POST /v1/memories/batch with infer=True when toggle is on.
 
-    def supersede_memory(self, *args, **kw):
-        return _EmbeddedMM.get_instance().supersede_memory(*args, **kw)
+        The remote pipeline runs LLM extraction + vector dedup + heuristic
+        supersede server-side; the response carries written memories plus
+        ``meta.supersessions`` and ``meta.skipped`` debug data. The embedded
+        equivalent is mypalclara's MemoryIngestionManager.smart_ingest which
+        does the same work in-process. Consumers reading meta fields will
+        need to switch from the embedded return shape to the routed one.
+        """
+        if USE_PALACE_SERVICE:
+            return await _remote().add(
+                messages=messages,
+                user_id=user_id,
+                agent_id=agent_id,
+                infer=True,
+                **kw,
+            )
+        return await _maybe_await(
+            _EmbeddedMM.get_instance().smart_ingest(
+                messages, user_id=user_id, agent_id=agent_id, **kw,
+            ),
+        )
+
+    async def supersede_memory(
+        self,
+        old_memory_id,
+        new_content,
+        user_id,
+        reason="manual_correction",
+        metadata=None,
+    ):
+        """Routes to POST /v1/memories/{id}/supersede when toggle is on."""
+        if USE_PALACE_SERVICE:
+            return await _remote().supersede_memory(
+                memory_id=old_memory_id,
+                user_id=user_id,
+                new_content=new_content,
+                reason=reason,
+                metadata=metadata,
+            )
+        return await _maybe_await(
+            _EmbeddedMM.get_instance().supersede_memory(
+                old_memory_id, new_content, user_id, reason, metadata,
+            ),
+        )
 
 
 # ---------------------------------------------------------------------------
