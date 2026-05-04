@@ -143,9 +143,14 @@ async def palace_app(palace_settings: dict[str, str]):
     # Slice 3: dynamics + maintenance routers close over dynamics_service.
     from palace.dynamics import service as dynamics_service_mod
     importlib.reload(dynamics_service_mod)
+    # Slice 4: intentions service + router close over async_session.
+    from palace.intentions import service as intentions_service_mod
+    importlib.reload(intentions_service_mod)
     from palace.api import dynamics as api_dynamics
+    from palace.api import intentions as api_intentions
     from palace.api import maintenance as api_maintenance
     importlib.reload(api_dynamics)
+    importlib.reload(api_intentions)
     importlib.reload(api_maintenance)
     from palace import main as palace_main
     importlib.reload(palace_main)
@@ -173,6 +178,7 @@ async def _truncate_tables(palace_app):
 
     from palace.database import async_session
     from palace.models import (
+        Intention,
         Memory,
         MemoryAccessLog,
         MemoryDynamics,
@@ -188,6 +194,7 @@ async def _truncate_tables(palace_app):
         # being explicit keeps the order obvious.
         await db.execute(delete(MemoryAccessLog))
         await db.execute(delete(MemoryDynamics))
+        await db.execute(delete(Intention))
         await db.execute(delete(Message))
         await db.execute(delete(SessionModel))
         await db.execute(delete(Memory))
