@@ -17,10 +17,17 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
+          # The standalone palace_client subpackage is imported at module
+          # top in tests/integration/test_client_e2e.py, so collection
+          # fails without it (even though the integration tests themselves
+          # are deselected by the default -m 'not integration' filter).
+          pip install -e ./palace_client
       - name: Lint
         run: ruff check palace/ tests/ palace_client/
       - name: Test
         run: pytest tests/
+      - name: Test palace_client
+        run: pytest palace_client/tests/
 
   build-and-publish:
     needs: test
