@@ -1,17 +1,21 @@
-// Palace Memory Service — gRPC schema (phase 3 slice 5)
+// Palace Memory Service — gRPC schema (phase 5 slice 2)
 //
-// Scope: MemoryService only. Other surfaces (sessions, episodes, arcs,
-// dynamics, intentions, retrieval, ingestion) ride HTTP for now and will
-// land here in phase 4.
+// Scope: full HTTP surface mirrored. MemoryService landed in phase 3 slice 5;
+// phase 5 slice 2 adds Session, Episode, Arc, Intention, Dynamics, Retrieval,
+// Ingestion, and Job services.
 //
 // Regenerate stubs:
 //   python -m grpc_tools.protoc -I=proto --python_out=palace/grpc/_generated \
 //     --grpc_python_out=palace/grpc/_generated proto/palace.proto
+//   sed -i '' 's/^import palace_pb2/from palace.grpc._generated import palace_pb2/' \
+//     palace/grpc/_generated/palace_pb2_grpc.py
 
 syntax = "proto3";
 package palace.v1;
 
-// -- Messages ---------------------------------------------------------
+// ====================================================================
+// MemoryService — phase 3 slice 5
+// ====================================================================
 
 message Memory {
   string id = 1;
@@ -32,8 +36,6 @@ message ScoredMemory {
   Memory memory = 1;
   float score = 2;
 }
-
-// -- Requests / Responses --------------------------------------------
 
 message CreateMemoryRequest {
   string user_id = 1;
@@ -86,12 +88,472 @@ message ListMemoriesResponse {
   repeated Memory memories = 1;
 }
 
-// -- Service ----------------------------------------------------------
-
 service MemoryService {
   rpc CreateMemory(CreateMemoryRequest) returns (MemoryResponse);
   rpc GetMemory(GetMemoryRequest) returns (MemoryResponse);
   rpc DeleteMemory(DeleteMemoryRequest) returns (DeleteResponse);
   rpc SearchMemories(SearchMemoriesRequest) returns (SearchMemoriesResponse);
   rpc ListMemories(ListMemoriesRequest) returns (ListMemoriesResponse);
+}
+
+// ====================================================================
+// SessionService — phase 5 slice 2
+// ====================================================================
+
+message Session {
+  string id = 1;
+  string user_id = 2;
+  string title = 3;
+  string summary = 4;
+  string created_at = 5;
+  string updated_at = 6;
+}
+
+message Message {
+  string id = 1;
+  string user_id = 2;
+  string role = 3;
+  string content = 4;
+  string created_at = 5;
+}
+
+message SessionWithMessages {
+  Session session = 1;
+  repeated Message messages = 2;
+}
+
+message CreateSessionRequest {
+  string user_id = 1;
+  string title = 2;
+}
+
+message GetSessionRequest {
+  string session_id = 1;
+}
+
+message AddMessageRequest {
+  string session_id = 1;
+  string user_id = 2;
+  string role = 3;
+  string content = 4;
+}
+
+message UpdateSessionRequest {
+  string session_id = 1;
+  string title = 2;
+  string summary = 3;
+}
+
+message DeleteSessionRequest {
+  string session_id = 1;
+}
+
+message SessionResponse {
+  Session session = 1;
+}
+
+message SessionWithMessagesResponse {
+  SessionWithMessages data = 1;
+}
+
+message MessageResponse {
+  Message message = 1;
+}
+
+service SessionService {
+  rpc CreateSession(CreateSessionRequest) returns (SessionResponse);
+  rpc GetSession(GetSessionRequest) returns (SessionWithMessagesResponse);
+  rpc AddMessage(AddMessageRequest) returns (MessageResponse);
+  rpc UpdateSession(UpdateSessionRequest) returns (SessionResponse);
+  rpc DeleteSession(DeleteSessionRequest) returns (DeleteResponse);
+}
+
+// ====================================================================
+// EpisodeService — phase 5 slice 2
+// ====================================================================
+
+message Episode {
+  string id = 1;
+  string user_id = 2;
+  string agent_id = 3;
+  string content = 4;
+  string summary = 5;
+  repeated string participants = 6;
+  repeated string topics = 7;
+  string emotional_tone = 8;
+  float significance = 9;
+  string timestamp = 10;
+  string session_id = 11;
+  int32 message_count = 12;
+  float score = 13;  // only present in search results; 0 otherwise
+}
+
+message ReflectionMessage {
+  string role = 1;
+  string content = 2;
+}
+
+message JobPending {
+  string job_id = 1;
+  string status = 2;  // "pending"
+}
+
+message EpisodesResponse {
+  repeated Episode episodes = 1;
+}
+
+message ReflectSessionRequest {
+  string user_id = 1;
+  repeated ReflectionMessage messages = 2;
+  string agent_id = 3;
+  string session_id = 4;
+  string mode = 5;  // "sync" | "async" (default async)
+}
+
+message ReflectSessionResponse {
+  oneof result {
+    JobPending pending = 1;
+    EpisodesResponse episodes = 2;
+  }
+}
+
+message SearchEpisodesRequest {
+  string query = 1;
+  string user_id = 2;
+  int32 limit = 3;
+  float min_significance = 4;
+}
+
+message GetRecentEpisodesRequest {
+  string user_id = 1;
+  int32 limit = 2;
+}
+
+service EpisodeService {
+  rpc ReflectSession(ReflectSessionRequest) returns (ReflectSessionResponse);
+  rpc SearchEpisodes(SearchEpisodesRequest) returns (EpisodesResponse);
+  rpc GetRecentEpisodes(GetRecentEpisodesRequest) returns (EpisodesResponse);
+}
+
+// ====================================================================
+// ArcService — phase 5 slice 2
+// ====================================================================
+
+message NarrativeArc {
+  string id = 1;
+  string user_id = 2;
+  string agent_id = 3;
+  string title = 4;
+  string summary = 5;
+  string status = 6;
+  repeated string key_episode_ids = 7;
+  string emotional_trajectory = 8;
+  string created_at = 9;
+  string updated_at = 10;
+}
+
+message ArcsResponse {
+  repeated NarrativeArc arcs = 1;
+}
+
+message SynthesizeNarrativesRequest {
+  string user_id = 1;
+  string agent_id = 2;
+  int32 lookback_episodes = 3;
+  string mode = 4;  // "sync" | "async" (default async)
+}
+
+message SynthesizeNarrativesResponse {
+  oneof result {
+    JobPending pending = 1;
+    ArcsResponse arcs = 2;
+  }
+}
+
+message GetActiveArcsRequest {
+  string user_id = 1;
+  int32 limit = 2;
+}
+
+service ArcService {
+  rpc SynthesizeNarratives(SynthesizeNarrativesRequest) returns (SynthesizeNarrativesResponse);
+  rpc GetActiveArcs(GetActiveArcsRequest) returns (ArcsResponse);
+}
+
+// ====================================================================
+// IntentionService — phase 5 slice 2
+// ====================================================================
+
+message Intention {
+  string id = 1;
+  string user_id = 2;
+  string agent_id = 3;
+  string content = 4;
+  string source_memory_id = 5;
+  string trigger_conditions_json = 6;  // JSON-encoded
+  int32 priority = 7;
+  bool fired = 8;
+  bool fire_once = 9;
+  string created_at = 10;
+  string expires_at = 11;
+  string fired_at = 12;
+}
+
+message FiredIntention {
+  string id = 1;
+  string content = 2;
+  string trigger_type = 3;
+  int32 priority = 4;
+  string match_details_json = 5;  // JSON-encoded
+  string source_memory_id = 6;
+}
+
+message SetIntentionRequest {
+  string user_id = 1;
+  string content = 2;
+  string trigger_conditions_json = 3;
+  string agent_id = 4;
+  string expires_at = 5;
+  string source_memory_id = 6;
+  int32 priority = 7;
+  bool fire_once = 8;
+}
+
+message CheckIntentionsRequest {
+  string user_id = 1;
+  string message = 2;
+  string context_json = 3;
+  string agent_id = 4;
+}
+
+message FormatIntentionsRequest {
+  string intentions_json = 1;  // JSON-encoded list
+  int32 max = 2;
+}
+
+message ListIntentionsRequest {
+  string user_id = 1;
+  string fired = 2;  // "true" | "false" | "all" (default "all")
+  int32 limit = 3;
+  string agent_id = 4;
+}
+
+message DeleteIntentionRequest {
+  string intention_id = 1;
+}
+
+message IntentionResponse {
+  Intention intention = 1;
+}
+
+message FiredIntentionsResponse {
+  repeated FiredIntention fired = 1;
+}
+
+message FormattedIntentionsResponse {
+  string text = 1;
+}
+
+message IntentionsResponse {
+  repeated Intention intentions = 1;
+}
+
+service IntentionService {
+  rpc SetIntention(SetIntentionRequest) returns (IntentionResponse);
+  rpc CheckIntentions(CheckIntentionsRequest) returns (FiredIntentionsResponse);
+  rpc FormatIntentions(FormatIntentionsRequest) returns (FormattedIntentionsResponse);
+  rpc ListIntentions(ListIntentionsRequest) returns (IntentionsResponse);
+  rpc DeleteIntention(DeleteIntentionRequest) returns (DeleteResponse);
+}
+
+// ====================================================================
+// DynamicsService — phase 5 slice 2
+// ====================================================================
+
+message MemoryDynamics {
+  string memory_id = 1;
+  string user_id = 2;
+  float stability = 3;
+  float difficulty = 4;
+  float retrieval_strength = 5;
+  float storage_strength = 6;
+  bool is_key = 7;
+  float importance_weight = 8;
+  string category = 9;
+  string tags_json = 10;
+  string last_accessed_at = 11;
+  int32 access_count = 12;
+  string created_at = 13;
+  string updated_at = 14;
+}
+
+message ScoreBreakdown {
+  float composite_score = 1;
+  float fsrs_score = 2;
+  float retrievability = 3;
+  float storage_strength = 4;
+}
+
+message PromoteMemoryRequest {
+  string memory_id = 1;
+  string user_id = 2;
+  int32 grade = 3;
+  string signal_type = 4;
+}
+
+message DemoteMemoryRequest {
+  string memory_id = 1;
+  string user_id = 2;
+  string reason = 3;
+}
+
+message GetDynamicsRequest {
+  string memory_id = 1;
+  string user_id = 2;
+}
+
+message ScoreMemoryRequest {
+  string memory_id = 1;
+  string user_id = 2;
+  float semantic_score = 3;
+}
+
+message DynamicsResponse {
+  MemoryDynamics dynamics = 1;
+}
+
+message ScoreBreakdownResponse {
+  ScoreBreakdown breakdown = 1;
+}
+
+service DynamicsService {
+  rpc PromoteMemory(PromoteMemoryRequest) returns (DynamicsResponse);
+  rpc DemoteMemory(DemoteMemoryRequest) returns (DynamicsResponse);
+  rpc GetDynamics(GetDynamicsRequest) returns (DynamicsResponse);
+  rpc ScoreMemory(ScoreMemoryRequest) returns (ScoreBreakdownResponse);
+}
+
+// ====================================================================
+// RetrievalService — phase 5 slice 2
+// ====================================================================
+
+message LayeredL1 {
+  string memories_json = 1;       // list of dicts (JSON)
+  string recent_episodes_json = 2;
+  string active_arcs_json = 3;
+}
+
+message LayeredL2 {
+  string memories_json = 1;
+  string episodes_json = 2;
+}
+
+message LayeredL3Graph {
+  string related_memories_json = 1;
+  string edges_json = 2;
+}
+
+message LayeredCharCounts {
+  int32 l1 = 1;
+  int32 l2 = 2;
+}
+
+message LayeredContext {
+  LayeredL1 l1_user_profile = 1;
+  LayeredL2 l2_relevant_context = 2;
+  LayeredL3Graph l3_graph_context = 3;  // omitted when null
+  bool has_l3_graph_context = 4;        // distinguish "missing" from "empty"
+  string recent_messages_json = 5;      // empty string = null
+  string summary = 6;
+  LayeredCharCounts char_counts = 7;
+}
+
+message AssembleLayeredRequest {
+  string user_id = 1;
+  string query = 2;
+  string agent_id = 3;
+  string session_id = 4;
+  int32 max_l1_chars = 5;
+  int32 max_l2_chars = 6;
+  int32 max_recent_messages = 7;
+  bool use_fsrs = 8;
+  int32 memory_limit = 9;
+  int32 episode_limit = 10;
+  float min_episode_significance = 11;
+  bool include_graph = 12;
+  int32 graph_depth = 13;
+  int32 graph_max_neighbors = 14;
+}
+
+message LayeredContextResponse {
+  LayeredContext context = 1;
+}
+
+service RetrievalService {
+  rpc AssembleLayered(AssembleLayeredRequest) returns (LayeredContextResponse);
+}
+
+// ====================================================================
+// IngestionService — phase 5 slice 2
+// ====================================================================
+
+message Supersession {
+  string superseded_id = 1;
+  string new_id = 2;
+  string reason = 3;
+  float similarity_score = 4;     // 0 if absent
+  bool has_similarity_score = 5;
+  string created_at = 6;
+}
+
+message SupersedeMemoryRequest {
+  string memory_id = 1;
+  string user_id = 2;
+  string new_content = 3;
+  string reason = 4;
+  string metadata_json = 5;
+}
+
+message GetSupersessionsRequest {
+  string memory_id = 1;
+}
+
+message SupersessionResponse {
+  Supersession supersession = 1;
+}
+
+message SupersessionsResponse {
+  repeated Supersession supersessions = 1;
+}
+
+service IngestionService {
+  rpc SupersedeMemory(SupersedeMemoryRequest) returns (SupersessionResponse);
+  rpc GetSupersessions(GetSupersessionsRequest) returns (SupersessionsResponse);
+}
+
+// ====================================================================
+// JobService — phase 5 slice 2
+// ====================================================================
+
+message Job {
+  string id = 1;
+  string kind = 2;
+  string user_id = 3;
+  string status = 4;
+  string created_at = 5;
+  string completed_at = 6;
+  string result_json = 7;     // JSON-encoded list|dict; empty = null
+  string error = 8;
+}
+
+message GetJobRequest {
+  string job_id = 1;
+}
+
+message JobResponse {
+  Job job = 1;
+}
+
+service JobService {
+  rpc GetJob(GetJobRequest) returns (JobResponse);
 }
