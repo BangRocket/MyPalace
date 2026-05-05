@@ -333,6 +333,72 @@ after `PALACE_WORKER_LEASE_SECONDS` (default 60s).
 
 ---
 
+## Per-tenant Postgres schemas (phase 12)
+
+Phase 12 moves tenant isolation from `WHERE tenant_id = ...` filtering
+to dedicated Postgres schemas (`acme.memories`, `globex.memories`,
+etc.). Default mode stays `table` through v0.11.x — the schema mode is
+opt-in until v0.12.0.
+
+### Cutover from table-mode to schema-mode (v0.11.x)
+
+```bash
+# 1. Run the shadow-copy migration. For every existing tenant this
+#    creates the schema + copies the data over. Idempotent (safe to
+#    re-run). Legacy public.* rows are preserved as a fallback.
+alembic upgrade head
+
+# 2. Spot-check that the per-tenant schemas have the expected row counts
+#    against the legacy public.* tables (per tenant):
+psql -c "SELECT count(*) FROM acme.memories"
+psql -c "SELECT count(*) FROM public.memories WHERE tenant_id='acme'"
+
+# 3. Flip the flag and restart. New writes go to <tenant>.<table>;
+#    SET LOCAL search_path scopes every query.
+echo "PALACE_TENANT_SCHEMA_MODE=schema" >> .env
+docker compose -f docker-compose.prod.yml restart mypalace worker
+
+# 4. Smoke-test against the live API:
+mypalace-admin tenants list
+mypalace-admin stats acme
+```
+
+### Reverting from schema-mode back to table-mode
+
+If something looks wrong after step 3, you can fall back. Live writes
+that landed in `<tenant>.<table>` between the flip and the revert will
+NOT propagate to `public.<table>` — that's why backups before any flag
+flip matter.
+
+```bash
+# Flip the flag back, restart.
+sed -i 's/PALACE_TENANT_SCHEMA_MODE=schema/PALACE_TENANT_SCHEMA_MODE=table/' .env
+docker compose -f docker-compose.prod.yml restart mypalace worker
+
+# (Optional) drop the per-tenant schemas to free disk:
+alembic downgrade -1
+```
+
+### `pg_dump` per-tenant
+
+Schema-mode enables single-tenant raw dumps without the rest:
+
+```bash
+pg_dump -h <host> -U mypalace -n acme mypalace_db > acme.sql
+```
+
+Restore the same way (`pg_restore -d ...`). For application-level
+migration the `mypalace-admin export` / `import` round-trip remains
+the canonical path — `pg_dump` is for ops-side disaster recovery only.
+
+### v0.12.0 — irreversible cutover
+
+When v0.12.0 ships, default mode flips to `schema` and Alembic 0011
+drops the legacy `public.<table>` rows + `tenant_id` columns. **Run
+the v0.11.x cutover above first**, verify everything works under
+schema-mode, then upgrade to v0.12.0. Once 0011 runs there is no
+table-mode to fall back to.
+
 ## Troubleshooting
 
 - **`/ready` returns 503** (alias: `/health/deep`) — at least one backend
