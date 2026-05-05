@@ -18,7 +18,7 @@ Extracted from [mypalclara](https://github.com/BangRocket/mypalclara)'s Palace m
 - **Pluggable embeddings** — HuggingFace (local) or OpenAI (API)
 - **Pluggable LLM backend** — any OpenAI-compatible chat completion endpoint (OpenRouter, OpenAI, etc.)
 
-### Project status — v0.9.0
+### Project status — v0.10.0
 
 Released to PyPI as `mypalace` (server) and `mypalace-client`. Production-ready
 in scope; see the phase notes below for what's in and what's deliberately left
@@ -59,6 +59,12 @@ out.
   trigger pod restarts), tunable SQLAlchemy connection pool with
   `pool_pre_ping` on by default, scheduled per-tenant backup worker
   (gzipped NDJSON, atomic publish, mtime-based pruning).
+- **Phase 10** — mypalclara parity: entity resolver (platform-id →
+  human name registry), personality evolution (LLM-driven self-evolving
+  traits, run via the worker queue), token-based context budget env
+  vars, optional Redis embedding cache with toggle, and VCH (verbatim
+  chat history search via Postgres FTS). Driven by
+  `docs/gap-analysis-mypalclara.md`.
 
 **Deliberately out of scope** (operators who need them should fork or
 deploy separately): per-tenant Postgres schemas, admin web UI, memory
@@ -586,7 +592,7 @@ The short version:
 
 ```bash
 # 1. install the client
-pip install mypalace-client==0.9.0   # or "mypalace-client[grpc]"
+pip install mypalace-client==0.10.0   # or "mypalace-client[grpc]"
 
 # 2. copy examples/mypalclara_router.py into mypalclara as
 #    mypalclara/core/memory/routed.py and swap the imports
