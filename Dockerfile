@@ -1,3 +1,15 @@
+# Phase 13: multi-stage build — Node stage builds the admin UI; Python
+# stage runs the server and serves the built UI from /app/static/admin.
+
+FROM node:24-alpine AS ui-build
+WORKDIR /ui
+# Cache npm install layer separately from source for fast iterations.
+COPY apps/admin-ui/package.json apps/admin-ui/package-lock.json* ./
+RUN npm install --no-audit --no-fund
+COPY apps/admin-ui/ ./
+RUN npm run build
+
+
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
@@ -14,6 +26,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY pyproject.toml README.md ./
 COPY mypalace ./mypalace
 COPY proto ./proto
+
+# Admin UI: built bundle from the ui-build stage. Lives at the path
+# mypalace.main._mount_admin_ui() looks for first.
+COPY --from=ui-build /ui/dist /app/static/admin
 
 RUN pip install --upgrade pip && pip install .
 

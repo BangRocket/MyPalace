@@ -333,6 +333,38 @@ after `PALACE_WORKER_LEASE_SECONDS` (default 60s).
 
 ---
 
+## Admin web UI (phase 13)
+
+Operators can manage MyPalace from a browser. The UI is bundled into
+the production Docker image; no extra service to run.
+
+```bash
+# After `docker compose up`, hit:
+open http://localhost:8000/admin/
+
+# Sign in with any key that has the admin scope. The bootstrap admin
+# key from .env works:
+echo "$PALACE_BOOTSTRAP_ADMIN_KEY"
+```
+
+Surface (v1):
+
+- **Health** — live backend status (Postgres / Qdrant / FalkorDB / Redis).
+- **Tenants** — list, create, delete.
+- **API keys** — list (incl. revoked), mint with one-time plaintext display, revoke.
+- **Stats** — per-tenant or `ALL` row counts, 7d activity, FSRS health, top users.
+- **Audit log** — recent admin operations with method/path/key filters.
+- **Memories** — read-only per-user browser.
+
+Auth model: admin API key in `sessionStorage` (closing the tab signs out). Same key that works with `mypalace-admin` and `curl`. Same trust boundary.
+
+Same-origin only; no extra CORS configuration. If you need to host the UI on a separate origin, that's not supported in v1 — file an issue.
+
+If the UI doesn't load (404 at `/admin/`), the server failed to find the built bundle. The server logs `admin UI bundle not found; /admin disabled` at boot. Either:
+
+- run a release image (the multi-stage build always includes the UI), or
+- build it into a dev install: `cd apps/admin-ui && npm install && npm run build`.
+
 ## Per-tenant Postgres schemas (phase 12)
 
 Phase 12 moves tenant isolation from `WHERE tenant_id = ...` filtering
