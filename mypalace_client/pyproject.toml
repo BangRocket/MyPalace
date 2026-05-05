@@ -25,10 +25,17 @@ grpc = [
     "grpcio>=1.60",
     "protobuf>=4.25",
 ]
+# CLI is bundled with the package; the extra exists so operators can
+# `pip install 'mypalace-client[cli]'` and signal intent. httpx is
+# already a base dep, so the extra adds no transitive deps today.
+cli = []
 dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.25",
 ]
+
+[project.scripts]
+mypalace-admin = "mypalace_client.cli.admin:main"
 
 [project.urls]
 Homepage = "https://github.com/BangRocket/MyPalace"

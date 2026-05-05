@@ -8,7 +8,14 @@ Async Python client for the [MyPalace Memory Service](https://github.com/BangRoc
 pip install mypalace-client
 # Optional gRPC transport:
 pip install "mypalace-client[grpc]"
+# Operator CLI (`mypalace-admin`):
+pip install "mypalace-client[cli]"
 ```
+
+> The `mypalace-admin` CLI is bundled with this package as of v0.10.x.
+> If you previously got it via the server-side `mypalace` package, that
+> entry point still works as a deprecation shim and will be removed
+> in v0.12.0 — switch to `pip install 'mypalace-client[cli]'`.
 
 ## Quick start
 
@@ -63,6 +70,25 @@ async with PalaceGrpcClient("localhost:50051", api_key="pk_live_...") as c:
 ```
 
 Other surfaces (sessions, episodes, etc.) ride HTTP via `PalaceClient`.
+
+## CLI: `mypalace-admin`
+
+Operator wrapper around the HTTP admin surface. Subcommands cover the
+day-to-day surface — `health`, `version`, `keys {list|mint|revoke}`,
+`tenants {list|create}`, `stats`, `audit`, `reembed`, `job`, `export`.
+
+```bash
+export MYPALACE_URL=http://your-palace:8000
+export MYPALACE_ADMIN_KEY=pk_live_...
+
+mypalace-admin health
+mypalace-admin tenants list
+mypalace-admin keys mint --label acme-prod --scopes read,write --tenant-id acme
+mypalace-admin stats acme
+mypalace-admin export acme -o acme.ndjson
+```
+
+`--json` emits raw JSON (good for `jq` pipelines).
 
 ## License
 
