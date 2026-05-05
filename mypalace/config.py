@@ -153,6 +153,19 @@ class Settings(BaseSettings):
         default=3000, validation_alias="PALACE_CONTEXT_BUDGET_L2_TOKENS",
     )
 
+    # Embedding result cache (phase 10 slice 4). Embeddings are deterministic
+    # for a given (model, text), so a long TTL is safe and avoids paying
+    # OpenAI/HuggingFace cost on repeated inputs (very common during
+    # ingestion + immediate search of the same text). Requires Redis;
+    # silently no-ops when redis_url is unset.
+    embedding_cache_disabled: bool = Field(
+        default=False, validation_alias="PALACE_EMBEDDING_CACHE_DISABLED",
+    )
+    embedding_cache_ttl_seconds: int = Field(
+        default=2_592_000,  # 30 days
+        validation_alias="PALACE_EMBEDDING_CACHE_TTL",
+    )
+
 
 settings = Settings()
 
