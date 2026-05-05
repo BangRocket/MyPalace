@@ -138,11 +138,30 @@ Land the plumbing **without** dropping the `tenant_id` columns:
 
 `mypalace-admin stats`, `tenants`, etc. switch to per-tenant queries.
 
-### Phase 12.3 — Drop the legacy `tenant_id` columns
+### Phase 12.3 — Two-step rollout (revised after implementation)
 
-After one minor in dual-mode (so operators can roll forward and back), an Alembic revision drops the `tenant_id` column from per-tenant tables and removes the fallback code path. The feature flag goes away.
+Originally planned as one PR. Split into two during implementation
+because shadow-copy and column-drop have very different reversibility
+profiles, and bundling them locks operators into one big upgrade.
 
-This is the irreversible step — gate on Joshua's explicit go-ahead.
+**12.3a (this minor — v0.11.0)** — Alembic 0010 shadow-copy migration:
+for each tenant in `public.tenants`, CREATE SCHEMA + replicate per-
+tenant DDL + INSERT ... SELECT every row from `public.<table>`. Default
+mode stays `table`. Operators upgrade, run `alembic upgrade head`, then
+flip `PALACE_TENANT_SCHEMA_MODE=schema` on their schedule. Reversible:
+flip back to `table`, `alembic downgrade -1`, the per-tenant schemas
+drop. Live writes during the brief in-between window go to whichever
+mode is active.
+
+**12.3b (next minor — v0.12.0)** — flip the default to `schema` and
+ship Alembic 0011 dropping the legacy `tenant_id` columns + the
+duplicate `public.<table>` rows. Removes the feature flag entirely.
+Coincides with the v0.12.0 server-side `mypalace-admin` shim removal
+(scheduled in phase 11) so all phase-12-era breaking changes happen
+at one release boundary.
+
+This **is** the irreversible step — gate on Joshua's explicit
+go-ahead before tagging v0.12.0.
 
 ---
 
