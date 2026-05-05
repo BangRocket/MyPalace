@@ -18,7 +18,7 @@ Extracted from [mypalclara](https://github.com/BangRocket/mypalclara)'s Palace m
 - **Pluggable embeddings** — HuggingFace (local) or OpenAI (API)
 - **Pluggable LLM backend** — any OpenAI-compatible chat completion endpoint (OpenRouter, OpenAI, etc.)
 
-### Project status — v0.10.0
+### Project status — v0.11.0
 
 Released to PyPI as `mypalace` (server) and `mypalace-client`. Production-ready
 in scope; see the phase notes below for what's in and what's deliberately left
@@ -65,6 +65,18 @@ out.
   vars, optional Redis embedding cache with toggle, and VCH (verbatim
   chat history search via Postgres FTS). Driven by
   `docs/gap-analysis-mypalclara.md`.
+- **Phase 11** — operator CLI moved into `mypalace-client[cli]` so
+  operators no longer need the full server install (and its torch /
+  sentence-transformers dependency tree) just to run `mypalace-admin`
+  against a remote server. Server-side script kept as a deprecation
+  shim through v0.11.x; removed in v0.12.0.
+- **Phase 12** — per-tenant Postgres schemas (opt-in in v0.11.x via
+  `PALACE_TENANT_SCHEMA_MODE=schema`; default in v0.12.0). Tenant
+  isolation moves from `WHERE tenant_id = ...` filtering into Postgres
+  itself, so a missed filter can no longer leak data across tenants.
+  Three-step rollout (contextvar plumbing → tenant lifecycle →
+  Alembic shadow-copy → v0.12.0 column drop) keeps the cutover
+  reversible until the very last step.
 
 **Deliberately out of scope** (operators who need them should fork or
 deploy separately): per-tenant Postgres schemas, admin web UI, memory
@@ -592,7 +604,7 @@ The short version:
 
 ```bash
 # 1. install the client
-pip install mypalace-client==0.10.0   # or "mypalace-client[grpc]"
+pip install mypalace-client==0.11.0   # or "mypalace-client[cli,grpc]"
 
 # 2. copy examples/mypalclara_router.py into mypalclara as
 #    mypalclara/core/memory/routed.py and swap the imports
