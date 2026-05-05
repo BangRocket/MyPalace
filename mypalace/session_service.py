@@ -104,7 +104,54 @@ class SessionService:
 
             await db.commit()
             await db.refresh(message)
-            return message
+
+        # Phase 10 slice 2: probabilistic personality evolution.
+        # Triggers only on assistant messages (we need both sides of the
+        # exchange) and only when PALACE_PERSONALITY_EVOLUTION_CHANCE > 0.
+        # Lookup is async + best-effort; failures never affect the write.
+        if role == "assistant":
+            await self._maybe_trigger_personality_evolution(
+                session_id=session_id,
+                user_id=user_id,
+                assistant_reply=content,
+                tenant_id=tenant_id,
+            )
+        return message
+
+    async def _maybe_trigger_personality_evolution(
+        self,
+        session_id: str,
+        user_id: str,
+        assistant_reply: str,
+        tenant_id: str,
+    ) -> None:
+        from mypalace.config import settings
+
+        if settings.personality_evolution_chance <= 0:
+            return
+
+        # Fetch the most recent user message in this session — that's the
+        # half of the exchange we just replied to.
+        async with async_session() as db:
+            result = await db.execute(
+                select(Message)
+                .where(Message.session_id == session_id)
+                .where(Message.tenant_id == tenant_id)
+                .where(Message.role == "user")
+                .order_by(Message.created_at.desc())
+                .limit(1),
+            )
+            user_msg = result.scalar_one_or_none()
+        if user_msg is None:
+            return
+
+        from mypalace.personality_service import maybe_enqueue_evolution
+        maybe_enqueue_evolution(
+            user_message=user_msg.content,
+            assistant_reply=assistant_reply,
+            user_id=user_id,
+            tenant_id=tenant_id,
+        )
 
     async def update(
         self,
