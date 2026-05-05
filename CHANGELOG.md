@@ -4,6 +4,31 @@ All notable changes to MyPalace are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and MyPalace adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased] — phase 11
+
+### Changed
+
+- **`mypalace-admin` CLI moved to the `mypalace-client` package.** Install
+  with `pip install 'mypalace-client[cli]'`. The full implementation now
+  lives at `mypalace_client/cli/admin.py` so operators can manage a remote
+  MyPalace server without installing the full server (and its torch /
+  sentence-transformers / qdrant-client dependency tree).
+- The server-side `mypalace` package's `mypalace-admin` script is now a
+  one-line deprecation shim that prints a stderr notice and delegates to
+  `mypalace_client.cli.admin.main` when the client is installed
+  alongside. Removal targeted for **v0.12.0**.
+- `cmd version` now reports the bundled mypalace-client version instead
+  of the server's mypalace package version (it lives in the client now).
+
+### Migration
+
+```bash
+pip install 'mypalace-client[cli]'   # new install
+# Old install (still works for one minor):
+mypalace-admin --help                 # → prints DEPRECATION on stderr,
+                                      #   then runs normally
+```
+
 ## [0.10.0] — 2026-05-05
 
 Phase 10 ("mypalclara parity"). Closes the three MISSING gaps and two

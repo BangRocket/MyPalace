@@ -97,19 +97,28 @@ The compose file enables the recommended production knobs by default:
 
 ## First-time setup after boot
 
+Either drive the admin surface with curl directly, or install the
+operator CLI (recommended):
+
+```bash
+pipx install 'mypalace-client[cli]'   # or: pip install ...
+export MYPALACE_URL=http://localhost:8000
+export MYPALACE_ADMIN_KEY=$(grep PALACE_BOOTSTRAP_ADMIN_KEY .env | cut -d= -f2)
+```
+
 ```bash
 ADMIN_KEY=$(grep PALACE_BOOTSTRAP_ADMIN_KEY .env | cut -d= -f2)
 
 # 1. Create your tenant (or use the auto-created `default` tenant)
+mypalace-admin tenants create --id acme --label "Acme Corp"
+# or:
 curl -X POST http://localhost:8000/v1/admin/tenants \
   -H "X-Palace-Key: $ADMIN_KEY" \
   -d '{"id":"acme","label":"Acme Corp"}'
 
 # 2. Mint a tenant-bound write key for your application
-curl -X POST http://localhost:8000/v1/admin/keys \
-  -H "X-Palace-Key: $ADMIN_KEY" \
-  -d '{"label":"acme-prod","scopes":["read","write"],"tenant_id":"acme"}'
-# → save the plaintext_key from the response
+mypalace-admin keys mint --label acme-prod --scopes read,write --tenant-id acme
+# → save the plaintext_key from the output
 
 # 3. (Optional) confirm the bootstrap admin key is the only cross-tenant key
 curl http://localhost:8000/v1/admin/keys -H "X-Palace-Key: $ADMIN_KEY" | jq

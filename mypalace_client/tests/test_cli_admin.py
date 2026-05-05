@@ -14,8 +14,7 @@ from unittest.mock import MagicMock
 
 import httpx
 import pytest
-
-from mypalace.cli.admin import build_parser, main
+from mypalace_client.cli.admin import build_parser, main
 
 
 def _resp(
@@ -39,7 +38,7 @@ def mock_client(monkeypatch):
     client_mock.__enter__ = MagicMock(return_value=client_mock)
     client_mock.__exit__ = MagicMock(return_value=None)
     monkeypatch.setattr(
-        "mypalace.cli.admin._client",
+        "mypalace_client.cli.admin._client",
         lambda args: client_mock,
     )
     return client_mock
