@@ -455,8 +455,11 @@ class LayeredContextRequest(BaseModel):
     query: str
     agent_id: str | None = None
     session_id: str | None = None
-    max_l1_chars: int = 3200
-    max_l2_chars: int = 12000
+    # Defaulting to None lets the service fall back to the env-configured
+    # token budgets (PALACE_CONTEXT_BUDGET_L1/L2_TOKENS × 4). Operators may
+    # still override per-request via these fields.
+    max_l1_chars: int | None = None
+    max_l2_chars: int | None = None
     max_recent_messages: int = 20
     use_fsrs: bool = True
     memory_limit: int = 10

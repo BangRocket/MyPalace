@@ -81,6 +81,8 @@ clean message in the logs rather than a confusing first-request crash.
 | `PALACE_DB_POOL_TIMEOUT` | `30` | Seconds a request waits for a free connection before erroring |
 | `PALACE_DB_POOL_RECYCLE` | `1800` | Recycle connections older than this (seconds). Mitigates idle-timeout drops from pgbouncer / cloud Postgres |
 | `PALACE_DB_POOL_PRE_PING` | `true` | Validate connection with `SELECT 1` before each checkout. Costs 1 extra round-trip per request but eliminates "stale connection" errors after Postgres restarts |
+| `PALACE_CONTEXT_BUDGET_L1_TOKENS` | `800` | Per-request L1 (user-profile) layer budget in tokens. Converts to chars at 4×. Defaults reproduce the legacy hardcoded 3200 chars. |
+| `PALACE_CONTEXT_BUDGET_L2_TOKENS` | `3000` | Per-request L2 (relevant-context) layer budget in tokens. Defaults reproduce the legacy hardcoded 12000 chars. |
 
 The compose file enables the recommended production knobs by default:
 

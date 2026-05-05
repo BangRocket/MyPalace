@@ -141,5 +141,29 @@ class Settings(BaseSettings):
         default=0.0, validation_alias="PALACE_PERSONALITY_EVOLUTION_CHANCE",
     )
 
+    # Layered retrieval budgets (phase 10 slice 3). Expressed in tokens
+    # for parity with mypalclara/core/memory/config.py BUDGET dict; converted
+    # to chars at the boundary using the standard 4-char-per-token heuristic.
+    # Defaults mirror the previous hardcoded char budgets (3200 chars =
+    # 800 tokens; 12000 chars = 3000 tokens).
+    context_budget_l1_tokens: int = Field(
+        default=800, validation_alias="PALACE_CONTEXT_BUDGET_L1_TOKENS",
+    )
+    context_budget_l2_tokens: int = Field(
+        default=3000, validation_alias="PALACE_CONTEXT_BUDGET_L2_TOKENS",
+    )
+
 
 settings = Settings()
+
+
+CHARS_PER_TOKEN = 4
+
+
+def context_budget_l1_chars() -> int:
+    """Token budget converted to chars at the 4-char/token heuristic."""
+    return settings.context_budget_l1_tokens * CHARS_PER_TOKEN
+
+
+def context_budget_l2_chars() -> int:
+    return settings.context_budget_l2_tokens * CHARS_PER_TOKEN
