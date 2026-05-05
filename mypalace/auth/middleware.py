@@ -13,6 +13,7 @@ from mypalace.auth.context import AuthContext
 from mypalace.auth.key_service import key_service
 from mypalace.auth.scopes import is_public, required_scope
 from mypalace.config import settings
+from mypalace.tenancy import set_current_tenant
 
 HEADER = "X-Palace-Key"
 
@@ -28,6 +29,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         if settings.auth_disabled:
             request.state.auth = AuthContext.all_scopes()
+            # Phase 12: in auth-disabled (tests, dev) the default tenant
+            # is the safe assumption. Routes can still override via
+            # auth.resolve_tenant(request_tenant=...) which reseats the
+            # contextvar.
+            set_current_tenant(settings.default_tenant_id)
             return await call_next(request)
 
         if is_public(path):
@@ -50,6 +56,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
             )
 
         request.state.auth = ctx
+        # Phase 12: tenant-bound keys lock the search_path immediately;
+        # cross-tenant admin keys leave the contextvar None until the
+        # route handler calls resolve_tenant().
+        if ctx.tenant_id is not None:
+            set_current_tenant(ctx.tenant_id)
         return await call_next(request)
 
 
