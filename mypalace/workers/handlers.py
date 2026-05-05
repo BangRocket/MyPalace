@@ -144,8 +144,20 @@ async def _reembed_handler(payload: dict, tenant_id: str) -> Any:
     }
 
 
+async def _personality_evolve_handler(payload: dict, tenant_id: str) -> Any:
+    """Phase 10 slice 2: LLM-driven personality evolution."""
+    from mypalace.personality_service import DEFAULT_AGENT_ID, personality_service
+    return await personality_service.evaluate_and_apply(
+        user_message=payload["user_message"],
+        assistant_reply=payload["assistant_reply"],
+        agent_id=payload.get("agent_id", DEFAULT_AGENT_ID),
+        tenant_id=tenant_id,
+    )
+
+
 # Built-in handlers wired at import time.
 register_handler("reflection", _reflection_handler)
 register_handler("synthesis", _synthesis_handler)
 register_handler("cleanup", _cleanup_handler)
 register_handler("reembed", _reembed_handler)
+register_handler("personality_evolve", _personality_evolve_handler)

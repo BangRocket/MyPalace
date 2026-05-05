@@ -133,5 +133,13 @@ class Settings(BaseSettings):
         default=7, validation_alias="PALACE_BACKUP_RETAIN_DAYS",
     )
 
+    # Personality evolution (phase 10 slice 2). Probability that a given
+    # ingested message exchange triggers an LLM-driven trait evolution
+    # job. 0.0 (default) disables the feature entirely — no jobs are
+    # enqueued and no LLM cost is incurred. mypalclara default was 0.1.
+    personality_evolution_chance: float = Field(
+        default=0.0, validation_alias="PALACE_PERSONALITY_EVOLUTION_CHANCE",
+    )
+
 
 settings = Settings()

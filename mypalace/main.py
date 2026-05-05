@@ -15,6 +15,7 @@ from mypalace.api import (
     episodes,
     jobs,
     memories,
+    personality,
     portability,
     reembed,
     sessions,
@@ -177,6 +178,7 @@ app.include_router(portability.router, prefix="/v1/admin", tags=["admin"])
 app.include_router(reembed.router, prefix="/v1/admin", tags=["admin"])
 app.include_router(audit.router, prefix="/v1/admin", tags=["admin"])
 app.include_router(entities.router, prefix="/v1/admin", tags=["admin"])
+app.include_router(personality.router, prefix="/v1/admin", tags=["admin"])
 app.include_router(memories.router, prefix="/v1/memories", tags=["memories"])
 app.include_router(memories.users_router, prefix="/v1/users", tags=["memories"])
 app.include_router(sessions.router, prefix="/v1/sessions", tags=["sessions"])

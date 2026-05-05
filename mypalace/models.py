@@ -288,6 +288,39 @@ class AuditLog(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
 
 
+class PersonalityTrait(SQLModel, table=True):
+    """Self-evolving agent personality trait (phase 10 slice 2).
+
+    Source mypalclara/db/models.py:PersonalityTrait. Soft-deleted via
+    ``active`` so history is preserved without a separate table — the
+    audit log already covers who/when on the API surface.
+    """
+
+    __tablename__ = "personality_traits"
+    __table_args__ = (
+        Index(
+            "ix_personality_traits_tenant_agent_active",
+            "tenant_id", "agent_id", "active",
+        ),
+        Index(
+            "ix_personality_traits_tenant_agent_category",
+            "tenant_id", "agent_id", "category",
+        ),
+    )
+
+    id: str = Field(primary_key=True, default_factory=lambda: str(uuid4()))
+    tenant_id: str = Field(default=DEFAULT_TENANT_ID, max_length=32)
+    agent_id: str = Field(default="default", max_length=64)
+    category: str = Field(max_length=50)
+    trait_key: str = Field(max_length=100)
+    content: str
+    source: str = Field(default="self", max_length=20)
+    reason: str | None = None
+    active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
+    updated_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
+
+
 class EntityAlias(SQLModel, table=True):
     """Maps platform-prefixed identifiers to human-readable names.
 
