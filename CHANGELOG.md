@@ -4,29 +4,88 @@ All notable changes to MyPalace are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and MyPalace adheres to
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased] — phase 11
+## [0.11.0] — 2026-05-05
 
-### Changed
+Two big workstreams shipped together: phase 11 (CLI repackaging) and
+phase 12 slices 0–3a (per-tenant Postgres schema plumbing). Default
+behavior is unchanged for existing deployments — the schema-mode
+isolation is opt-in via `PALACE_TENANT_SCHEMA_MODE=schema` until
+**v0.12.0** flips the default and drops the legacy `tenant_id`
+columns.
 
-- **`mypalace-admin` CLI moved to the `mypalace-client` package.** Install
-  with `pip install 'mypalace-client[cli]'`. The full implementation now
-  lives at `mypalace_client/cli/admin.py` so operators can manage a remote
-  MyPalace server without installing the full server (and its torch /
-  sentence-transformers / qdrant-client dependency tree).
-- The server-side `mypalace` package's `mypalace-admin` script is now a
-  one-line deprecation shim that prints a stderr notice and delegates to
-  `mypalace_client.cli.admin.main` when the client is installed
-  alongside. Removal targeted for **v0.12.0**.
-- `cmd version` now reports the bundled mypalace-client version instead
-  of the server's mypalace package version (it lives in the client now).
+### Changed (phase 11 — CLI move)
+
+- **`mypalace-admin` CLI moved to the `mypalace-client` package.**
+  Install with `pip install 'mypalace-client[cli]'`. Operators can now
+  manage a remote MyPalace server without installing the full server
+  (no more torch / sentence-transformers / qdrant-client dependency
+  tree on the operator's box).
+- The server-side `mypalace` package's `mypalace-admin` script is now
+  a one-line **deprecation shim** that prints a stderr notice and
+  delegates to `mypalace_client.cli.admin.main` when the client is
+  installed alongside. Removal targeted for **v0.12.0**.
+- `cmd_version` reports the bundled mypalace-client version (it lives
+  in the client now).
+
+### Added (phase 12 — per-tenant Postgres schemas, opt-in)
+
+- **`docs/per-tenant-schemas-design.md`** (slice 0) — design doc that
+  scoped the rollout. Three-PR plan: 12.1 contextvar/event plumbing,
+  12.2 tenant lifecycle (CREATE/DROP SCHEMA), 12.3a Alembic
+  shadow-copy. Original 12.3 split into 12.3a (this release) +
+  12.3b (v0.12.0).
+- **Per-request tenant contextvar** (slice 12.1) + SQLAlchemy
+  `after_begin` event listener that runs `SET LOCAL search_path TO
+  "<tenant>", public` at transaction start when
+  `PALACE_TENANT_SCHEMA_MODE=schema`. Default `table` mode is fully
+  no-op so existing deployments see zero behavior change.
+  `mypalace.tenancy` module with `current_tenant` /
+  `set_current_tenant` / `tenant_scope` helpers + a strict
+  `is_valid_schema_name` regex used as defence against SQL injection
+  before composing identifier-interpolated SQL.
+- **Tenant lifecycle** (slice 12.2). `POST /v1/admin/tenants` in
+  schema-mode provisions the per-tenant schema after the tenant row
+  commits. `DELETE /v1/admin/tenants/{id}` grows `?confirm=<id>` (the
+  destructive guard) and `?force=true` (skip the data-presence check).
+  In schema-mode, also `DROP SCHEMA CASCADE`. Two new helpers in
+  `mypalace.tenancy`: `replicate_per_tenant_schema(tenant_id, conn)`
+  and `drop_tenant_schema(tenant_id, conn)`.
+- **Alembic 0010 shadow-copy migration** (slice 12.3a). For every
+  tenant in `public.tenants`: CREATE SCHEMA + replicate per-tenant
+  DDL + INSERT ... SELECT every row. Idempotent. Both copies coexist
+  after the migration; legacy `public.*` rows preserved as the
+  fallback when `tenant_schema_mode=table`.
+- New env var: `PALACE_TENANT_SCHEMA_MODE` (default `"table"`; set to
+  `"schema"` after running `alembic upgrade head` to cut over).
+
+### Documentation
+
+- `docs/deployment.md` grows a **"Per-tenant Postgres schemas (phase
+  12)" section** covering the cutover runbook (alembic upgrade →
+  spot-check → flip flag → restart), the revert path, the new
+  `pg_dump -n <tenant>` capability, and the v0.12.0 irreversibility
+  warning.
+
+### Coming in v0.12.0 (phase 12.3b + phase 11 deprecations)
+
+- Default `PALACE_TENANT_SCHEMA_MODE` flips to `"schema"`.
+- Alembic 0011 drops `tenant_id` columns from per-tenant tables and
+  removes the duplicate `public.<table>` rows. **Irreversible** —
+  backups before upgrade are required.
+- Server-side `mypalace-admin` deprecation shim removed; only the
+  `mypalace-client[cli]` install path works.
 
 ### Migration
 
 ```bash
-pip install 'mypalace-client[cli]'   # new install
-# Old install (still works for one minor):
-mypalace-admin --help                 # → prints DEPRECATION on stderr,
-                                      #   then runs normally
+# Operator CLI: switch install path (old still works through v0.11.x).
+pip install 'mypalace-client[cli]'
+
+# Schema-mode cutover (optional in v0.11; mandatory before v0.12):
+alembic upgrade head                      # runs 0010 shadow-copy
+psql -c "SELECT count(*) FROM acme.memories"   # spot-check per tenant
+echo "PALACE_TENANT_SCHEMA_MODE=schema" >> .env
+docker compose -f docker-compose.prod.yml restart mypalace worker
 ```
 
 ## [0.10.0] — 2026-05-05

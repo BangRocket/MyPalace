@@ -1,6 +1,6 @@
 [project]
 name = "mypalace"
-version = "0.10.0"
+version = "0.11.0"
 license = "PolyForm-Noncommercial-1.0.0"
 description = "MyPalace — standalone memory service for AI assistants. Full HTTP + gRPC surface, multi-tenancy, graph, cache, workers, rate limits, websockets, observability, analytics, bulk import/export, TTL, embedding migration, audit log, memory versioning."
 requires-python = ">=3.12"
