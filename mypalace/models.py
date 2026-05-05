@@ -288,6 +288,32 @@ class AuditLog(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
 
 
+class EntityAlias(SQLModel, table=True):
+    """Maps platform-prefixed identifiers to human-readable names.
+
+    Source mypalclara/core/memory/entity_resolver.py. Used by graph node
+    labelling so the knowledge graph shows "Josh" instead of
+    "discord-271274659385835521".
+    """
+
+    __tablename__ = "entity_aliases"
+    __table_args__ = (
+        Index(
+            "uq_entity_aliases_tenant_identifier",
+            "tenant_id", "identifier", unique=True,
+        ),
+        Index("ix_entity_aliases_tenant_canonical", "tenant_id", "canonical_name"),
+    )
+
+    id: str = Field(primary_key=True, default_factory=lambda: str(uuid4()))
+    tenant_id: str = Field(default=DEFAULT_TENANT_ID, max_length=32)
+    identifier: str = Field(max_length=200)
+    canonical_name: str = Field(max_length=200)
+    source: str = Field(default="manual", max_length=20)
+    created_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
+    updated_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
+
+
 class MemorySupersession(SQLModel, table=True):
     """Audit log linking a superseded memory to its replacement (slice 5).
 

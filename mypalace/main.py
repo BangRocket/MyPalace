@@ -11,6 +11,7 @@ from mypalace.api import (
     arcs,
     audit,
     context,
+    entities,
     episodes,
     jobs,
     memories,
@@ -175,6 +176,7 @@ app.include_router(stats.router, prefix="/v1/admin", tags=["admin"])
 app.include_router(portability.router, prefix="/v1/admin", tags=["admin"])
 app.include_router(reembed.router, prefix="/v1/admin", tags=["admin"])
 app.include_router(audit.router, prefix="/v1/admin", tags=["admin"])
+app.include_router(entities.router, prefix="/v1/admin", tags=["admin"])
 app.include_router(memories.router, prefix="/v1/memories", tags=["memories"])
 app.include_router(memories.users_router, prefix="/v1/users", tags=["memories"])
 app.include_router(sessions.router, prefix="/v1/sessions", tags=["sessions"])
