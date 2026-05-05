@@ -43,7 +43,13 @@ def is_public(path: str) -> bool:
     if path in PUBLIC_PATHS:
         return True
     # FastAPI serves /docs assets like /docs/swagger-ui-bundle.js
-    return path.startswith("/docs/") or path.startswith("/redoc/")
+    if path.startswith("/docs/") or path.startswith("/redoc/"):
+        return True
+    # Phase 13: admin web UI bundle. The page itself must load before
+    # the operator has authenticated so the login form can render. The
+    # API calls the UI makes (/v1/admin/*) still require admin scope —
+    # only the static assets here are public.
+    return path == "/admin" or path.startswith("/admin/")
 
 
 def required_scope(method: str, path: str) -> str:

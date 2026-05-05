@@ -198,3 +198,48 @@ app.include_router(retrieval_api.router, prefix="/v1/context", tags=["retrieval"
 app.include_router(vch.router, prefix="/v1/context", tags=["retrieval"])
 app.include_router(graph_api.router, prefix="/v1/graph", tags=["graph"])
 app.include_router(events_api.router, prefix="/v1", tags=["events"])
+
+# Phase 13: mount the admin web UI under /admin/* if a built bundle is
+# present. Looked for at multiple paths so it works in both the dev
+# tree (apps/admin-ui/dist/) and the production Docker image (image
+# stage copies the bundle to /app/static/admin/).
+def _mount_admin_ui() -> None:
+    import logging as _logging
+    from pathlib import Path as _Path
+
+    from fastapi.responses import FileResponse as _FileResponse
+    from fastapi.staticfiles import StaticFiles as _StaticFiles
+
+    log = _logging.getLogger("mypalace.admin_ui")
+    candidates = (
+        _Path("/app/static/admin"),
+        _Path(__file__).resolve().parent.parent / "apps" / "admin-ui" / "dist",
+    )
+    bundle_dir = next((p for p in candidates if (p / "index.html").exists()), None)
+    if bundle_dir is None:
+        log.info(
+            "admin UI bundle not found; /admin disabled. Build with "
+            "`cd apps/admin-ui && npm install && npm run build`",
+        )
+        return
+
+    log.info("admin UI mounted at /admin from %s", bundle_dir)
+    # SPA: every unknown /admin/* path serves index.html so React Router
+    # can handle the route. Only files explicitly under /admin/assets/
+    # need to resolve to disk.
+    app.mount(
+        "/admin/assets",
+        _StaticFiles(directory=str(bundle_dir / "assets")),
+        name="admin_assets",
+    )
+
+    index_html = bundle_dir / "index.html"
+
+    @app.get("/admin", include_in_schema=False)
+    @app.get("/admin/", include_in_schema=False)
+    @app.get("/admin/{full_path:path}", include_in_schema=False)
+    async def _admin_spa(full_path: str = ""):  # noqa: ARG001
+        return _FileResponse(index_html)
+
+
+_mount_admin_ui()
