@@ -43,7 +43,16 @@ from mypalace.ratelimit.middleware import RateLimitMiddleware
 
 
 async def _ensure_default_tenant() -> None:
-    """Idempotent INSERT of the default tenant row."""
+    """Idempotent INSERT of the default tenant row.
+
+    pg_insert builds a raw SQL INSERT and does NOT apply SQLModel's
+    default_factory=utcnow on `created_at`, so we have to set it
+    explicitly. (The ORM Tenant(...) constructor would apply it, but
+    we want ON CONFLICT DO NOTHING semantics that the ORM doesn't
+    expose cleanly.)
+    """
+    from mypalace.models import utcnow
+
     async with async_session() as db:
         existing = await db.execute(
             select(Tenant).where(Tenant.id == settings.default_tenant_id),
@@ -52,6 +61,7 @@ async def _ensure_default_tenant() -> None:
             stmt = pg_insert(Tenant).values(
                 id=settings.default_tenant_id,
                 label="Default Tenant",
+                created_at=utcnow(),
             ).on_conflict_do_nothing(index_elements=["id"])
             await db.execute(stmt)
             await db.commit()
