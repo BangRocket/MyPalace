@@ -26,7 +26,7 @@ async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False
 # Bumped each time we add a new alembic revision. Lifespan stamps this
 # revision on a fresh DB so future ``alembic upgrade head`` calls find a
 # known starting point.
-LATEST_ALEMBIC_REVISION = "2026_05_05_0008_personality_traits"
+LATEST_ALEMBIC_REVISION = "2026_05_05_0009_messages_fts"
 
 
 async def get_db() -> AsyncSession:

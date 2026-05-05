@@ -21,6 +21,7 @@ from mypalace.api import (
     sessions,
     stats,
     tenants,
+    vch,
 )
 from mypalace.api import dynamics as dynamics_api
 from mypalace.api import events as events_api
@@ -194,5 +195,6 @@ app.include_router(intentions_api.router, prefix="/v1/intentions", tags=["intent
 app.include_router(intentions_api.users_router, prefix="/v1/users", tags=["intentions"])
 app.include_router(maintenance_api.router, prefix="/v1/maintenance", tags=["maintenance"])
 app.include_router(retrieval_api.router, prefix="/v1/context", tags=["retrieval"])
+app.include_router(vch.router, prefix="/v1/context", tags=["retrieval"])
 app.include_router(graph_api.router, prefix="/v1/graph", tags=["graph"])
 app.include_router(events_api.router, prefix="/v1", tags=["events"])
