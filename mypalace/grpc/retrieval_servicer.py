@@ -30,8 +30,10 @@ class RetrievalServicer(mypalace_pb2_grpc.RetrievalServiceServicer):
             query=request.query,
             agent_id=request.agent_id or None,
             session_id=request.session_id or None,
-            max_l1_chars=request.max_l1_chars or 3200,
-            max_l2_chars=request.max_l2_chars or 12000,
+            # 0 in proto3 means "use service default" — let the service
+            # fall back to PALACE_CONTEXT_BUDGET_L1/L2_TOKENS env config.
+            max_l1_chars=request.max_l1_chars or None,
+            max_l2_chars=request.max_l2_chars or None,
             max_recent_messages=request.max_recent_messages or 20,
             use_fsrs=bool(request.use_fsrs),
             memory_limit=request.memory_limit or 10,

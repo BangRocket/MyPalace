@@ -20,6 +20,7 @@ import asyncio
 from typing import Any
 
 from mypalace.arc_service import arc_service
+from mypalace.config import context_budget_l1_chars, context_budget_l2_chars
 from mypalace.dynamics.service import dynamics_service
 from mypalace.episode_service import episode_service
 from mypalace.memory_service import memory_service
@@ -83,8 +84,8 @@ class LayeredRetrievalService:
         query: str,
         agent_id: str | None = None,
         session_id: str | None = None,
-        max_l1_chars: int = 3200,
-        max_l2_chars: int = 12000,
+        max_l1_chars: int | None = None,
+        max_l2_chars: int | None = None,
         max_recent_messages: int = 20,
         use_fsrs: bool = True,
         memory_limit: int = 10,
@@ -96,7 +97,18 @@ class LayeredRetrievalService:
         graph_max_neighbors: int = 50,
     ) -> dict[str, Any]:
         """Parallel-fetch L1 + L2 sources, FSRS-rerank L2 memories, then
-        char-budget each layer."""
+        char-budget each layer.
+
+        Per-call budgets fall back to PALACE_CONTEXT_BUDGET_L1/L2_TOKENS
+        env vars when None — operators tune defaults globally without
+        every caller having to thread the values through.
+        """
+        l1_budget = (
+            max_l1_chars if max_l1_chars is not None else context_budget_l1_chars()
+        )
+        l2_budget = (
+            max_l2_chars if max_l2_chars is not None else context_budget_l2_chars()
+        )
 
         # Parallel fetch all the source data.
         l1_mem_task = memory_service.search(
@@ -166,8 +178,8 @@ class LayeredRetrievalService:
             l2_memories = [_memory_to_dict(m, score) for m, score in l2_mem_results]
 
         # Char-budget each layer.
-        l1_kept, l1_chars = _enforce_char_budget(l1_memories, max_l1_chars)
-        l2_kept, l2_chars = _enforce_char_budget(l2_memories, max_l2_chars)
+        l1_kept, l1_chars = _enforce_char_budget(l1_memories, l1_budget)
+        l2_kept, l2_chars = _enforce_char_budget(l2_memories, l2_budget)
 
         # Optional session messages.
         recent_messages: list[dict[str, Any]] | None = None
