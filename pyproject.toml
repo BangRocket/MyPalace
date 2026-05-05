@@ -71,6 +71,9 @@ ignore = ["UP046"]  # Generic[T] is the canonical Pydantic v2 idiom
 "mypalace/grpc/_generated/*.py" = ["ALL"]  # protoc-generated stubs; do not lint
 "mypalace/grpc/*_servicer.py" = ["N802"]  # gRPC servicer methods must match proto (PascalCase)
 
+[project.scripts]
+mypalace-admin = "mypalace.cli.admin:main"
+
 [project.urls]
 Homepage = "https://github.com/BangRocket/MyPalace"
 Repository = "https://github.com/BangRocket/MyPalace"
