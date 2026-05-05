@@ -4,6 +4,52 @@ All notable changes to MyPalace are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and MyPalace adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.9.0] — 2026-05-05
+
+Phase 9 ("Operator UX"). Three additions aimed at making MyPalace
+easier to run in production: a first-class admin CLI, proper k8s
+liveness/readiness split with tunable DB pool, and a scheduled
+backup worker.
+
+### Added
+
+- **`mypalace-admin` CLI** (phase 9 slice 1). Console script registered
+  via `[project.scripts]`. Subcommands cover the day-to-day operator
+  surface — `health`, `version`, `keys {list|mint|revoke}`,
+  `tenants {list|create}`, `stats`, `audit`, `reembed`, `job`, `export`.
+  Auth via `MYPALACE_ADMIN_KEY` env or `--admin-key`; URL via
+  `MYPALACE_URL` or `--url`. Pretty tables by default, `--json` for
+  passthrough. Calls admin endpoints directly via httpx — admin
+  surface is intentionally server-side only and not on `mypalace_client`.
+- **`/live` and `/ready` k8s probes** (phase 9 slice 2). `/live` is a
+  process-up probe that intentionally does NOT touch backends — a
+  Postgres blip must NOT trigger pod restarts. `/ready` aggregates
+  backend pings (same semantics as `/health/deep`, which remains as
+  a back-compat alias). Use `/live` for `livenessProbe` and `/ready`
+  for `readinessProbe`.
+- **DB connection pool knobs** (phase 9 slice 2):
+  `PALACE_DB_POOL_SIZE`, `PALACE_DB_MAX_OVERFLOW`,
+  `PALACE_DB_POOL_TIMEOUT`, `PALACE_DB_POOL_RECYCLE`,
+  `PALACE_DB_POOL_PRE_PING`. `pool_pre_ping` defaults to `true` so
+  stale connections after a Postgres restart don't take out the first
+  request — one extra round-trip per checkout, eliminates a common
+  production wart.
+- **Scheduled backup worker** (phase 9 slice 3). New process,
+  `python -m mypalace.workers.backup`. On each tick: enumerate every
+  tenant, stream the same NDJSON the export endpoint produces, gzip
+  to disk under `PALACE_BACKUP_DIR`, atomic publish via `.tmp` +
+  rename, then prune `*.ndjson.gz` older than
+  `PALACE_BACKUP_RETAIN_DAYS` (by mtime — clock-skew safe). One
+  tenant failure doesn't block the others. `docker-compose.prod.yml`
+  adds a `backup` profile so the service only starts when explicitly
+  requested. Disabled by default.
+
+### Changed
+
+- `docs/deployment.md` documents the new probes, pool tunables, and
+  backup workflow (including the round-trip restore via
+  `/v1/admin/import`).
+
 ## [0.8.1] — 2026-05-05
 
 Three post-tag fixes surfaced when bringing v0.8.0 up against a real

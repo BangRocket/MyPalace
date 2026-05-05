@@ -18,13 +18,13 @@ Extracted from [mypalclara](https://github.com/BangRocket/mypalclara)'s Palace m
 - **Pluggable embeddings** — HuggingFace (local) or OpenAI (API)
 - **Pluggable LLM backend** — any OpenAI-compatible chat completion endpoint (OpenRouter, OpenAI, etc.)
 
-### Project status — v0.7.1
+### Project status — v0.9.0
 
 Released to PyPI as `mypalace` (server) and `mypalace-client`. Production-ready
 in scope; see the phase notes below for what's in and what's deliberately left
 out.
 
-**Capabilities** (built across phases 1–7):
+**Capabilities** (built across phases 1–9):
 - **Phase 1** — memory CRUD + semantic search, sessions, context assembly,
   pluggable embeddings (HuggingFace / OpenAI) and LLM backend.
 - **Phase 2** — episodes + LLM reflection, narrative arcs, FSRS-6 dynamics,
@@ -50,9 +50,15 @@ out.
   with `/v1/memories/{id}/history`, cross-tenant search
   (`POST /v1/memories/search?tenant_id=ALL`), mypalclara migration guide.
 
-**In progress** (phase 8): production hardening — deep `/health` that pings
-each backend, boot-time config validation, DB-query observability via
-SQLAlchemy event hooks, production docker-compose + deployment guide.
+- **Phase 8** — production hardening: deep `/health/deep` that pings each
+  backend, boot-time config validation that refuses to start on bad env,
+  DB-query observability via SQLAlchemy event hooks, production
+  docker-compose + deployment guide.
+- **Phase 9** — operator UX: `mypalace-admin` CLI for day-to-day ops,
+  proper k8s `/live` vs `/ready` split (so backend blips no longer
+  trigger pod restarts), tunable SQLAlchemy connection pool with
+  `pool_pre_ping` on by default, scheduled per-tenant backup worker
+  (gzipped NDJSON, atomic publish, mtime-based pruning).
 
 **Deliberately out of scope** (operators who need them should fork or
 deploy separately): per-tenant Postgres schemas, admin web UI, memory
@@ -580,7 +586,7 @@ The short version:
 
 ```bash
 # 1. install the client
-pip install mypalace-client==0.7.1   # or "mypalace-client[grpc]"
+pip install mypalace-client==0.9.0   # or "mypalace-client[grpc]"
 
 # 2. copy examples/mypalclara_router.py into mypalclara as
 #    mypalclara/core/memory/routed.py and swap the imports
