@@ -76,6 +76,11 @@ clean message in the logs rather than a confusing first-request crash.
 | `LLM_API_KEY` | (empty) | Required for reflection / smart-ingestion / synthesis. OpenRouter key works out of the box |
 | `PALACE_CACHE_TTL_SEARCH` | `60` | Seconds to cache `/context/layered` and `/memories/search` |
 | `PALACE_DB_SLOW_QUERY_MS` | `200` | Threshold for slow-query log + counter |
+| `PALACE_DB_POOL_SIZE` | `5` | SQLAlchemy connection pool size per process. Bump to 10–20 under sustained load |
+| `PALACE_DB_MAX_OVERFLOW` | `10` | Burst capacity beyond `pool_size`. Total max connections = pool_size + max_overflow |
+| `PALACE_DB_POOL_TIMEOUT` | `30` | Seconds a request waits for a free connection before erroring |
+| `PALACE_DB_POOL_RECYCLE` | `1800` | Recycle connections older than this (seconds). Mitigates idle-timeout drops from pgbouncer / cloud Postgres |
+| `PALACE_DB_POOL_PRE_PING` | `true` | Validate connection with `SELECT 1` before each checkout. Costs 1 extra round-trip per request but eliminates "stale connection" errors after Postgres restarts |
 
 The compose file enables the recommended production knobs by default:
 
@@ -283,12 +288,19 @@ after `PALACE_WORKER_LEASE_SECONDS` (default 60s).
 
 ## Troubleshooting
 
-- **`/health/deep` returns 503** — at least one backend isn't answering.
-  The `backends` array in the response identifies which one. Most often:
-  Postgres connection pool exhausted under load (raise the SQLAlchemy
-  pool size via env / config), or FalkorDB persistence I/O blocking the
-  event loop (consider moving to a separate Redis instance for the
-  cache + rate limiter and keeping FalkorDB for graph only).
+- **`/ready` returns 503** (alias: `/health/deep`) — at least one backend
+  isn't answering. The `backends` array in the response identifies which
+  one. Most often: Postgres connection pool exhausted under load (raise
+  `PALACE_DB_POOL_SIZE` / `PALACE_DB_MAX_OVERFLOW`), or FalkorDB
+  persistence I/O blocking the event loop (consider moving to a separate
+  Redis instance for the cache + rate limiter and keeping FalkorDB for
+  graph only).
+- **`/live` is the k8s livenessProbe**, `/ready` is the readinessProbe.
+  `/live` only checks that the process is up — it intentionally does NOT
+  ping backends so that a transient Postgres blip doesn't trigger pod
+  restarts. Use `/ready` for the readinessProbe so traffic drains when a
+  backend is down. `/health` and `/health/deep` remain as back-compat
+  aliases.
 - **Slow query log is loud** — `PALACE_DB_SLOW_QUERY_MS` defaults to
   200ms. Tune up if your backend is fundamentally slower (e.g. on
   burstable cloud instances) and track the

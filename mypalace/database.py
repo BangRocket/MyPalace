@@ -11,7 +11,16 @@ from mypalace.config import settings
 
 logger = logging.getLogger(__name__)
 
-engine = create_async_engine(settings.database_url, echo=False, future=True)
+engine = create_async_engine(
+    settings.database_url,
+    echo=False,
+    future=True,
+    pool_size=settings.db_pool_size,
+    max_overflow=settings.db_max_overflow,
+    pool_timeout=settings.db_pool_timeout,
+    pool_recycle=settings.db_pool_recycle,
+    pool_pre_ping=settings.db_pool_pre_ping,
+)
 async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 # Bumped each time we add a new alembic revision. Lifespan stamps this

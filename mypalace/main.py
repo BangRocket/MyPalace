@@ -126,14 +126,24 @@ app.add_middleware(ObservabilityMiddleware)
 
 @app.get("/health")
 async def health():
+    """Backwards-compat alias for /live. Cheap process-up probe."""
     return {"status": "ok", "service": "mypalace"}
 
 
-@app.get("/health/deep")
-async def health_deep():
-    """Phase 8 slice 1: ping every configured backend; return per-backend
-    detail. Returns 200 with overall=ok if every configured backend
-    answered, 503 with overall=degraded otherwise."""
+@app.get("/live")
+async def live():
+    """Liveness probe (k8s livenessProbe). Returns 200 iff the process is
+    running and the event loop responds. Does NOT touch backends — a
+    backend outage must NOT cause k8s to restart the pod, only stop
+    sending traffic."""
+    return {"status": "ok", "service": "mypalace"}
+
+
+@app.get("/ready")
+async def ready():
+    """Readiness probe (k8s readinessProbe). 200 when every configured
+    backend responds; 503 when any configured backend is down. Pull the
+    pod out of the load balancer until backends recover."""
     from fastapi.responses import JSONResponse
 
     from mypalace.health.checks import check_all_backends, to_dict
@@ -145,6 +155,12 @@ async def health_deep():
         "backends": [to_dict(r) for r in results],
     }
     return JSONResponse(content=body, status_code=200 if overall_ok else 503)
+
+
+@app.get("/health/deep")
+async def health_deep():
+    """Backwards-compat alias for /ready."""
+    return await ready()
 
 
 @app.get("/metrics", include_in_schema=False)

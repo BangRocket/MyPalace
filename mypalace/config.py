@@ -97,5 +97,24 @@ class Settings(BaseSettings):
         default=60, validation_alias="PALACE_RATE_LIMIT_SEARCH",
     )
 
+    # DB connection pool (phase 9 slice 2). Defaults are SQLAlchemy's, but
+    # under load you usually want pool_size > 5 and pre_ping on so stale
+    # connections after Postgres restarts don't take out the first request.
+    db_pool_size: int = Field(
+        default=5, validation_alias="PALACE_DB_POOL_SIZE",
+    )
+    db_max_overflow: int = Field(
+        default=10, validation_alias="PALACE_DB_MAX_OVERFLOW",
+    )
+    db_pool_timeout: int = Field(
+        default=30, validation_alias="PALACE_DB_POOL_TIMEOUT",
+    )
+    db_pool_recycle: int = Field(
+        default=1800, validation_alias="PALACE_DB_POOL_RECYCLE",
+    )
+    db_pool_pre_ping: bool = Field(
+        default=True, validation_alias="PALACE_DB_POOL_PRE_PING",
+    )
+
 
 settings = Settings()
