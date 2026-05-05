@@ -59,7 +59,7 @@ services:
       start_period: 10s
 
   mypalace:
-    image: bangrocket/mypalace:${MYPALACE_VERSION:-0.11.0}
+    image: bangrocket/mypalace:${MYPALACE_VERSION:-0.11.1}
     container_name: mypalace-api
     restart: unless-stopped
     depends_on:
@@ -109,7 +109,7 @@ services:
       start_period: 30s
 
   worker:
-    image: bangrocket/mypalace:${MYPALACE_VERSION:-0.11.0}
+    image: bangrocket/mypalace:${MYPALACE_VERSION:-0.11.1}
     container_name: mypalace-worker
     restart: unless-stopped
     depends_on:
@@ -145,7 +145,7 @@ services:
   # and starting the service explicitly:
   #     docker compose -f docker-compose.prod.yml --profile backup up -d backup
   backup:
-    image: bangrocket/mypalace:${MYPALACE_VERSION:-0.11.0}
+    image: bangrocket/mypalace:${MYPALACE_VERSION:-0.11.1}
     container_name: mypalace-backup
     restart: unless-stopped
     profiles: ["backup"]

@@ -1,7 +1,7 @@
 # Deploying MyPalace in production
 
 This guide covers a single-host docker-compose deployment of MyPalace
-0.11.0 with all five backends, a worker process, and the recommended
+0.11.1 with all five backends, a worker process, and the recommended
 defaults for production. The compose file is at
 [`docker-compose.prod.yml`](../docker-compose.prod.yml).
 
@@ -69,7 +69,7 @@ clean message in the logs rather than a confusing first-request crash.
 
 | Var | Default | Why |
 |---|---|---|
-| `MYPALACE_VERSION` | `0.11.0` | Pin the image tag; bump on upgrade |
+| `MYPALACE_VERSION` | `0.11.1` | Pin the image tag; bump on upgrade |
 | `POSTGRES_PASSWORD` | `mypalace` | Change for anything public-facing |
 | `EMBEDDING_PROVIDER` | `huggingface` | Local embeddings — no per-call cost |
 | `EMBEDDING_MODEL` | `sentence-transformers/all-MiniLM-L6-v2` | Small, fast, decent quality |

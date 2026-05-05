@@ -18,7 +18,7 @@ Extracted from [mypalclara](https://github.com/BangRocket/mypalclara)'s Palace m
 - **Pluggable embeddings** — HuggingFace (local) or OpenAI (API)
 - **Pluggable LLM backend** — any OpenAI-compatible chat completion endpoint (OpenRouter, OpenAI, etc.)
 
-### Project status — v0.11.0
+### Project status — v0.11.1
 
 Released to PyPI as `mypalace` (server) and `mypalace-client`. Production-ready
 in scope; see the phase notes below for what's in and what's deliberately left
@@ -77,6 +77,10 @@ out.
   Three-step rollout (contextvar plumbing → tenant lifecycle →
   Alembic shadow-copy → v0.12.0 column drop) keeps the cutover
   reversible until the very last step.
+- **Phase 13** — admin web UI bundled with the server. Vite + React
+  console at `/admin/*`: tenants, API keys, stats, audit, memories,
+  health. Same admin key as the CLI; same trust boundary; same origin
+  (no new service to deploy).
 
 **Deliberately out of scope** (operators who need them should fork or
 deploy separately): per-tenant Postgres schemas, admin web UI, memory
@@ -604,7 +608,7 @@ The short version:
 
 ```bash
 # 1. install the client
-pip install mypalace-client==0.11.0   # or "mypalace-client[cli,grpc]"
+pip install mypalace-client==0.11.1   # or "mypalace-client[cli,grpc]"
 
 # 2. copy examples/mypalclara_router.py into mypalclara as
 #    mypalclara/core/memory/routed.py and swap the imports
