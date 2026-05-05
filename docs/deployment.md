@@ -83,6 +83,8 @@ clean message in the logs rather than a confusing first-request crash.
 | `PALACE_DB_POOL_PRE_PING` | `true` | Validate connection with `SELECT 1` before each checkout. Costs 1 extra round-trip per request but eliminates "stale connection" errors after Postgres restarts |
 | `PALACE_CONTEXT_BUDGET_L1_TOKENS` | `800` | Per-request L1 (user-profile) layer budget in tokens. Converts to chars at 4×. Defaults reproduce the legacy hardcoded 3200 chars. |
 | `PALACE_CONTEXT_BUDGET_L2_TOKENS` | `3000` | Per-request L2 (relevant-context) layer budget in tokens. Defaults reproduce the legacy hardcoded 12000 chars. |
+| `PALACE_EMBEDDING_CACHE_DISABLED` | `false` | Skip the Redis embedding cache wrapper even when `PALACE_REDIS_URL` is set. Useful for cost-control debugging or to verify embedding determinism. |
+| `PALACE_EMBEDDING_CACHE_TTL` | `2592000` (30d) | TTL for cached `(model, text) → vector` entries. Embeddings are deterministic for a given model+text so a long TTL is safe; lower if you frequently switch embedding models. |
 
 The compose file enables the recommended production knobs by default:
 
