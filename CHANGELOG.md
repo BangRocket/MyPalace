@@ -4,6 +4,39 @@ All notable changes to MyPalace are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and MyPalace adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.1] — 2026-05-05
+
+Three post-tag fixes surfaced when bringing v0.8.0 up against a real
+deploy. v0.8.0's PyPI publish never landed (CI failure on the first
+fix below), so 0.8.1 is effectively the first 0.8 release to ship.
+
+### Fixed
+
+- **`aiosqlite` missing from dev extras.** Phase 8 slice 2's
+  `tests/test_db_observability.py` uses an in-memory aiosqlite engine
+  to drive the SQLAlchemy event hooks. The dep was added to the local
+  venv via `uv pip install` but never to `pyproject.toml`, so CI's
+  `pip install -e ".[dev]"` left it absent and v0.8.0's release
+  workflow failed at test collection.
+- **Qdrant healthcheck used `wget`, which the slim qdrant image no
+  longer ships.** Both `docker-compose.yml` and
+  `docker-compose.prod.yml` switched to a bash `/dev/tcp` probe that
+  works on every recent qdrant image (bash IS still bundled).
+- **`_ensure_default_tenant()` lifespan startup raised
+  `NotNullViolationError` on first boot.** `pg_insert(...).values(...)`
+  bypasses SQLModel's `default_factory=utcnow`, so `created_at`
+  arrived as null. Fix: pass `created_at=utcnow()` explicitly. Bug
+  was latent since phase 3 slice 2 because mock tests stub
+  `_ensure_default_tenant` and the integration conftest creates
+  tenants via the ORM constructor (which DOES apply defaults).
+
+### Changed
+
+- **Dev compose default ports moved off mypalclara collisions.**
+  Postgres now binds 5443→5432 (was 5442), Qdrant binds 6334→6333.
+  Mypalclara owns 5442/6333 in its own compose, so running both
+  side-by-side now works without env overrides.
+
 ## [0.8.0] — 2026-05-04
 
 Production hardening. Three slices since 0.7.1.

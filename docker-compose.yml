@@ -9,7 +9,8 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     ports:
-      - "5442:5432"
+      # 5443 on the host (mypalclara's compose owns 5442 for clara_main)
+      - "5443:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U palace -d palace"]
       interval: 5s
@@ -20,7 +21,8 @@ services:
     image: qdrant/qdrant:latest
     container_name: palace-qdrant
     ports:
-      - "6333:6333"
+      # 6334 on the host (mypalclara's compose owns 6333 for clara_memories)
+      - "6334:6333"
     volumes:
       - qdrant-data:/qdrant/storage
     healthcheck:
