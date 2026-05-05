@@ -4,6 +4,79 @@ All notable changes to MyPalace are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and MyPalace adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.10.0] — 2026-05-05
+
+Phase 10 ("mypalclara parity"). Closes the three MISSING gaps and two
+small DIVERGED items identified in `docs/gap-analysis-mypalclara.md`,
+generated against `BangRocket/mypalclara` main. Five small slices, no
+breaking changes.
+
+### Added
+
+- **Entity resolver** (slice 1). `EntityAlias` model + Alembic 0007 +
+  `mypalace.entity_service` + `/v1/admin/entities/{aliases,resolve}`
+  CRUD. Maps platform-prefixed identifiers (`discord-271274659385835521`)
+  to human-readable names (`Josh`) so graph nodes / display surfaces
+  show real names. Per-tenant in-memory cache, `ON CONFLICT DO UPDATE`
+  upsert, platform-prefix fallback, optional LLM-driven extraction
+  from a recent conversation.
+- **Personality evolution** (slice 2). `PersonalityTrait` model +
+  Alembic 0008 + `mypalace.personality_service` +
+  `/v1/admin/personality/traits` CRUD. LLM-driven self-evolving traits
+  with add/update/remove actions. **Architectural shift vs mypalclara:**
+  evaluation runs through the existing worker queue (kind:
+  `personality_evolve`) so the user-facing message-write path never
+  blocks on an LLM call. Soft-delete via `active=False`. Disabled by
+  default — set `PALACE_PERSONALITY_EVOLUTION_CHANCE=0.1` to match
+  mypalclara's behavior.
+- **Token-based context budget env vars** (slice 3).
+  `PALACE_CONTEXT_BUDGET_L1_TOKENS` (default 800) and
+  `PALACE_CONTEXT_BUDGET_L2_TOKENS` (default 3000). Char conversion at
+  the boundary (4×). `LayeredRetrievalService.assemble()` and
+  `LayeredContextRequest` accept `None` for budgets and fall back to
+  the env values. Defaults reproduce the previous hardcoded 3200/12000
+  char budgets exactly — no behavior change unless overridden.
+- **Embedding cache + toggle** (slice 4). `CachedEmbedder` wraps any
+  provider with a `(model, text) → vector` Redis cache; saves
+  HuggingFace inference and OpenAI cost on identical inputs (very
+  common: ingestion + immediate search of the same text).
+  `PALACE_EMBEDDING_CACHE_DISABLED` (default `false`) and
+  `PALACE_EMBEDDING_CACHE_TTL` (default 30 days). Cache failures
+  degrade to a delegate call so embedding never becomes a Redis-
+  availability problem.
+- **VCH — verbatim chat history search** (slice 5). Postgres FTS over
+  the existing `messages` table. New Alembic 0009 adds a GIN expression
+  index on `to_tsvector('english', content)`. `mypalace.vch_service` +
+  `POST /v1/context/vch` (read-scoped) return matched messages plus a
+  5-minute context window from the same session. Dedupes overlapping
+  matches per session bucket. DB errors swallowed — VCH is best-effort
+  retrieval enrichment.
+
+### Changed
+
+- `EmbeddingProvider` Protocol gains a `.model` property so the cache
+  wrapper has a stable name to key on.
+- `mypalace/session_service.py:add_message` now fires the personality-
+  evolution probability gate when an assistant message lands. Best-
+  effort, fully behind the chance gate (default 0.0 = no-op).
+- `LATEST_ALEMBIC_REVISION` advanced through 0007 → 0008 → 0009.
+
+### Documentation
+
+- `docs/gap-analysis-mypalclara.md` published (PR #46) — the spec that
+  scoped this phase.
+- `docs/deployment.md` documents every new env var (entity resolver
+  needs none; personality, budgets, embedding cache, VCH all listed).
+
+### Deferred (from gap analysis, intentionally not addressed)
+
+- LLM provider expansion (Anthropic, custom OpenAI-compatible endpoints).
+- Dual-write vector migration mode (large; defer until a vector backend
+  swap is actually planned).
+- Graph vector store factory (premature).
+- VCH integration into the layered pipeline as an L2 source (cache-key
+  implications worth a separate PR).
+
 ## [0.9.0] — 2026-05-05
 
 Phase 9 ("Operator UX"). Three additions aimed at making MyPalace
