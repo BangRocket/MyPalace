@@ -116,5 +116,22 @@ class Settings(BaseSettings):
         default=True, validation_alias="PALACE_DB_POOL_PRE_PING",
     )
 
+    # Scheduled backups (phase 9 slice 3). When enabled, a dedicated
+    # `python -m mypalace.workers.backup` process exports every tenant
+    # to BACKUP_DIR on a fixed interval and prunes files older than
+    # RETAIN_DAYS. Disabled by default — opt-in for production.
+    backup_enabled: bool = Field(
+        default=False, validation_alias="PALACE_BACKUP_ENABLED",
+    )
+    backup_dir: str = Field(
+        default="./backups", validation_alias="PALACE_BACKUP_DIR",
+    )
+    backup_interval_hours: int = Field(
+        default=24, validation_alias="PALACE_BACKUP_INTERVAL_HOURS",
+    )
+    backup_retain_days: int = Field(
+        default=7, validation_alias="PALACE_BACKUP_RETAIN_DAYS",
+    )
+
 
 settings = Settings()

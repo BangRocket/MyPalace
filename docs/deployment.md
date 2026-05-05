@@ -277,6 +277,40 @@ curl -X POST http://localhost:8000/v1/admin/reembed \
 docker compose -f docker-compose.prod.yml up -d --scale worker=1
 ```
 
+### Scheduled backups
+
+The optional `backup` service writes one gzipped NDJSON file per tenant
+to `/backups` inside the container (mounted on the `backup-data` named
+volume). Disabled by default — enable with the `backup` compose profile:
+
+```bash
+# In .env
+PALACE_BACKUP_INTERVAL_HOURS=24       # default
+PALACE_BACKUP_RETAIN_DAYS=7           # default
+
+docker compose -f docker-compose.prod.yml --profile backup up -d backup
+
+# Inspect contents
+docker compose -f docker-compose.prod.yml exec backup ls -lh /backups
+
+# Copy off-host on a cron
+docker compose -f docker-compose.prod.yml cp backup:/backups ./offsite-backups
+```
+
+The backup wire format matches `/v1/admin/export` exactly, so any file
+under `/backups` is restorable via `/v1/admin/import`:
+
+```bash
+gunzip -c offsite-backups/acme-20260504T000000Z.ndjson.gz | \
+  curl -X POST "http://localhost:8000/v1/admin/import?tenant_id=acme" \
+       -H "X-Palace-Key: $ADMIN_KEY" \
+       --data-binary @-
+```
+
+The worker prunes `*.ndjson.gz` files older than `RETAIN_DAYS` on every
+pass. Pruning uses mtime, not the timestamp embedded in the filename —
+clock-skew safe.
+
 ### Drain workers gracefully
 
 `docker compose -f docker-compose.prod.yml stop worker` sends SIGTERM;

@@ -140,7 +140,35 @@ services:
       PALACE_WORKER_LEASE_SECONDS: ${PALACE_WORKER_LEASE_SECONDS:-60}
       PALACE_WORKER_MAX_ATTEMPTS: ${PALACE_WORKER_MAX_ATTEMPTS:-3}
 
+  # Optional: scheduled tenant backups (phase 9 slice 3).
+  # Disabled by default. Enable by setting PALACE_BACKUP_ENABLED=true in .env
+  # and starting the service explicitly:
+  #     docker compose -f docker-compose.prod.yml --profile backup up -d backup
+  backup:
+    image: bangrocket/mypalace:${MYPALACE_VERSION:-0.7.1}
+    container_name: mypalace-backup
+    restart: unless-stopped
+    profiles: ["backup"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    command: ["python", "-m", "mypalace.workers.backup"]
+    environment:
+      PALACE_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-mypalace}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB:-mypalace}
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_COLLECTION: ${QDRANT_COLLECTION:-mypalace_memories}
+      PALACE_LOG_FORMAT: ${PALACE_LOG_FORMAT:-json}
+      PALACE_BACKUP_ENABLED: "true"
+      PALACE_BACKUP_DIR: /backups
+      PALACE_BACKUP_INTERVAL_HOURS: ${PALACE_BACKUP_INTERVAL_HOURS:-24}
+      PALACE_BACKUP_RETAIN_DAYS: ${PALACE_BACKUP_RETAIN_DAYS:-7}
+    volumes:
+      - backup-data:/backups
+
 volumes:
   postgres-data:
   qdrant-data:
   falkordb-data:
+  backup-data:
