@@ -26,6 +26,14 @@ class Settings(BaseSettings):
     llm_provider: str = "openrouter"
     llm_api_key: str | None = None
     llm_model: str = "openai/gpt-4o-mini"
+    # Phase 14: override the provider's default base URL. Useful for:
+    #   - custom OpenAI-compatible endpoints (vLLM, TGI, LocalAI, Together)
+    #   - self-hosted Anthropic-compatible proxies
+    #   - region-specific Anthropic endpoints
+    # Empty string / unset = use the provider's hardcoded default.
+    llm_base_url: str | None = Field(
+        default=None, validation_alias="PALACE_LLM_BASE_URL",
+    )
     log_level: str = "INFO"
 
     # Auth (slice 1)
