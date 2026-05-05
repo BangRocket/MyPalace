@@ -29,6 +29,8 @@ SCOPE_RULES: list[tuple[str, str, str]] = [
 PUBLIC_PATHS: frozenset[str] = frozenset({
     "/health",
     "/health/deep",  # phase 8 slice 1 — k8s readiness probes need unauthenticated access
+    "/live",         # phase 9 slice 2 — k8s livenessProbe
+    "/ready",        # phase 9 slice 2 — k8s readinessProbe
     "/metrics",      # phase 4 slice 2 — k8s scrapers need unauthenticated access
     "/docs",
     "/redoc",
