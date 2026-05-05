@@ -4,6 +4,34 @@ All notable changes to MyPalace are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and MyPalace adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.11.1] — 2026-05-05
+
+Strictly additive — no env vars to set, no behavior change unless an
+operator visits the new `/admin/` path.
+
+### Added
+
+- **Admin web UI** (phase 13). Browser console for the day-to-day
+  operator surface. Vite + React + TypeScript bundle ships inside the
+  production Docker image and mounts at `/admin/*` on the existing
+  MyPalace server (no new service, no CORS, no extra endpoints).
+  Sign in with the same admin key the CLI uses; closing the tab signs
+  out (`sessionStorage`-backed). Surface: Health (live), Tenants
+  (CRUD), API Keys (mint/revoke), Stats (per-tenant or `ALL`), Audit
+  log (filterable), Memories (read-only browser).
+- Multi-stage Dockerfile: Node-24-alpine builds the UI, copies `dist/`
+  into the Python image at `/app/static/admin/`. Server logs `admin UI
+  bundle not found` and disables `/admin` at boot when no bundle is
+  present (e.g. dev installs that haven't run `npm run build`).
+- `/admin/*` added to `is_public()` so the page renders before login;
+  `/v1/admin/*` API calls still require admin scope (tripwire test).
+
+### Changed
+
+- `Dockerfile` now multi-stage. CI build time grows by ~30s for the
+  Node install + Vite build, image grows by ~5 MB. Acceptable trade
+  for "single artifact, single tag."
+
 ## [0.11.0] — 2026-05-05
 
 Two big workstreams shipped together: phase 11 (CLI repackaging) and
