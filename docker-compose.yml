@@ -24,7 +24,9 @@ services:
     volumes:
       - qdrant-data:/qdrant/storage
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:6333/healthz"]
+      # Qdrant images are slim — no curl/wget. bash IS present, so use
+      # its built-in TCP socket support to verify the API port is open.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/6333"]
       interval: 5s
       timeout: 5s
       retries: 5
