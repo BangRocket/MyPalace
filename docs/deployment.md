@@ -85,6 +85,10 @@ clean message in the logs rather than a confusing first-request crash.
 | `PALACE_CONTEXT_BUDGET_L2_TOKENS` | `3000` | Per-request L2 (relevant-context) layer budget in tokens. Defaults reproduce the legacy hardcoded 12000 chars. |
 | `PALACE_EMBEDDING_CACHE_DISABLED` | `false` | Skip the Redis embedding cache wrapper even when `PALACE_REDIS_URL` is set. Useful for cost-control debugging or to verify embedding determinism. |
 | `PALACE_EMBEDDING_CACHE_TTL` | `2592000` (30d) | TTL for cached `(model, text) → vector` entries. Embeddings are deterministic for a given model+text so a long TTL is safe; lower if you frequently switch embedding models. |
+| `LLM_PROVIDER` | `openrouter` | One of `openrouter`, `openai`, `anthropic`, or `custom`. `custom` requires `PALACE_LLM_BASE_URL`. |
+| `LLM_API_KEY` | (empty) | Bearer token for openai / openrouter / custom; `x-api-key` for anthropic. |
+| `LLM_MODEL` | `openai/gpt-4o-mini` | Model id. For anthropic use `claude-3-5-sonnet-latest` etc. |
+| `PALACE_LLM_BASE_URL` | (empty) | Override the provider's default base URL. Use for self-hosted OpenAI-compatible endpoints (vLLM, TGI, LocalAI, Together) or Anthropic-compatible proxies. Empty = use the provider default. |
 
 The compose file enables the recommended production knobs by default:
 
