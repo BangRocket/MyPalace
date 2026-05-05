@@ -2,8 +2,9 @@
 
 import logging
 
-from sqlalchemy import text
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import Session as SyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel
 
@@ -22,6 +23,43 @@ engine = create_async_engine(
     pool_pre_ping=settings.db_pool_pre_ping,
 )
 async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+
+@event.listens_for(SyncSession, "after_begin")
+def _set_search_path_after_begin(session, transaction, connection):  # noqa: ARG001
+    """Phase 12: SET LOCAL search_path at the start of each transaction
+    when tenant_schema_mode == "schema".
+
+    Fires synchronously on the underlying sync session that AsyncSession
+    wraps; ``connection`` is the live DBAPI-level connection inside the
+    transaction. ``SET LOCAL`` is transaction-scoped — auto-resets at
+    commit/rollback so a returned-to-pool connection never carries a
+    stale search_path.
+
+    No-op when:
+      - the schema-mode flag isn't set
+      - no current tenant is in the contextvar (background task without
+        a request — they should set tenant_scope() explicitly)
+      - the tenant id is malformed (defensive against SQL injection)
+    """
+    if settings.tenant_schema_mode != "schema":
+        return
+
+    from mypalace.tenancy import current_tenant, is_valid_schema_name
+    tid = current_tenant()
+    if tid is None:
+        return
+    if not is_valid_schema_name(tid):
+        logger.warning(
+            "tenancy: refusing to set search_path for invalid tenant_id=%r",
+            tid,
+        )
+        return
+
+    # Schema names are pre-validated above, so direct interpolation is
+    # safe. Postgres requires identifier quoting (the regex restricts to
+    # safe chars but the quotes also handle the all-numeric edge case).
+    connection.execute(text(f'SET LOCAL search_path TO "{tid}", public'))
 
 # Bumped each time we add a new alembic revision. Lifespan stamps this
 # revision on a fresh DB so future ``alembic upgrade head`` calls find a

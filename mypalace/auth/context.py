@@ -46,8 +46,17 @@ class AuthContext:
         - Tenant-bound key: key tenant wins; conflicting request_tenant → 403.
         - Cross-tenant admin (tenant_id is None): use request_tenant;
           fall back to settings.default_tenant_id if absent.
+
+        Phase 12: also seats the resolved tenant in
+        ``mypalace.tenancy.current_tenant`` so any subsequent DB query
+        in this request runs against the right schema (when
+        ``settings.tenant_schema_mode == "schema"``). Idempotent —
+        calling repeatedly with the same value is fine; calling with a
+        different value (e.g. cross-tenant admin querying multiple
+        tenants in one request) reseats it for the next query.
         """
         from mypalace.config import settings
+        from mypalace.tenancy import set_current_tenant
 
         if self.tenant_id is not None:
             if request_tenant is not None and request_tenant != self.tenant_id:
@@ -58,8 +67,12 @@ class AuthContext:
                         f"'{self.tenant_id}', request specified '{request_tenant}'"
                     ),
                 )
-            return self.tenant_id
-        return request_tenant or settings.default_tenant_id
+            resolved = self.tenant_id
+        else:
+            resolved = request_tenant or settings.default_tenant_id
+
+        set_current_tenant(resolved)
+        return resolved
 
     @classmethod
     def all_scopes(
