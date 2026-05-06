@@ -4,6 +4,47 @@ All notable changes to MyPalace are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and MyPalace adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.11.2] — 2026-05-05
+
+Strictly additive — existing `openai` / `openrouter` callers see no
+behavior change. Closes the LLM-provider-expansion gap deferred in
+`docs/gap-analysis-mypalclara.md` (slice S1).
+
+### Added
+
+- **Anthropic Messages API** as a first-class LLM backend
+  (`LLM_PROVIDER=anthropic`). Routes through `POST /v1/messages` with
+  `x-api-key` + `anthropic-version` headers; system messages hoisted
+  to the top-level `system` field; response parsed from
+  `content[0].text`. No `anthropic` SDK dep — straight `httpx` against
+  the documented wire format. Multi-system messages concatenate;
+  `tool_use` blocks fall through cleanly.
+- **`PALACE_LLM_BASE_URL`** overrides the per-provider default base
+  URL. Same flag works for OpenAI-compatible endpoints (vLLM, TGI,
+  LocalAI, Together) and Anthropic-compatible proxies. Trailing slash
+  stripped; empty string falls through to the provider default.
+- **`LLM_PROVIDER=custom`** new sentinel value: requires
+  `PALACE_LLM_BASE_URL`, otherwise fails fast at first call instead
+  of silently routing to the wrong endpoint.
+- 18 new unit tests covering URL resolution (defaults + override +
+  trailing-slash + unknown provider), OpenAI-compatible request shape
+  (URL, Authorization header, OpenRouter `HTTP-Referer`), Anthropic
+  request shape (URL, `x-api-key`, version header, system hoisting,
+  multi-system concatenation, top-level `max_tokens`), Anthropic
+  response parsing (text vs `tool_use`, empty fallthrough), and the
+  custom-provider override path.
+
+### Changed
+
+- `mypalace/llm.py` refactored: `complete()` routes to
+  `_complete_anthropic` or `_complete_openai_compatible` based on
+  `self.provider`. Existing call sites unaffected.
+- `mypalace/config.py` grows `llm_base_url` (`PALACE_LLM_BASE_URL`
+  alias).
+- `docs/deployment.md` documents the new env vars.
+- `README.md` LLM-backend bullet, phase notes (phase 14), and
+  Configuration table updated.
+
 ## [0.11.1] — 2026-05-05
 
 Strictly additive — no env vars to set, no behavior change unless an

@@ -16,9 +16,9 @@ Extracted from [mypalclara](https://github.com/BangRocket/mypalclara)'s Palace m
 - **Session/message persistence** — conversation threads with PostgreSQL
 - **Context assembly** — combine relevant memories + recent messages into a single payload for LLM prompts
 - **Pluggable embeddings** — HuggingFace (local) or OpenAI (API)
-- **Pluggable LLM backend** — any OpenAI-compatible chat completion endpoint (OpenRouter, OpenAI, etc.)
+- **Pluggable LLM backend** — Anthropic Messages API, or any OpenAI-compatible chat-completion endpoint (OpenRouter, OpenAI, vLLM, TGI, LocalAI, Together, …); `PALACE_LLM_BASE_URL` overrides the per-provider default
 
-### Project status — v0.11.1
+### Project status — v0.11.2
 
 Released to PyPI as `mypalace` (server) and `mypalace-client`. Production-ready
 in scope; see the phase notes below for what's in and what's deliberately left
@@ -81,10 +81,20 @@ out.
   console at `/admin/*`: tenants, API keys, stats, audit, memories,
   health. Same admin key as the CLI; same trust boundary; same origin
   (no new service to deploy).
+- **Phase 14** — LLM provider expansion. New
+  `LLM_PROVIDER=anthropic` routes through the Anthropic Messages API
+  (`POST /v1/messages`, `x-api-key` + `anthropic-version` headers,
+  system messages hoisted to the top-level `system` field). New
+  `PALACE_LLM_BASE_URL` overrides the per-provider default — works
+  for OpenAI-compatible endpoints (vLLM, TGI, LocalAI, Together) and
+  Anthropic-compatible proxies. New `LLM_PROVIDER=custom` requires
+  `PALACE_LLM_BASE_URL` (fails fast at first call instead of silently
+  routing to the wrong endpoint). Zero breaking changes; existing
+  `openai` / `openrouter` callers unaffected.
 
 **Deliberately out of scope** (operators who need them should fork or
-deploy separately): per-tenant Postgres schemas, admin web UI, memory
-clustering / topic discovery, fine-grained per-key tenant-resource scoping.
+deploy separately): memory clustering / topic discovery, fine-grained
+per-key tenant-resource scoping.
 
 ---
 
@@ -527,9 +537,10 @@ All settings come from environment variables (or `.env`).
 | `EMBEDDING_MODEL` | `BAAI/bge-large-en-v1.5` | for HF; pass an OpenAI model name when provider is openai |
 | `HF_TOKEN` | — | optional, for gated models |
 | `OPENAI_API_KEY` | — | required if `EMBEDDING_PROVIDER=openai` |
-| `LLM_PROVIDER` | `openrouter` | `openrouter` or `openai` |
+| `LLM_PROVIDER` | `openrouter` | `openrouter`, `openai`, `anthropic`, or `custom` (custom requires `PALACE_LLM_BASE_URL`) |
 | `LLM_API_KEY` | — | required for any LLM call |
-| `LLM_MODEL` | `openai/gpt-4o-mini` | OpenRouter-style or OpenAI model id |
+| `LLM_MODEL` | `openai/gpt-4o-mini` | OpenRouter-style id, OpenAI model id, or Anthropic model id (e.g. `claude-opus-4-7`) |
+| `PALACE_LLM_BASE_URL` | — | override the per-provider default; trailing slash stripped; empty falls through to the default |
 | `LOG_LEVEL` | `INFO` | |
 
 ---
