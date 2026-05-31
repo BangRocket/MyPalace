@@ -4,6 +4,7 @@ Source: mypalclara/core/memory/context/topics.py. Topic extraction is an LLM
 call run via the worker queue; recurrence patterns are computed server-side by
 aggregating TopicMention rows over a lookback window.
 """
+
 from __future__ import annotations
 
 import json
@@ -18,6 +19,7 @@ from sqlalchemy import select
 from mypalace.database import async_session
 from mypalace.llm import llm
 from mypalace.models import DEFAULT_TENANT_ID, TopicMention, utcnow
+from mypalace.prompts.topics import TOPIC_EXTRACTION_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -25,40 +27,6 @@ DEFAULT_AGENT_ID = "default"
 _WEIGHT_ORDER = {"light": 1, "moderate": 2, "heavy": 3}
 _VALID_WEIGHTS = {"light", "moderate", "heavy"}
 _VALID_TYPES = {"entity", "theme"}
-
-TOPIC_EXTRACTION_PROMPT = """Extract key topics from this conversation that might recur in future conversations.
-
-**The conversation:**
-{conversation}
-
-**Conversation sentiment:** {sentiment:.2f} (scale: -1 negative to +1 positive)
-
-**What to extract:**
-For each topic, provide:
-- topic: Normalized name using consistent, lowercase, singular forms. Prefer common phrasing (e.g., "job search" not "employment hunt" or "the job hunt", "mom" not "my mother")
-- topic_type: "entity" (person, place, project, company) or "theme" (ongoing concern, interest, goal)
-- context_snippet: Brief summary of how it came up (10-20 words)
-- emotional_weight: "light" (casual mention), "moderate" (some feeling), "heavy" (significant emotion)
-
-**Rules:**
-1. Only extract topics with emotional significance OR specific enough to recur
-2. Skip generic topics like "work", "life", "stuff", "things"
-3. Use consistent normalization - same topic should always have the same name
-4. Max 3 unique topics per conversation
-
-**Respond in JSON:**
-{{
-    "topics": [
-        {{
-            "topic": "job search",
-            "topic_type": "theme",
-            "context_snippet": "frustrated about not hearing back from interviews",
-            "emotional_weight": "heavy"
-        }}
-    ]
-}}
-
-If no significant topics, return: {{"topics": []}}"""
 
 
 def _parse_llm_json(raw: str) -> dict[str, Any] | None:
@@ -91,12 +59,14 @@ def _validate_topics(raw_topics: list[dict]) -> list[dict]:
         weight = t.get("emotional_weight", "moderate")
         if weight not in _VALID_WEIGHTS:
             weight = "moderate"
-        out.append({
-            "topic": name,
-            "topic_type": topic_type,
-            "context_snippet": (t.get("context_snippet", "") or "")[:100],
-            "emotional_weight": weight,
-        })
+        out.append(
+            {
+                "topic": name,
+                "topic_type": topic_type,
+                "context_snippet": (t.get("context_snippet", "") or "")[:100],
+                "emotional_weight": weight,
+            }
+        )
     return out
 
 
@@ -108,7 +78,8 @@ def _dedupe_topics(topics: list[dict]) -> list[dict]:
             seen[name] = t
             continue
         if _WEIGHT_ORDER.get(t["emotional_weight"], 0) > _WEIGHT_ORDER.get(
-            seen[name]["emotional_weight"], 0,
+            seen[name]["emotional_weight"],
+            0,
         ):
             seen[name] = t
     return list(seen.values())
@@ -117,8 +88,12 @@ def _dedupe_topics(topics: list[dict]) -> list[dict]:
 def compute_topic_pattern(mentions: list[dict]) -> dict:
     """Analyze recurrence for one topic's mentions. Ported from mypalclara."""
     if not mentions:
-        return {"mention_count": 0, "sentiment_trend": "stable",
-                "avg_emotional_weight": "light", "pattern_note": ""}
+        return {
+            "mention_count": 0,
+            "sentiment_trend": "stable",
+            "avg_emotional_weight": "light",
+            "pattern_note": "",
+        }
     count = len(mentions)
     sentiments = [m.get("sentiment", 0.0) for m in mentions]
     if len(sentiments) >= 2 and sentiments[-1] - sentiments[0] < -0.2:
@@ -139,8 +114,12 @@ def compute_topic_pattern(mentions: list[dict]) -> dict:
         note = f"mentioned {count} times recently"
     else:
         note = "mentioned recently"
-    return {"mention_count": count, "sentiment_trend": trend,
-            "avg_emotional_weight": avg_weight, "pattern_note": note}
+    return {
+        "mention_count": count,
+        "sentiment_trend": trend,
+        "avg_emotional_weight": avg_weight,
+        "pattern_note": note,
+    }
 
 
 def _format_relative_time(ts: datetime | None) -> str:
@@ -177,12 +156,14 @@ class TopicService:
         if not conversation_text or len(conversation_text.strip()) < 50:
             return []
         prompt = TOPIC_EXTRACTION_PROMPT.format(
-            conversation=conversation_text[:4000], sentiment=conversation_sentiment,
+            conversation=conversation_text[:4000],
+            sentiment=conversation_sentiment,
         )
         try:
             raw = await llm.complete(
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.0, max_tokens=500,
+                temperature=0.0,
+                max_tokens=500,
             )
         except Exception:
             logger.exception("topic extraction LLM call failed")
@@ -194,11 +175,18 @@ class TopicService:
         now = utcnow()
         rows = [
             TopicMention(
-                tenant_id=tenant_id, user_id=user_id, agent_id=agent_id,
-                topic=t["topic"], topic_type=t["topic_type"],
-                context_snippet=t["context_snippet"], emotional_weight=t["emotional_weight"],
-                sentiment=conversation_sentiment, channel_id=channel_id,
-                channel_name=channel_name, is_dm=is_dm, created_at=now,
+                tenant_id=tenant_id,
+                user_id=user_id,
+                agent_id=agent_id,
+                topic=t["topic"],
+                topic_type=t["topic_type"],
+                context_snippet=t["context_snippet"],
+                emotional_weight=t["emotional_weight"],
+                sentiment=conversation_sentiment,
+                channel_id=channel_id,
+                channel_name=channel_name,
+                is_dm=is_dm,
+                created_at=now,
             )
             for t in topics
         ]
@@ -208,7 +196,12 @@ class TopicService:
             await db.commit()
             for row in rows:
                 await db.refresh(row)
-        logger.info("topic mentions stored tenant=%s user=%s count=%d", tenant_id, user_id, len(rows))
+        logger.info(
+            "topic mentions stored tenant=%s user=%s count=%d",
+            tenant_id,
+            user_id,
+            len(rows),
+        )
         return rows
 
     async def get_recurrence(
@@ -242,23 +235,24 @@ class TopicService:
                 continue
             items.sort(key=lambda x: x.created_at)
             mention_dicts = [
-                {"sentiment": i.sentiment, "emotional_weight": i.emotional_weight}
-                for i in items
+                {"sentiment": i.sentiment, "emotional_weight": i.emotional_weight} for i in items
             ]
             pattern = compute_topic_pattern(mention_dicts)
             types = [i.topic_type for i in items]
             channels = sorted({i.channel_name for i in items if i.channel_name})
-            recurring.append({
-                "topic": topic,
-                "topic_type": max(set(types), key=types.count),
-                "mention_count": pattern["mention_count"],
-                "first_mentioned": _format_relative_time(items[0].created_at),
-                "last_mentioned": _format_relative_time(items[-1].created_at),
-                "sentiment_trend": pattern["sentiment_trend"],
-                "avg_emotional_weight": pattern["avg_emotional_weight"],
-                "pattern_note": pattern["pattern_note"],
-                "channels": channels,
-            })
+            recurring.append(
+                {
+                    "topic": topic,
+                    "topic_type": max(set(types), key=types.count),
+                    "mention_count": pattern["mention_count"],
+                    "first_mentioned": _format_relative_time(items[0].created_at),
+                    "last_mentioned": _format_relative_time(items[-1].created_at),
+                    "sentiment_trend": pattern["sentiment_trend"],
+                    "avg_emotional_weight": pattern["avg_emotional_weight"],
+                    "pattern_note": pattern["pattern_note"],
+                    "channels": channels,
+                }
+            )
         recurring.sort(key=lambda x: x["mention_count"], reverse=True)
         return recurring
 

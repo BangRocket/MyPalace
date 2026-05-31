@@ -63,11 +63,15 @@ async def _ensure_default_tenant() -> None:
             select(Tenant).where(Tenant.id == settings.default_tenant_id),
         )
         if existing.scalar_one_or_none() is None:
-            stmt = pg_insert(Tenant).values(
-                id=settings.default_tenant_id,
-                label="Default Tenant",
-                created_at=utcnow(),
-            ).on_conflict_do_nothing(index_elements=["id"])
+            stmt = (
+                pg_insert(Tenant)
+                .values(
+                    id=settings.default_tenant_id,
+                    label="Default Tenant",
+                    created_at=utcnow(),
+                )
+                .on_conflict_do_nothing(index_elements=["id"])
+            )
             await db.execute(stmt)
             await db.commit()
 
@@ -83,6 +87,7 @@ async def lifespan(app: FastAPI):
     import logging as _logging
 
     from mypalace.health.config_validator import validate_config
+
     _log = _logging.getLogger("mypalace.startup")
     for warning in validate_config():
         _log.warning(warning)
@@ -92,6 +97,7 @@ async def lifespan(app: FastAPI):
     # async engine. Idempotent — re-installation on the same engine is a
     # no-op.
     from mypalace.database import engine as _engine
+
     install_db_metrics(_engine)
     await init_db()
     await _ensure_default_tenant()
@@ -103,6 +109,7 @@ async def lifespan(app: FastAPI):
     grpc_server = None
     if settings.grpc_port is not None:
         from mypalace.grpc.server import serve as serve_grpc
+
         grpc_server = await serve_grpc(settings.grpc_port)
 
     yield
@@ -204,6 +211,7 @@ app.include_router(topics.router, prefix="/v1/topics", tags=["topics"])
 app.include_router(topics.users_router, prefix="/v1/users", tags=["topics"])
 app.include_router(graph_api.router, prefix="/v1/graph", tags=["graph"])
 app.include_router(events_api.router, prefix="/v1", tags=["events"])
+
 
 # Phase 13: mount the admin web UI under /admin/* if a built bundle is
 # present. Looked for at multiple paths so it works in both the dev

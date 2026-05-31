@@ -17,6 +17,7 @@ T = TypeVar("T")
 # Request models
 # ---------------------------------------------------------------------------
 
+
 class CreateMemoryRequest(BaseModel):
     user_id: str
     content: str
@@ -32,6 +33,7 @@ class BatchMessage(BaseModel):
     """A single message in a batch-create request. Extra keys allowed and
     flow through into per-memory metadata (per-message keys win over request
     metadata on collision)."""
+
     model_config = {"extra": "allow"}
     role: str
     content: str
@@ -109,6 +111,7 @@ class AssembleContextRequest(BaseModel):
 # Response models
 # ---------------------------------------------------------------------------
 
+
 class MemoryOut(BaseModel):
     id: str
     user_id: str
@@ -138,10 +141,7 @@ class MemoryOut(BaseModel):
             updated_at=m.updated_at.isoformat() if m.updated_at else None,
             accessed_at=m.accessed_at.isoformat() if m.accessed_at else None,
             access_count=m.access_count,
-            expires_at=(
-                m.expires_at.isoformat()
-                if getattr(m, "expires_at", None) else None
-            ),
+            expires_at=(m.expires_at.isoformat() if getattr(m, "expires_at", None) else None),
             metadata=m.metadata_json,
         )
 
@@ -185,9 +185,11 @@ class ContextOut(BaseModel):
 # Envelope
 # ---------------------------------------------------------------------------
 
+
 class Meta(BaseModel):
     """Response metadata. Extra keys allowed (e.g. slice-5 ``supersessions``
     and ``skipped`` debug data appended to /v1/memories/batch responses)."""
+
     model_config = {"extra": "allow"}
     count: int = 0
     took_ms: int = 0
@@ -211,8 +213,10 @@ class ErrorResponse(BaseModel):
 # Slice 2: episodes / arcs / jobs
 # ---------------------------------------------------------------------------
 
+
 class ReflectionMessage(BaseModel):
     """A single message in a reflection request body."""
+
     model_config = {"extra": "allow"}
     role: str
     content: str
@@ -315,6 +319,7 @@ class JobPendingOut(BaseModel):
 # Slice 3: FSRS dynamics
 # ---------------------------------------------------------------------------
 
+
 class PromoteMemoryRequest(BaseModel):
     user_id: str
     grade: int = 3  # GOOD; valid 1-4
@@ -377,6 +382,7 @@ class ScoreBreakdownOut(BaseModel):
 # ---------------------------------------------------------------------------
 # Slice 4: intentions
 # ---------------------------------------------------------------------------
+
 
 class SetIntentionRequest(BaseModel):
     user_id: str
@@ -450,6 +456,7 @@ class IntentionFormatOut(BaseModel):
 # Slice 5: layered retrieval + smart ingestion
 # ---------------------------------------------------------------------------
 
+
 class LayeredContextRequest(BaseModel):
     user_id: str
     query: str
@@ -473,6 +480,7 @@ class LayeredContextRequest(BaseModel):
 
 class MemoryWithScoreOut(BaseModel):
     """Memory with similarity score and optional FSRS composite score."""
+
     id: str
     user_id: str
     agent_id: str | None = None
@@ -505,6 +513,7 @@ class LayeredCharCounts(BaseModel):
 class LayeredL3GraphOut(BaseModel):
     """Phase 4 slice 6: 1-hop graph neighbors of the L2 memories. Null when
     include_graph=False or the graph is disabled / empty for this query."""
+
     related_memories: list[dict[str, Any]] = []
     edges: list[dict[str, Any]] = []
 
@@ -537,6 +546,7 @@ class SupersessionOut(BaseModel):
 # Emotional context (phase: emotional + topic services)
 # ---------------------------------------------------------------------------
 
+
 class RecordEmotionalRequest(BaseModel):
     user_id: str
     messages: list[str] = Field(default_factory=list)
@@ -563,7 +573,7 @@ class EmotionalContextOut(BaseModel):
     created_at: str | None
 
     @classmethod
-    def from_row(cls, r: Any) -> "EmotionalContextOut":
+    def from_row(cls, r: Any) -> EmotionalContextOut:
         return cls(
             id=r.id,
             user_id=r.user_id,
@@ -583,6 +593,7 @@ class EmotionalContextOut(BaseModel):
 # ---------------------------------------------------------------------------
 # Topic recurrence
 # ---------------------------------------------------------------------------
+
 
 class ExtractTopicsRequest(BaseModel):
     user_id: str

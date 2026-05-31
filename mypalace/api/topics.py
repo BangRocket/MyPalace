@@ -1,4 +1,5 @@
 """Topic routes — async extraction (worker) + per-user recurrence fetch."""
+
 from __future__ import annotations
 
 import time
@@ -20,8 +21,8 @@ from mypalace.job_service import job_service
 from mypalace.topic_service import DEFAULT_AGENT_ID, topic_service
 from mypalace.workers.queue import enqueue as enqueue_job
 
-router = APIRouter()         # /v1/topics/...
-users_router = APIRouter()   # /v1/users/{user_id}/topic-recurrence
+router = APIRouter()  # /v1/topics/...
+users_router = APIRouter()  # /v1/users/{user_id}/topic-recurrence
 
 
 @router.post("/extract")
@@ -42,9 +43,13 @@ async def extract_topics(
     }
     if settings.worker_queue_enabled:
         job = await enqueue_job(
-            kind="topic_extract", user_id=req.user_id, payload=payload, tenant_id=tenant_id,
+            kind="topic_extract",
+            user_id=req.user_id,
+            payload=payload,
+            tenant_id=tenant_id,
         )
     else:
+
         async def coro():
             return await topic_service.extract_and_store(
                 user_id=req.user_id,
@@ -58,7 +63,10 @@ async def extract_topics(
             )
 
         job = await job_service.run_async(
-            kind="topic_extract", user_id=req.user_id, coro_factory=coro, tenant_id=tenant_id,
+            kind="topic_extract",
+            user_id=req.user_id,
+            coro_factory=coro,
+            tenant_id=tenant_id,
         )
     took = int((time.time() - start) * 1000)
     response = ApiResponse(data=JobPendingOut(job_id=job.id), meta=Meta(count=1, took_ms=took))
@@ -79,8 +87,11 @@ async def topic_recurrence(
     tenant_id = auth.resolve_tenant()
     start = time.time()
     items = await topic_service.get_recurrence(
-        user_id=user_id, agent_id=agent_id,
-        lookback_days=lookback_days, min_mentions=min_mentions, tenant_id=tenant_id,
+        user_id=user_id,
+        agent_id=agent_id,
+        lookback_days=lookback_days,
+        min_mentions=min_mentions,
+        tenant_id=tenant_id,
     )
     took = int((time.time() - start) * 1000)
     return ApiResponse(

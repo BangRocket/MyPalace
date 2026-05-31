@@ -1,4 +1,5 @@
 """Tests for the VADER compound-score helper."""
+
 from __future__ import annotations
 
 from mypalace._sentiment import compound_score

@@ -33,35 +33,40 @@ logger = logging.getLogger(__name__)
 
 # Per the design doc §2.1: which tables live in per-tenant schemas vs the
 # shared `public` catalog. Anything not listed here defaults to public.
-PER_TENANT_TABLES: frozenset[str] = frozenset({
-    "memories",
-    "messages",
-    "sessions",
-    "narrative_arcs",
-    "memory_dynamics",
-    "intentions",
-    "memory_access_logs",
-    "memory_versions",
-    "personality_traits",
-    "entity_aliases",
-    "memory_supersessions",
-    "emotional_contexts",
-    "topic_mentions",
-})
+PER_TENANT_TABLES: frozenset[str] = frozenset(
+    {
+        "memories",
+        "messages",
+        "sessions",
+        "narrative_arcs",
+        "memory_dynamics",
+        "intentions",
+        "memory_access_logs",
+        "memory_versions",
+        "personality_traits",
+        "entity_aliases",
+        "memory_supersessions",
+        "emotional_contexts",
+        "topic_mentions",
+    }
+)
 
-PUBLIC_TABLES: frozenset[str] = frozenset({
-    "tenants",
-    "api_keys",
-    "audit_logs",
-    "alembic_version",
-    "reflection_jobs",
-})
+PUBLIC_TABLES: frozenset[str] = frozenset(
+    {
+        "tenants",
+        "api_keys",
+        "audit_logs",
+        "alembic_version",
+        "reflection_jobs",
+    }
+)
 
 # Default None so callers can distinguish "not set yet" from "explicit
 # default tenant" — the latter is a deliberate choice the request made;
 # the former means we shouldn't be running a query yet.
 _current_tenant: contextvars.ContextVar[str | None] = contextvars.ContextVar(
-    "mypalace_current_tenant", default=None,
+    "mypalace_current_tenant",
+    default=None,
 )
 
 # Schema names go straight into SQL as identifiers, so we *must* validate
@@ -106,6 +111,7 @@ def _per_tenant_table_objects():
     from sqlmodel import SQLModel
 
     import mypalace.models  # noqa: F401  — populates SQLModel.metadata
+
     for table in SQLModel.metadata.tables.values():
         if table.name in PER_TENANT_TABLES:
             yield table
@@ -136,7 +142,8 @@ def replicate_per_tenant_schema(tenant_id: str, sync_conn: Connection) -> None:
             sync_conn.execute(CreateIndex(ix, if_not_exists=True))
     logger.info(
         "tenancy: replicated per-tenant DDL into schema=%s tables=%d",
-        tenant_id, len(PER_TENANT_TABLES),
+        tenant_id,
+        len(PER_TENANT_TABLES),
     )
 
 
@@ -155,10 +162,14 @@ def drop_tenant_schema(tenant_id: str, sync_conn: Connection) -> None:
 # Keep DropTable re-exported for tests that want to confirm we don't
 # accidentally use it on per-tenant tables in `public`.
 __all__ = (
-    "PER_TENANT_TABLES", "PUBLIC_TABLES",
-    "current_tenant", "set_current_tenant", "tenant_scope",
+    "PER_TENANT_TABLES",
+    "PUBLIC_TABLES",
+    "current_tenant",
+    "set_current_tenant",
+    "tenant_scope",
     "is_valid_schema_name",
-    "replicate_per_tenant_schema", "drop_tenant_schema",
+    "replicate_per_tenant_schema",
+    "drop_tenant_schema",
     "DropTable",  # re-export; used by future migration tools
 )
 

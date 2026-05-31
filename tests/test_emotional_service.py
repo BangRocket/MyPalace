@@ -1,7 +1,7 @@
 """EmotionalService — pure arc logic + DB-backed record/get_recent (mocked session)."""
+
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -46,8 +46,18 @@ class TestRecord:
 
         row = await svc.record(
             user_id="u1",
-            messages=["I'm so frustrated", "still annoyed", "ok", "feeling better", "great now", "wonderful"],
-            energy="focused", summary="job search", channel_name="#dm", is_dm=True,
+            messages=[
+                "I'm so frustrated",
+                "still annoyed",
+                "ok",
+                "feeling better",
+                "great now",
+                "wonderful",
+            ],
+            energy="focused",
+            summary="job search",
+            channel_name="#dm",
+            is_dm=True,
         )
 
         db.add.assert_called_once()

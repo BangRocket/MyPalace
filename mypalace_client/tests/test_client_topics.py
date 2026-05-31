@@ -1,11 +1,12 @@
 """Client tests for topic endpoints using an httpx MockTransport."""
+
 from __future__ import annotations
 
 import httpx
 import pytest
+from mypalace_client.models import JobPending, TopicRecurrence
 
 from mypalace_client import PalaceClient
-from mypalace_client.models import JobPending, TopicRecurrence
 
 
 def _client(handler) -> PalaceClient:
@@ -21,7 +22,11 @@ async def test_extract_topics_returns_job():
         return httpx.Response(202, json={"data": {"job_id": "job-1"}, "meta": {"count": 1}})
 
     pc = _client(handler)
-    out = await pc.extract_topics(user_id="u1", conversation_text="x" * 60, conversation_sentiment=-0.2)
+    out = await pc.extract_topics(
+        user_id="u1",
+        conversation_text="x" * 60,
+        conversation_sentiment=-0.2,
+    )
     assert isinstance(out, JobPending)
     assert out.job_id == "job-1"
 
@@ -30,12 +35,25 @@ async def test_extract_topics_returns_job():
 async def test_get_topic_recurrence():
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/v1/users/u1/topic-recurrence"
-        return httpx.Response(200, json={"data": [{
-            "topic": "job search", "topic_type": "theme", "mention_count": 3,
-            "first_mentioned": "3 days ago", "last_mentioned": "yesterday",
-            "sentiment_trend": "declining", "avg_emotional_weight": "heavy",
-            "pattern_note": "recurring concern (3 mentions)", "channels": ["#dm"],
-        }], "meta": {"count": 1}})
+        return httpx.Response(
+            200,
+            json={
+                "data": [
+                    {
+                        "topic": "job search",
+                        "topic_type": "theme",
+                        "mention_count": 3,
+                        "first_mentioned": "3 days ago",
+                        "last_mentioned": "yesterday",
+                        "sentiment_trend": "declining",
+                        "avg_emotional_weight": "heavy",
+                        "pattern_note": "recurring concern (3 mentions)",
+                        "channels": ["#dm"],
+                    }
+                ],
+                "meta": {"count": 1},
+            },
+        )
 
     pc = _client(handler)
     out = await pc.get_topic_recurrence(user_id="u1", lookback_days=14, min_mentions=2)

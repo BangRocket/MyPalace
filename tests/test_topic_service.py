@@ -1,4 +1,5 @@
 """TopicService — pure helpers + DB/LLM-mocked extract/recurrence."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
@@ -26,9 +27,19 @@ def _async_cm(target):
 
 def _mention(topic, sentiment, weight, when):
     return TopicMention(
-        id=f"id-{when.isoformat()}", tenant_id="test", user_id="u1", agent_id="default",
-        topic=topic, topic_type="theme", context_snippet="", emotional_weight=weight,
-        sentiment=sentiment, channel_id="", channel_name="#dm", is_dm=True, created_at=when,
+        id=f"id-{when.isoformat()}",
+        tenant_id="test",
+        user_id="u1",
+        agent_id="default",
+        topic=topic,
+        topic_type="theme",
+        context_snippet="",
+        emotional_weight=weight,
+        sentiment=sentiment,
+        channel_id="",
+        channel_name="#dm",
+        is_dm=True,
+        created_at=when,
     )
 
 
@@ -39,29 +50,47 @@ class TestValidate:
             {"topic": "", "topic_type": "theme"},
         ]
         out = _validate_topics(raw)
-        assert out == [{
-            "topic": "job search", "topic_type": "theme",
-            "context_snippet": "", "emotional_weight": "moderate",
-        }]
+        assert out == [
+            {
+                "topic": "job search",
+                "topic_type": "theme",
+                "context_snippet": "",
+                "emotional_weight": "moderate",
+            }
+        ]
 
 
 class TestDedupe:
     def test_keeps_heaviest_weight(self):
-        out = _dedupe_topics([
-            {"topic": "mom", "topic_type": "entity", "context_snippet": "", "emotional_weight": "light"},
-            {"topic": "mom", "topic_type": "entity", "context_snippet": "", "emotional_weight": "heavy"},
-        ])
+        out = _dedupe_topics(
+            [
+                {
+                    "topic": "mom",
+                    "topic_type": "entity",
+                    "context_snippet": "",
+                    "emotional_weight": "light",
+                },
+                {
+                    "topic": "mom",
+                    "topic_type": "entity",
+                    "context_snippet": "",
+                    "emotional_weight": "heavy",
+                },
+            ]
+        )
         assert len(out) == 1
         assert out[0]["emotional_weight"] == "heavy"
 
 
 class TestPattern:
     def test_declining_and_recurring(self):
-        p = compute_topic_pattern([
-            {"sentiment": 0.5, "emotional_weight": "moderate"},
-            {"sentiment": 0.0, "emotional_weight": "moderate"},
-            {"sentiment": -0.5, "emotional_weight": "heavy"},
-        ])
+        p = compute_topic_pattern(
+            [
+                {"sentiment": 0.5, "emotional_weight": "moderate"},
+                {"sentiment": 0.0, "emotional_weight": "moderate"},
+                {"sentiment": -0.5, "emotional_weight": "heavy"},
+            ]
+        )
         assert p["mention_count"] == 3
         assert p["sentiment_trend"] == "declining"
         assert "getting heavier" in p["pattern_note"] or "recurring" in p["pattern_note"]
@@ -78,11 +107,17 @@ class TestExtractAndStore:
         svc = TopicService()
         db = MagicMock(add=MagicMock(), commit=AsyncMock(), refresh=AsyncMock())
         monkeypatch.setattr(tp_mod, "async_session", MagicMock(return_value=_async_cm(db)))
-        llm_json = '{"topics": [{"topic": "Job Search", "topic_type": "theme", "context_snippet": "interviews", "emotional_weight": "heavy"}]}'
+        llm_json = (
+            '{"topics": [{"topic": "Job Search", "topic_type": "theme", '
+            '"context_snippet": "interviews", "emotional_weight": "heavy"}]}'
+        )
         with patch.object(tp_mod.llm, "complete", new=AsyncMock(return_value=llm_json)):
             rows = await svc.extract_and_store(
                 user_id="u1",
-                conversation_text="we talked at length about the job search and interviews not going well " * 2,
+                conversation_text=(
+                    "we talked at length about the job search and interviews not going well "
+                )
+                * 2,
                 conversation_sentiment=-0.3,
             )
         assert len(rows) == 1
@@ -94,9 +129,13 @@ class TestExtractAndStore:
         svc = TopicService()
         monkeypatch.setattr(tp_mod, "async_session", MagicMock(return_value=_async_cm(MagicMock())))
         with patch.object(tp_mod.llm, "complete", new=AsyncMock(side_effect=RuntimeError("boom"))):
-            assert await svc.extract_and_store(
-                user_id="u1", conversation_text="x" * 60,
-            ) == []
+            assert (
+                await svc.extract_and_store(
+                    user_id="u1",
+                    conversation_text="x" * 60,
+                )
+                == []
+            )
 
 
 class TestRecurrence:

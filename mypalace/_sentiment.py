@@ -3,6 +3,7 @@
 Mirrors mypalclara/core/sentiment.py. Only the compound score is needed
 by the emotional-context service, so the surface is intentionally tiny.
 """
+
 from __future__ import annotations
 
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer

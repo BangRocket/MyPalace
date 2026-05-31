@@ -1,4 +1,5 @@
 """Schema-shape assertions for the TopicMention table."""
+
 from __future__ import annotations
 
 from mypalace.models import TopicMention
@@ -11,9 +12,19 @@ def test_tablename():
 def test_columns_present():
     cols = set(TopicMention.__table__.columns.keys())
     assert {
-        "id", "tenant_id", "user_id", "agent_id", "topic", "topic_type",
-        "context_snippet", "emotional_weight", "sentiment", "channel_id",
-        "channel_name", "is_dm", "created_at",
+        "id",
+        "tenant_id",
+        "user_id",
+        "agent_id",
+        "topic",
+        "topic_type",
+        "context_snippet",
+        "emotional_weight",
+        "sentiment",
+        "channel_id",
+        "channel_name",
+        "is_dm",
+        "created_at",
     } <= cols
 
 

@@ -3,6 +3,7 @@
 Source: mypalclara/core/memory/context/emotional.py. The service scores a
 finalized conversation server-side and stores one EmotionalContext row.
 """
+
 from __future__ import annotations
 
 import logging
@@ -77,7 +78,10 @@ class EmotionalService:
             await db.refresh(row)
         logger.info(
             "emotional context recorded tenant=%s user=%s arc=%s energy=%s",
-            tenant_id, user_id, arc, energy,
+            tenant_id,
+            user_id,
+            arc,
+            energy,
         )
         return row
 

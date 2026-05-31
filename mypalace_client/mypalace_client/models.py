@@ -173,6 +173,7 @@ class FiredIntention(BaseModel):
 
 # --- slice 5: layered retrieval + smart ingestion ---
 
+
 class MemoryWithScore(BaseModel):
     """Memory with similarity score and optional FSRS composite score."""
 
