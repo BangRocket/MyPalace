@@ -72,12 +72,6 @@ ignore = ["UP046"]  # Generic[T] is the canonical Pydantic v2 idiom
 "mypalace/grpc/_generated/*.py" = ["ALL"]  # protoc-generated stubs; do not lint
 "mypalace/grpc/*_servicer.py" = ["N802"]  # gRPC servicer methods must match proto (PascalCase)
 
-[project.scripts]
-# Phase 11: the server-side `mypalace-admin` is now a deprecation shim
-# that delegates to mypalace_client.cli.admin (preferred install path:
-# `pip install 'mypalace-client[cli]'`). Removal targeted for v0.12.0.
-mypalace-admin = "mypalace.cli.admin:main"
-
 [project.urls]
 Homepage = "https://github.com/BangRocket/MyPalace"
 Repository = "https://github.com/BangRocket/MyPalace"
