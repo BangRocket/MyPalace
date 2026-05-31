@@ -30,6 +30,7 @@
 
 **Modify:**
 - `mypalace/models.py` — add `EmotionalContext`, `TopicMention`
+- `mypalace/tenancy.py` — add `emotional_contexts` + `topic_mentions` to `PER_TENANT_TABLES` (a tripwire test, `test_tenant_schema_lifecycle.py`, fails if any new table is unclassified)
 - `mypalace/api/common.py` — add request/response models
 - `mypalace/main.py` — register four routers
 - `mypalace/workers/handlers.py` — add `topic_extract` handler

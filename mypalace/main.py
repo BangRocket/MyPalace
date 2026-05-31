@@ -11,6 +11,7 @@ from mypalace.api import (
     arcs,
     audit,
     context,
+    emotional,
     entities,
     episodes,
     jobs,
@@ -196,6 +197,8 @@ app.include_router(intentions_api.users_router, prefix="/v1/users", tags=["inten
 app.include_router(maintenance_api.router, prefix="/v1/maintenance", tags=["maintenance"])
 app.include_router(retrieval_api.router, prefix="/v1/context", tags=["retrieval"])
 app.include_router(vch.router, prefix="/v1/context", tags=["retrieval"])
+app.include_router(emotional.router, prefix="/v1/emotional", tags=["emotional"])
+app.include_router(emotional.users_router, prefix="/v1/users", tags=["emotional"])
 app.include_router(graph_api.router, prefix="/v1/graph", tags=["graph"])
 app.include_router(events_api.router, prefix="/v1", tags=["events"])
 

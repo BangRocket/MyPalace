@@ -531,3 +531,50 @@ class SupersessionOut(BaseModel):
     reason: str
     similarity_score: float | None = None
     created_at: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Emotional context (phase: emotional + topic services)
+# ---------------------------------------------------------------------------
+
+class RecordEmotionalRequest(BaseModel):
+    user_id: str
+    messages: list[str] = Field(default_factory=list)
+    agent_id: str = "default"
+    channel_id: str = ""
+    channel_name: str = ""
+    is_dm: bool = False
+    energy: str = "neutral"
+    summary: str = ""
+
+
+class EmotionalContextOut(BaseModel):
+    id: str
+    user_id: str
+    agent_id: str
+    channel_id: str
+    channel_name: str
+    is_dm: bool
+    starting_sentiment: float
+    ending_sentiment: float
+    emotional_arc: str
+    energy_level: str
+    topic_summary: str
+    created_at: str | None
+
+    @classmethod
+    def from_row(cls, r: Any) -> "EmotionalContextOut":
+        return cls(
+            id=r.id,
+            user_id=r.user_id,
+            agent_id=r.agent_id,
+            channel_id=r.channel_id,
+            channel_name=r.channel_name,
+            is_dm=r.is_dm,
+            starting_sentiment=r.starting_sentiment,
+            ending_sentiment=r.ending_sentiment,
+            emotional_arc=r.emotional_arc,
+            energy_level=r.energy_level,
+            topic_summary=r.topic_summary,
+            created_at=r.created_at.isoformat() if r.created_at else None,
+        )

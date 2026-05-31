@@ -45,6 +45,7 @@ PER_TENANT_TABLES: frozenset[str] = frozenset({
     "personality_traits",
     "entity_aliases",
     "memory_supersessions",
+    "emotional_contexts",
 })
 
 PUBLIC_TABLES: frozenset[str] = frozenset({
