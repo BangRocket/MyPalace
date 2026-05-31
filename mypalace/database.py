@@ -28,7 +28,8 @@ async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False
 @event.listens_for(SyncSession, "after_begin")
 def _set_search_path_after_begin(session, transaction, connection):  # noqa: ARG001
     """Phase 12: SET LOCAL search_path at the start of each transaction
-    when tenant_schema_mode == "schema".
+    on every transaction (per-tenant schema isolation is mandatory as of
+    v0.12.0).
 
     Fires synchronously on the underlying sync session that AsyncSession
     wraps; ``connection`` is the live DBAPI-level connection inside the
@@ -36,24 +37,25 @@ def _set_search_path_after_begin(session, transaction, connection):  # noqa: ARG
     commit/rollback so a returned-to-pool connection never carries a
     stale search_path.
 
-    No-op when:
-      - the schema-mode flag isn't set
-      - no current tenant is in the contextvar (background task without
-        a request — they should set tenant_scope() explicitly)
+    Pins ``public`` when:
+      - no current tenant is in the contextvar (public-only catalog
+        queries: auth key lookup, tenants list, worker queue)
       - the tenant id is malformed (defensive against SQL injection)
     """
-    if settings.tenant_schema_mode != "schema":
-        return
-
     from mypalace.tenancy import current_tenant, is_valid_schema_name
     tid = current_tenant()
     if tid is None:
+        # No tenant in context: public-only catalog queries. Pin to
+        # public explicitly so a pooled connection never carries a stale
+        # per-tenant path.
+        connection.execute(text("SET LOCAL search_path TO public"))
         return
     if not is_valid_schema_name(tid):
         logger.warning(
             "tenancy: refusing to set search_path for invalid tenant_id=%r",
             tid,
         )
+        connection.execute(text("SET LOCAL search_path TO public"))
         return
 
     # Schema names are pre-validated above, so direct interpolation is
