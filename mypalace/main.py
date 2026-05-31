@@ -22,6 +22,7 @@ from mypalace.api import (
     sessions,
     stats,
     tenants,
+    topics,
     vch,
 )
 from mypalace.api import dynamics as dynamics_api
@@ -199,6 +200,8 @@ app.include_router(retrieval_api.router, prefix="/v1/context", tags=["retrieval"
 app.include_router(vch.router, prefix="/v1/context", tags=["retrieval"])
 app.include_router(emotional.router, prefix="/v1/emotional", tags=["emotional"])
 app.include_router(emotional.users_router, prefix="/v1/users", tags=["emotional"])
+app.include_router(topics.router, prefix="/v1/topics", tags=["topics"])
+app.include_router(topics.users_router, prefix="/v1/users", tags=["topics"])
 app.include_router(graph_api.router, prefix="/v1/graph", tags=["graph"])
 app.include_router(events_api.router, prefix="/v1", tags=["events"])
 

@@ -578,3 +578,29 @@ class EmotionalContextOut(BaseModel):
             topic_summary=r.topic_summary,
             created_at=r.created_at.isoformat() if r.created_at else None,
         )
+
+
+# ---------------------------------------------------------------------------
+# Topic recurrence
+# ---------------------------------------------------------------------------
+
+class ExtractTopicsRequest(BaseModel):
+    user_id: str
+    conversation_text: str
+    conversation_sentiment: float = 0.0
+    agent_id: str = "default"
+    channel_id: str = ""
+    channel_name: str = ""
+    is_dm: bool = False
+
+
+class TopicRecurrenceOut(BaseModel):
+    topic: str
+    topic_type: str
+    mention_count: int
+    first_mentioned: str
+    last_mentioned: str
+    sentiment_trend: str
+    avg_emotional_weight: str
+    pattern_note: str
+    channels: list[str]

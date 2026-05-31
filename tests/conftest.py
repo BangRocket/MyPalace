@@ -159,6 +159,14 @@ def mock_emotional_service():
 
 
 @pytest.fixture
+def mock_topic_service():
+    mock = MagicMock()
+    mock.extract_and_store = AsyncMock(return_value=[])
+    mock.get_recurrence = AsyncMock(return_value=[])
+    return mock
+
+
+@pytest.fixture
 def client(
     mock_memory_service,
     mock_session_service,
@@ -172,6 +180,7 @@ def client(
     mock_ingestion_service,
     mock_key_service,
     mock_emotional_service,
+    mock_topic_service,
 ):
     from contextlib import ExitStack, asynccontextmanager
 
@@ -198,6 +207,9 @@ def client(
         patch("mypalace.episode_service.episode_service", mock_episode_service),
         patch("mypalace.api.emotional.emotional_service", mock_emotional_service),
         patch("mypalace.emotional_service.emotional_service", mock_emotional_service),
+        patch("mypalace.api.topics.topic_service", mock_topic_service),
+        patch("mypalace.api.topics.job_service", mock_job_service),
+        patch("mypalace.topic_service.topic_service", mock_topic_service),
         patch("mypalace.database.init_db", AsyncMock()),
     ]
     with ExitStack() as stack:
