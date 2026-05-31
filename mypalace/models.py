@@ -377,6 +377,36 @@ class EmotionalContext(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
 
 
+class TopicMention(SQLModel, table=True):
+    """A single topic mention extracted from a conversation.
+
+    Source mypalclara/core/memory/context/topics.py. Recurrence patterns are
+    computed server-side by aggregating these rows over a lookback window.
+    """
+
+    __tablename__ = "topic_mentions"
+    __table_args__ = (
+        Index(
+            "ix_topic_mentions_tenant_user_topic_created",
+            "tenant_id", "user_id", "topic", "created_at",
+        ),
+    )
+
+    id: str = Field(primary_key=True, default_factory=lambda: str(uuid4()))
+    tenant_id: str = Field(default=DEFAULT_TENANT_ID, max_length=32)
+    user_id: str = Field(index=True)
+    agent_id: str = Field(default="default", max_length=64)
+    topic: str = Field(max_length=200)
+    topic_type: str = Field(default="theme", max_length=20)
+    context_snippet: str = Field(default="", max_length=200)
+    emotional_weight: str = Field(default="moderate", max_length=20)
+    sentiment: float = Field(default=0.0)
+    channel_id: str = Field(default="", max_length=200)
+    channel_name: str = Field(default="", max_length=200)
+    is_dm: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
+
+
 class MemorySupersession(SQLModel, table=True):
     """Audit log linking a superseded memory to its replacement (slice 5).
 
