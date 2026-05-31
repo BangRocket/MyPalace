@@ -23,6 +23,7 @@ from mypalace_client.models import (
     Session,
     SessionWithMessages,
     Supersession,
+    TopicRecurrence,
 )
 
 
@@ -385,6 +386,40 @@ class PalaceClient:
             params={"limit": limit, "max_age_days": max_age_days, "agent_id": agent_id},
         )
         return [EmotionalContext.model_validate(e) for e in self._data(envelope) or []]
+
+    # ---- topics ----
+
+    async def extract_topics(
+        self,
+        user_id: str,
+        conversation_text: str,
+        conversation_sentiment: float = 0.0,
+        agent_id: str = "default",
+        channel_id: str = "",
+        channel_name: str = "",
+        is_dm: bool = False,
+    ) -> JobPending:
+        body = {
+            "user_id": user_id,
+            "conversation_text": conversation_text,
+            "conversation_sentiment": conversation_sentiment,
+            "agent_id": agent_id,
+            "channel_id": channel_id,
+            "channel_name": channel_name,
+            "is_dm": is_dm,
+        }
+        envelope = await self._request("POST", "/v1/topics/extract", json=body)
+        return JobPending.model_validate(self._data(envelope))
+
+    async def get_topic_recurrence(
+        self, user_id: str, lookback_days: int = 14, min_mentions: int = 2,
+        agent_id: str = "default",
+    ) -> list[TopicRecurrence]:
+        envelope = await self._request(
+            "GET", f"/v1/users/{user_id}/topic-recurrence",
+            params={"lookback_days": lookback_days, "min_mentions": min_mentions, "agent_id": agent_id},
+        )
+        return [TopicRecurrence.model_validate(t) for t in self._data(envelope) or []]
 
     # ---- arcs / synthesis ----
 

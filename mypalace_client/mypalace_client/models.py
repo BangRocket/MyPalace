@@ -232,3 +232,18 @@ class EmotionalContext(BaseModel):
     energy_level: str
     topic_summary: str
     created_at: datetime | None = None
+
+
+class TopicRecurrence(BaseModel):
+    """A recurring topic pattern from the topic-recurrence service."""
+
+    model_config = ConfigDict(extra="ignore")
+    topic: str
+    topic_type: str
+    mention_count: int
+    first_mentioned: str
+    last_mentioned: str
+    sentiment_trend: str
+    avg_emotional_weight: str
+    pattern_note: str
+    channels: list[str] = []
