@@ -538,16 +538,30 @@ class MemoryService:
         if not flat:
             return []
 
-        memory_ids = [r[0] for r in flat]
-        async with async_session() as db:
-            mem_result = await db.execute(
-                select(Memory).where(
-                    Memory.id.in_(memory_ids),
-                    _not_expired_clause(),
-                ),
-            )
-            memories = mem_result.scalars().all()
-        mem_map = {m.id: m for m in memories}
+        # v0.12.0: hydrate per tenant under its own search_path. The ids
+        # came from per-tenant Qdrant collections, so the rows live in
+        # <tenant>.memories — a single unscoped fetch would read stale
+        # public.memories.
+        from collections import defaultdict
+
+        from mypalace.tenancy import tenant_scope
+
+        ids_by_tenant: dict[str, list[str]] = defaultdict(list)
+        for mid, _score, t_id in flat:
+            ids_by_tenant[t_id].append(mid)
+
+        mem_map: dict[str, Memory] = {}
+        for t_id, ids in ids_by_tenant.items():
+            with tenant_scope(t_id):
+                async with async_session() as db:
+                    mem_result = await db.execute(
+                        select(Memory).where(
+                            Memory.id.in_(ids),
+                            _not_expired_clause(),
+                        ),
+                    )
+                    for m in mem_result.scalars().all():
+                        mem_map[m.id] = m
         return [
             (mem_map[mid], score, t_id)
             for mid, score, t_id in flat
