@@ -7,6 +7,7 @@ import httpx
 from mypalace_client.exceptions import PalaceError, PalaceNotFound, PalaceTransport
 from mypalace_client.models import (
     Context,
+    EmotionalContext,
     Episode,
     FiredIntention,
     Intention,
@@ -348,6 +349,42 @@ class PalaceClient:
             params={"limit": limit},
         )
         return [Episode.model_validate(e) for e in self._data(envelope) or []]
+
+    # ---- emotional context ----
+
+    async def record_emotional_context(
+        self,
+        user_id: str,
+        messages: list[str],
+        agent_id: str = "default",
+        channel_id: str = "",
+        channel_name: str = "",
+        is_dm: bool = False,
+        energy: str = "neutral",
+        summary: str = "",
+    ) -> EmotionalContext:
+        body = {
+            "user_id": user_id,
+            "messages": messages,
+            "agent_id": agent_id,
+            "channel_id": channel_id,
+            "channel_name": channel_name,
+            "is_dm": is_dm,
+            "energy": energy,
+            "summary": summary,
+        }
+        envelope = await self._request("POST", "/v1/emotional/record", json=body)
+        return EmotionalContext.model_validate(self._data(envelope))
+
+    async def get_emotional_context(
+        self, user_id: str, limit: int = 3, max_age_days: int = 7,
+        agent_id: str = "default",
+    ) -> list[EmotionalContext]:
+        envelope = await self._request(
+            "GET", f"/v1/users/{user_id}/emotional-context",
+            params={"limit": limit, "max_age_days": max_age_days, "agent_id": agent_id},
+        )
+        return [EmotionalContext.model_validate(e) for e in self._data(envelope) or []]
 
     # ---- arcs / synthesis ----
 

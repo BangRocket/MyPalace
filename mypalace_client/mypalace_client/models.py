@@ -214,3 +214,21 @@ class Supersession(BaseModel):
     reason: str
     similarity_score: float | None = None
     created_at: datetime | None = None
+
+
+class EmotionalContext(BaseModel):
+    """A per-conversation emotional summary from the emotional-context service."""
+
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    user_id: str
+    agent_id: str
+    channel_id: str
+    channel_name: str
+    is_dm: bool
+    starting_sentiment: float
+    ending_sentiment: float
+    emotional_arc: str
+    energy_level: str
+    topic_summary: str
+    created_at: datetime | None = None
