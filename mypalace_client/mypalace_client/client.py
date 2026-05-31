@@ -7,6 +7,7 @@ import httpx
 from mypalace_client.exceptions import PalaceError, PalaceNotFound, PalaceTransport
 from mypalace_client.models import (
     Context,
+    EmotionalContext,
     Episode,
     FiredIntention,
     Intention,
@@ -22,6 +23,7 @@ from mypalace_client.models import (
     Session,
     SessionWithMessages,
     Supersession,
+    TopicRecurrence,
 )
 
 
@@ -46,7 +48,9 @@ class PalaceClient:
             if api_key:
                 headers["X-Palace-Key"] = api_key
             self._client = httpx.AsyncClient(
-                base_url=self._base_url, timeout=timeout, headers=headers,
+                base_url=self._base_url,
+                timeout=timeout,
+                headers=headers,
             )
             self._owns_client = True
 
@@ -78,13 +82,15 @@ class PalaceClient:
             payload = self._safe_json_for_error(resp)
             raise PalaceNotFound(
                 self._error_message(payload, "Not found"),
-                status_code=404, payload=payload,
+                status_code=404,
+                payload=payload,
             )
         if resp.status_code >= 400:
             payload = self._safe_json_for_error(resp)
             raise PalaceError(
                 self._error_message(payload, f"HTTP {resp.status_code}"),
-                status_code=resp.status_code, payload=payload,
+                status_code=resp.status_code,
+                payload=payload,
             )
         return self._parse_json_or_raise(resp)
 
@@ -243,14 +249,18 @@ class PalaceClient:
         if run_id is not None:
             params["run_id"] = run_id
         envelope = await self._request(
-            "DELETE", f"/v1/users/{user_id}/memories", params=params,
+            "DELETE",
+            f"/v1/users/{user_id}/memories",
+            params=params,
         )
         data = self._data(envelope) or {}
         return int(data.get("deleted", 0))
 
     async def list_for_user(self, user_id: str, limit: int = 50) -> list[Memory]:
         envelope = await self._request(
-            "GET", f"/v1/users/{user_id}/memories", params={"limit": limit},
+            "GET",
+            f"/v1/users/{user_id}/memories",
+            params={"limit": limit},
         )
         return [Memory.model_validate(m) for m in self._data(envelope) or []]
 
@@ -268,17 +278,25 @@ class PalaceClient:
         return SessionWithMessages.model_validate(self._data(envelope))
 
     async def add_message(
-        self, session_id: str, user_id: str, role: str, content: str,
+        self,
+        session_id: str,
+        user_id: str,
+        role: str,
+        content: str,
     ) -> Message:
         body = {"user_id": user_id, "role": role, "content": content}
         envelope = await self._request(
-            "POST", f"/v1/sessions/{session_id}/messages", json=body,
+            "POST",
+            f"/v1/sessions/{session_id}/messages",
+            json=body,
         )
         return Message.model_validate(self._data(envelope))
 
     async def update_session(self, session_id: str, **fields: Any) -> Session:
         envelope = await self._request(
-            "PATCH", f"/v1/sessions/{session_id}", json=fields,
+            "PATCH",
+            f"/v1/sessions/{session_id}",
+            json=fields,
         )
         return Session.model_validate(self._data(envelope))
 
@@ -323,8 +341,10 @@ class PalaceClient:
         if session_id is not None:
             body["session_id"] = session_id
         envelope = await self._request(
-            "POST", "/v1/reflection/session",
-            json=body, params={"mode": mode},
+            "POST",
+            "/v1/reflection/session",
+            json=body,
+            params={"mode": mode},
         )
         data = self._data(envelope)
         if mode == "sync":
@@ -332,35 +352,128 @@ class PalaceClient:
         return JobPending.model_validate(data)
 
     async def search_episodes(
-        self, query: str, user_id: str,
-        limit: int = 5, min_significance: float = 0.0,
+        self,
+        query: str,
+        user_id: str,
+        limit: int = 5,
+        min_significance: float = 0.0,
     ) -> "list[Episode]":
         body = {
-            "query": query, "user_id": user_id,
-            "limit": limit, "min_significance": min_significance,
+            "query": query,
+            "user_id": user_id,
+            "limit": limit,
+            "min_significance": min_significance,
         }
         envelope = await self._request("POST", "/v1/episodes/search", json=body)
         return [Episode.model_validate(e) for e in self._data(envelope) or []]
 
     async def get_recent_episodes(self, user_id: str, limit: int = 5) -> "list[Episode]":
         envelope = await self._request(
-            "GET", f"/v1/users/{user_id}/episodes/recent",
+            "GET",
+            f"/v1/users/{user_id}/episodes/recent",
             params={"limit": limit},
         )
         return [Episode.model_validate(e) for e in self._data(envelope) or []]
 
+    # ---- emotional context ----
+
+    async def record_emotional_context(
+        self,
+        user_id: str,
+        messages: list[str],
+        agent_id: str = "default",
+        channel_id: str = "",
+        channel_name: str = "",
+        is_dm: bool = False,
+        energy: str = "neutral",
+        summary: str = "",
+    ) -> EmotionalContext:
+        body = {
+            "user_id": user_id,
+            "messages": messages,
+            "agent_id": agent_id,
+            "channel_id": channel_id,
+            "channel_name": channel_name,
+            "is_dm": is_dm,
+            "energy": energy,
+            "summary": summary,
+        }
+        envelope = await self._request("POST", "/v1/emotional/record", json=body)
+        return EmotionalContext.model_validate(self._data(envelope))
+
+    async def get_emotional_context(
+        self,
+        user_id: str,
+        limit: int = 3,
+        max_age_days: int = 7,
+        agent_id: str = "default",
+    ) -> list[EmotionalContext]:
+        envelope = await self._request(
+            "GET",
+            f"/v1/users/{user_id}/emotional-context",
+            params={"limit": limit, "max_age_days": max_age_days, "agent_id": agent_id},
+        )
+        return [EmotionalContext.model_validate(e) for e in self._data(envelope) or []]
+
+    # ---- topics ----
+
+    async def extract_topics(
+        self,
+        user_id: str,
+        conversation_text: str,
+        conversation_sentiment: float = 0.0,
+        agent_id: str = "default",
+        channel_id: str = "",
+        channel_name: str = "",
+        is_dm: bool = False,
+    ) -> JobPending:
+        body = {
+            "user_id": user_id,
+            "conversation_text": conversation_text,
+            "conversation_sentiment": conversation_sentiment,
+            "agent_id": agent_id,
+            "channel_id": channel_id,
+            "channel_name": channel_name,
+            "is_dm": is_dm,
+        }
+        envelope = await self._request("POST", "/v1/topics/extract", json=body)
+        return JobPending.model_validate(self._data(envelope))
+
+    async def get_topic_recurrence(
+        self,
+        user_id: str,
+        lookback_days: int = 14,
+        min_mentions: int = 2,
+        agent_id: str = "default",
+    ) -> list[TopicRecurrence]:
+        envelope = await self._request(
+            "GET",
+            f"/v1/users/{user_id}/topic-recurrence",
+            params={
+                "lookback_days": lookback_days,
+                "min_mentions": min_mentions,
+                "agent_id": agent_id,
+            },
+        )
+        return [TopicRecurrence.model_validate(t) for t in self._data(envelope) or []]
+
     # ---- arcs / synthesis ----
 
     async def synthesize_narratives(
-        self, user_id: str, agent_id: str | None = None,
-        lookback_episodes: int = 20, mode: str = "async",
+        self,
+        user_id: str,
+        agent_id: str | None = None,
+        lookback_episodes: int = 20,
+        mode: str = "async",
     ) -> "list[NarrativeArc] | JobPending":
         body: dict[str, Any] = {"user_id": user_id, "lookback_episodes": lookback_episodes}
         if agent_id is not None:
             body["agent_id"] = agent_id
         envelope = await self._request(
-            "POST", "/v1/synthesis/narratives",
-            json=body, params={"mode": mode},
+            "POST",
+            "/v1/synthesis/narratives",
+            json=body,
+            params={"mode": mode},
         )
         data = self._data(envelope)
         if mode == "sync":
@@ -369,7 +482,8 @@ class PalaceClient:
 
     async def get_active_arcs(self, user_id: str, limit: int = 10) -> "list[NarrativeArc]":
         envelope = await self._request(
-            "GET", f"/v1/users/{user_id}/arcs/active",
+            "GET",
+            f"/v1/users/{user_id}/arcs/active",
             params={"limit": limit},
         )
         return [NarrativeArc.model_validate(a) for a in self._data(envelope) or []]
@@ -395,7 +509,9 @@ class PalaceClient:
             "signal_type": signal_type,
         }
         envelope = await self._request(
-            "POST", f"/v1/memories/{memory_id}/promote", json=body,
+            "POST",
+            f"/v1/memories/{memory_id}/promote",
+            json=body,
         )
         return MemoryDynamics.model_validate(self._data(envelope))
 
@@ -407,7 +523,9 @@ class PalaceClient:
     ) -> MemoryDynamics:
         body = {"user_id": user_id, "reason": reason}
         envelope = await self._request(
-            "POST", f"/v1/memories/{memory_id}/demote", json=body,
+            "POST",
+            f"/v1/memories/{memory_id}/demote",
+            json=body,
         )
         return MemoryDynamics.model_validate(self._data(envelope))
 
@@ -417,7 +535,8 @@ class PalaceClient:
         user_id: str,
     ) -> MemoryDynamics:
         envelope = await self._request(
-            "GET", f"/v1/memories/{memory_id}/dynamics",
+            "GET",
+            f"/v1/memories/{memory_id}/dynamics",
             params={"user_id": user_id},
         )
         return MemoryDynamics.model_validate(self._data(envelope))
@@ -430,13 +549,16 @@ class PalaceClient:
     ) -> ScoreBreakdown:
         body = {"user_id": user_id, "semantic_score": semantic_score}
         envelope = await self._request(
-            "POST", f"/v1/memories/{memory_id}/score", json=body,
+            "POST",
+            f"/v1/memories/{memory_id}/score",
+            json=body,
         )
         return ScoreBreakdown.model_validate(self._data(envelope))
 
     async def prune_access_logs(self, retention_days: int = 90) -> int:
         envelope = await self._request(
-            "POST", "/v1/maintenance/prune-access-logs",
+            "POST",
+            "/v1/maintenance/prune-access-logs",
             params={"retention_days": retention_days},
         )
         data = self._data(envelope) or {}
@@ -505,7 +627,8 @@ class PalaceClient:
         limit: int = 50,
     ) -> list[Intention]:
         envelope = await self._request(
-            "GET", f"/v1/users/{user_id}/intentions",
+            "GET",
+            f"/v1/users/{user_id}/intentions",
             params={"fired": fired, "limit": limit},
         )
         return [Intention.model_validate(i) for i in self._data(envelope) or []]
@@ -575,13 +698,16 @@ class PalaceClient:
         if metadata is not None:
             body["metadata"] = metadata
         envelope = await self._request(
-            "POST", f"/v1/memories/{memory_id}/supersede", json=body,
+            "POST",
+            f"/v1/memories/{memory_id}/supersede",
+            json=body,
         )
         return dict(self._data(envelope) or {})
 
     async def get_supersessions(self, memory_id: str) -> list[Supersession]:
         envelope = await self._request(
-            "GET", f"/v1/memories/{memory_id}/supersedes",
+            "GET",
+            f"/v1/memories/{memory_id}/supersedes",
         )
         return [Supersession.model_validate(s) for s in self._data(envelope) or []]
 

@@ -138,9 +138,7 @@ class MemoryDynamics(SQLModel, table=True):
     """FSRS-6 scheduling state for a memory (slice 3)."""
 
     __tablename__ = "memory_dynamics"
-    __table_args__ = (
-        Index("ix_memory_dynamics_user_accessed", "user_id", "last_accessed_at"),
-    )
+    __table_args__ = (Index("ix_memory_dynamics_user_accessed", "user_id", "last_accessed_at"),)
 
     memory_id: str = Field(primary_key=True)
     tenant_id: str = Field(default=DEFAULT_TENANT_ID, index=True, max_length=32)
@@ -157,7 +155,8 @@ class MemoryDynamics(SQLModel, table=True):
         sa_column=Column(JSONB, nullable=True),
     )
     last_accessed_at: datetime | None = Field(
-        default=None, sa_column=_ts_column(nullable=True),
+        default=None,
+        sa_column=_ts_column(nullable=True),
     )
     access_count: int = Field(default=0)
     created_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
@@ -192,9 +191,7 @@ class MemoryAccessLog(SQLModel, table=True):
     """Audit trail of memory accesses with FSRS grade (slice 3)."""
 
     __tablename__ = "memory_access_logs"
-    __table_args__ = (
-        Index("ix_memory_access_logs_user_accessed", "user_id", "accessed_at"),
-    )
+    __table_args__ = (Index("ix_memory_access_logs_user_accessed", "user_id", "accessed_at"),)
 
     id: str = Field(primary_key=True, default_factory=lambda: str(uuid4()))
     tenant_id: str = Field(default=DEFAULT_TENANT_ID, index=True, max_length=32)
@@ -244,9 +241,7 @@ class MemoryVersion(SQLModel, table=True):
     """
 
     __tablename__ = "memory_versions"
-    __table_args__ = (
-        Index("ix_memory_versions_memory_created", "memory_id", "created_at"),
-    )
+    __table_args__ = (Index("ix_memory_versions_memory_created", "memory_id", "created_at"),)
 
     id: str = Field(primary_key=True, default_factory=lambda: str(uuid4()))
     memory_id: str = Field(index=True)
@@ -300,11 +295,15 @@ class PersonalityTrait(SQLModel, table=True):
     __table_args__ = (
         Index(
             "ix_personality_traits_tenant_agent_active",
-            "tenant_id", "agent_id", "active",
+            "tenant_id",
+            "agent_id",
+            "active",
         ),
         Index(
             "ix_personality_traits_tenant_agent_category",
-            "tenant_id", "agent_id", "category",
+            "tenant_id",
+            "agent_id",
+            "category",
         ),
     )
 
@@ -333,7 +332,9 @@ class EntityAlias(SQLModel, table=True):
     __table_args__ = (
         Index(
             "uq_entity_aliases_tenant_identifier",
-            "tenant_id", "identifier", unique=True,
+            "tenant_id",
+            "identifier",
+            unique=True,
         ),
         Index("ix_entity_aliases_tenant_canonical", "tenant_id", "canonical_name"),
     )
@@ -345,6 +346,71 @@ class EntityAlias(SQLModel, table=True):
     source: str = Field(default="manual", max_length=20)
     created_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
     updated_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
+
+
+class EmotionalContext(SQLModel, table=True):
+    """Per-conversation emotional summary (arc over a sentiment timeline).
+
+    Source mypalclara/core/memory/context/emotional.py. mypalclara sends the
+    finalized conversation; the service scores it with VADER and stores the arc.
+    """
+
+    __tablename__ = "emotional_contexts"
+    __table_args__ = (
+        Index(
+            "ix_emotional_contexts_tenant_user_created",
+            "tenant_id",
+            "user_id",
+            "created_at",
+        ),
+    )
+
+    id: str = Field(primary_key=True, default_factory=lambda: str(uuid4()))
+    tenant_id: str = Field(default=DEFAULT_TENANT_ID, max_length=32)
+    user_id: str = Field(index=True)
+    agent_id: str = Field(default="default", max_length=64)
+    channel_id: str = Field(default="", max_length=200)
+    channel_name: str = Field(default="", max_length=200)
+    is_dm: bool = Field(default=False)
+    starting_sentiment: float = Field(default=0.0)
+    ending_sentiment: float = Field(default=0.0)
+    emotional_arc: str = Field(default="stable", max_length=20)
+    energy_level: str = Field(default="neutral", max_length=50)
+    topic_summary: str = Field(default="")
+    created_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
+
+
+class TopicMention(SQLModel, table=True):
+    """A single topic mention extracted from a conversation.
+
+    Source mypalclara/core/memory/context/topics.py. Recurrence patterns are
+    computed server-side by aggregating these rows over a lookback window.
+    """
+
+    __tablename__ = "topic_mentions"
+    __table_args__ = (
+        Index(
+            "ix_topic_mentions_tenant_user_topic_created",
+            "tenant_id",
+            "user_id",
+            "topic",
+            "created_at",
+        ),
+    )
+
+    id: str = Field(primary_key=True, default_factory=lambda: str(uuid4()))
+    tenant_id: str = Field(default=DEFAULT_TENANT_ID, max_length=32)
+    user_id: str = Field(index=True)
+    agent_id: str = Field(default="default", max_length=64)
+    topic: str = Field(max_length=200)
+    topic_type: str = Field(default="theme", max_length=20)
+    context_snippet: str = Field(default="", max_length=200)
+    emotional_weight: str = Field(default="moderate", max_length=20)
+    sentiment: float = Field(default=0.0)
+    channel_id: str = Field(default="", max_length=200)
+    channel_name: str = Field(default="", max_length=200)
+    is_dm: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
 
 
 class MemorySupersession(SQLModel, table=True):

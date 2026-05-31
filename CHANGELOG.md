@@ -4,6 +4,30 @@ All notable changes to MyPalace are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and MyPalace adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.11.3] — 2026-05-31
+
+Strictly additive — new tables, routes, and client methods; no behavior
+change for existing callers. (Uses 0.11.3 rather than 0.12.0, which remains
+reserved for the breaking per-tenant-schema flip noted in 0.11.0.)
+
+### Added
+
+- **Emotional-context service** (`emotional_service.py`): server-side VADER
+  arc scoring + storage. `POST /v1/emotional/record`,
+  `GET /v1/users/{id}/emotional-context`. New `emotional_contexts` table.
+- **Topic-recurrence service** (`topic_service.py`): LLM topic extraction via
+  the worker queue (`kind="topic_extract"`) + server-side recurrence
+  aggregation. `POST /v1/topics/extract` (202 + job_id),
+  `GET /v1/users/{id}/topic-recurrence`. New `topic_mentions` table.
+- `PalaceClient.record_emotional_context` / `get_emotional_context` /
+  `extract_topics` / `get_topic_recurrence`, with `EmotionalContext` and
+  `TopicRecurrence` models.
+- `vaderSentiment` dependency.
+
+### Migrations
+
+- `2026_05_31_0011_emotional_contexts`, `2026_05_31_0012_topic_mentions`.
+
 ## [0.11.2] — 2026-05-05
 
 Strictly additive — existing `openai` / `openrouter` callers see no
