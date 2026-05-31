@@ -155,9 +155,26 @@ async def _personality_evolve_handler(payload: dict, tenant_id: str) -> Any:
     )
 
 
+async def _topic_extract_handler(payload: dict, tenant_id: str) -> Any:
+    """LLM topic extraction + storage from a serialized payload."""
+    from mypalace.topic_service import DEFAULT_AGENT_ID, topic_service
+    rows = await topic_service.extract_and_store(
+        user_id=payload["user_id"],
+        conversation_text=payload["conversation_text"],
+        conversation_sentiment=payload.get("conversation_sentiment", 0.0),
+        agent_id=payload.get("agent_id", DEFAULT_AGENT_ID),
+        channel_id=payload.get("channel_id", ""),
+        channel_name=payload.get("channel_name", ""),
+        is_dm=payload.get("is_dm", False),
+        tenant_id=tenant_id,
+    )
+    return {"stored": len(rows), "topics": [r.topic for r in rows]}
+
+
 # Built-in handlers wired at import time.
 register_handler("reflection", _reflection_handler)
 register_handler("synthesis", _synthesis_handler)
 register_handler("cleanup", _cleanup_handler)
 register_handler("reembed", _reembed_handler)
 register_handler("personality_evolve", _personality_evolve_handler)
+register_handler("topic_extract", _topic_extract_handler)
