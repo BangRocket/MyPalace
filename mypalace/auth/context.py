@@ -49,8 +49,7 @@ class AuthContext:
 
         Phase 12: also seats the resolved tenant in
         ``mypalace.tenancy.current_tenant`` so any subsequent DB query
-        in this request runs against the right schema (when
-        ``settings.tenant_schema_mode == "schema"``). Idempotent —
+        in this request runs against the right schema. Idempotent —
         calling repeatedly with the same value is fine; calling with a
         different value (e.g. cross-tenant admin querying multiple
         tenants in one request) reseats it for the next query.

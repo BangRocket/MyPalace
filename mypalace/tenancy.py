@@ -4,15 +4,13 @@ A single ``ContextVar`` carries the resolved tenant id for the current
 request / worker job. Two consumers read it:
 
 - ``mypalace.database`` — installs an ``after_begin`` SQLAlchemy event
-  that runs ``SET LOCAL search_path`` when ``settings.tenant_schema_mode``
-  is ``"schema"``.
+  that runs ``SET LOCAL search_path`` for the current tenant (per-tenant
+  schema isolation is mandatory as of v0.12.0).
 - Any future code that wants to know "which tenant am I serving right
   now" without threading it through every signature.
 
-Default mode (``"table"``) is the existing table-level isolation: the
-contextvar is still populated for diagnostics but no SQL behavior
-changes. Operators flip the flag in 12.3 once shadow-copied data and
-schemas are in place (see docs/per-tenant-schemas-design.md).
+When no tenant is in context the event pins ``search_path`` to
+``public`` (catalog-only queries). See docs/per-tenant-schemas-design.md.
 """
 
 from __future__ import annotations

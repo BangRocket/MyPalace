@@ -174,15 +174,6 @@ class Settings(BaseSettings):
         validation_alias="PALACE_EMBEDDING_CACHE_TTL",
     )
 
-    # Tenant isolation mode (phase 12). "table" = existing table-level
-    # tenant_id WHERE-filtering. "schema" = per-tenant Postgres schemas
-    # with SET LOCAL search_path. Default "table" preserves existing
-    # behavior; flip to "schema" once tenant schemas have been
-    # provisioned and shadow-copied per docs/per-tenant-schemas-design.md.
-    tenant_schema_mode: str = Field(
-        default="table", validation_alias="PALACE_TENANT_SCHEMA_MODE",
-    )
-
 
 settings = Settings()
 
