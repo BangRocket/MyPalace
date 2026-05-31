@@ -144,21 +144,21 @@ class TestAuthContextResolveTenantSetsContextvar:
         assert exc.value.status_code == 403
 
 
-class TestSettingsExposed:
-    def test_default_mode_is_table(self):
+class TestFlagRemoved:
+    def test_tenant_schema_mode_setting_is_gone(self):
         from mypalace.config import settings
-        # Tripwire: changing the default flips behavior for every existing
-        # deployment. Must stay "table" until phase 12.3.
-        assert settings.tenant_schema_mode == "table"
+        # v0.12.0 removed the flag — schema isolation is mandatory.
+        # Tripwire so it isn't accidentally reintroduced.
+        assert not hasattr(settings, "tenant_schema_mode")
 
 
 class TestEventListenerInstalled:
     """Smoke-test that database.py registered the after_begin hook.
 
     Real runtime SET LOCAL behavior needs Postgres; that lives in
-    integration tests. Here we just confirm the hook function exists
-    and is bound to its target so a refactor that drops the listener
-    triggers a CI failure.
+    integration tests. Here we confirm the hook function exists, is
+    bound to its target, and emits the right search_path SQL — schema
+    isolation is always on as of v0.12.0.
     """
 
     def test_hook_function_exists(self):
@@ -166,29 +166,11 @@ class TestEventListenerInstalled:
         from mypalace.database import _set_search_path_after_begin
         assert callable(_set_search_path_after_begin)
 
-    def test_hook_no_op_when_table_mode(self, monkeypatch):
-        # Connection mock should be called zero times under table mode
-        # regardless of contextvar state.
+    def test_hook_runs_set_local_for_tenant(self):
         from unittest.mock import MagicMock
 
-        from mypalace.config import settings
         from mypalace.database import _set_search_path_after_begin
 
-        monkeypatch.setattr(settings, "tenant_schema_mode", "table")
-        with tenant_scope("acme"):
-            connection = MagicMock()
-            _set_search_path_after_begin(
-                session=MagicMock(), transaction=MagicMock(), connection=connection,
-            )
-        assert connection.execute.call_count == 0
-
-    def test_hook_runs_set_local_under_schema_mode(self, monkeypatch):
-        from unittest.mock import MagicMock
-
-        from mypalace.config import settings
-        from mypalace.database import _set_search_path_after_begin
-
-        monkeypatch.setattr(settings, "tenant_schema_mode", "schema")
         connection = MagicMock()
         with tenant_scope("acme"):
             _set_search_path_after_begin(
@@ -200,13 +182,11 @@ class TestEventListenerInstalled:
         assert "acme" in sql
         assert "search_path" in sql.lower()
 
-    def test_hook_skips_invalid_tenant_id(self, monkeypatch):
+    def test_hook_pins_public_for_invalid_tenant_id(self):
         from unittest.mock import MagicMock
 
-        from mypalace.config import settings
         from mypalace.database import _set_search_path_after_begin
 
-        monkeypatch.setattr(settings, "tenant_schema_mode", "schema")
         connection = MagicMock()
         # set_current_tenant directly to bypass tenant_scope's reset hook,
         # since we're testing defence against an upstream bug that allowed
@@ -219,19 +199,20 @@ class TestEventListenerInstalled:
         finally:
             from mypalace.tenancy import _current_tenant
             _current_tenant.reset(token)
-        assert connection.execute.call_count == 0
+        # v0.12.0: a malformed tenant pins to public; never interpolated.
+        assert connection.execute.call_count == 1
+        sql = str(connection.execute.call_args[0][0])
+        assert "public" in sql.lower()
+        assert "DROP" not in sql
 
-    def test_hook_skips_when_no_tenant_in_context(self, monkeypatch):
+    def test_hook_pins_public_when_no_tenant_in_context(self):
         from unittest.mock import MagicMock
 
-        from mypalace.config import settings
         from mypalace.database import _set_search_path_after_begin
 
-        monkeypatch.setattr(settings, "tenant_schema_mode", "schema")
         connection = MagicMock()
-        # Worker job that forgot to call tenant_scope; we choose to no-op
-        # rather than guess. (Test isn't 100% airtight because the contextvar
-        # may still hold a value from another test — set it to None first.)
+        # Worker job that forgot to call tenant_scope: pin to public
+        # (catalog-only) rather than a tenant schema.
         token = set_current_tenant(None)
         try:
             _set_search_path_after_begin(
@@ -240,4 +221,6 @@ class TestEventListenerInstalled:
         finally:
             from mypalace.tenancy import _current_tenant
             _current_tenant.reset(token)
-        assert connection.execute.call_count == 0
+        assert connection.execute.call_count == 1
+        sql = str(connection.execute.call_args[0][0])
+        assert "public" in sql.lower()

@@ -129,6 +129,26 @@ class TestImportRoute:
 # ---------- ingest unit ----------
 
 class TestIngestRecords:
+    @pytest.fixture(autouse=True)
+    def _stub_schema_provisioning(self, monkeypatch):
+        # v0.12.0: _ingest_records now ensures the target tenant's schema
+        # exists via engine.begin() + replicate. Stub both so these unit
+        # tests don't reach a real DB.
+        from mypalace.api import portability as port_mod
+
+        class _FakeConn:
+            async def run_sync(self, fn):
+                fn(MagicMock())
+
+        fake_engine = MagicMock()
+        fake_engine.begin = MagicMock()
+        fake_engine.begin.return_value.__aenter__ = AsyncMock(return_value=_FakeConn())
+        fake_engine.begin.return_value.__aexit__ = AsyncMock(return_value=None)
+        monkeypatch.setattr(port_mod, "engine", fake_engine)
+        monkeypatch.setattr(
+            port_mod, "replicate_per_tenant_schema", lambda *a, **k: None,
+        )
+
     @pytest.mark.asyncio
     async def test_unknown_type_skipped(self, monkeypatch):
         from mypalace.api import portability as port_mod

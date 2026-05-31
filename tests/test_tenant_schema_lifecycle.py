@@ -7,8 +7,8 @@ Here we mock the SQLAlchemy connection and verify:
   the right table set
 - drop_tenant_schema emits DROP SCHEMA CASCADE
 - both helpers refuse invalid tenant ids
-- POST /v1/admin/tenants triggers replicate when mode=schema
-- DELETE /v1/admin/tenants/{id} requires confirm=<id> when destructive
+- POST /v1/admin/tenants always replicates the per-tenant schema (v0.12.0)
+- DELETE /v1/admin/tenants/{id} always requires confirm=<id> (v0.12.0)
 """
 
 from __future__ import annotations
@@ -88,47 +88,9 @@ class TestDropSchema:
 
 
 class TestCreateTenantWiring:
-    def test_create_in_table_mode_skips_schema_provisioning(
-        self, client, monkeypatch,
-    ):
+    def test_create_calls_replicate(self, client, monkeypatch):
+        # v0.12.0: create always provisions the per-tenant schema.
         from mypalace.api import tenants as api
-        from mypalace.config import settings
-
-        monkeypatch.setattr(settings, "tenant_schema_mode", "table")
-
-        # Stub the DB session so the tenant insert "succeeds".
-        scalar = MagicMock()
-        scalar.scalar_one_or_none.return_value = None
-        db = MagicMock()
-        db.execute = AsyncMock(return_value=scalar)
-        db.add = MagicMock()
-        db.commit = AsyncMock()
-        db.refresh = AsyncMock()
-        cm = MagicMock()
-        cm.__aenter__ = AsyncMock(return_value=db)
-        cm.__aexit__ = AsyncMock(return_value=None)
-        monkeypatch.setattr(api, "async_session", MagicMock(return_value=cm))
-
-        replicate_called = []
-        monkeypatch.setattr(
-            api, "replicate_per_tenant_schema",
-            lambda *a, **k: replicate_called.append(a),
-        )
-
-        r = client.post(
-            "/v1/admin/tenants",
-            json={"id": "acme", "label": "Acme Corp"},
-        )
-        assert r.status_code == 200
-        assert replicate_called == []  # never called in table mode
-
-    def test_create_in_schema_mode_calls_replicate(
-        self, client, monkeypatch,
-    ):
-        from mypalace.api import tenants as api
-        from mypalace.config import settings
-
-        monkeypatch.setattr(settings, "tenant_schema_mode", "schema")
 
         scalar = MagicMock()
         scalar.scalar_one_or_none.return_value = None
@@ -142,8 +104,8 @@ class TestCreateTenantWiring:
         cm.__aexit__ = AsyncMock(return_value=None)
         monkeypatch.setattr(api, "async_session", MagicMock(return_value=cm))
 
-        # Mock engine.begin() → conn.run_sync(callable) — just record that
-        # the callable received the right tenant id.
+        # Mock engine.begin() → conn.run_sync(callable) — record that the
+        # replicate callback received the right tenant id.
         called_with: list = []
 
         class _FakeConn:
@@ -203,36 +165,46 @@ class TestDeleteTenantConfirmGuard:
         monkeypatch.setattr(api, "async_session", MagicMock(return_value=cm))
         return db
 
-    def test_table_mode_no_force_no_data_succeeds(self, client, monkeypatch):
-        from mypalace.config import settings
-        monkeypatch.setattr(settings, "tenant_schema_mode", "table")
-        self._stub_db(monkeypatch, has_data=False)
+    def _stub_schema_drop(self, monkeypatch):
+        # v0.12.0: delete always DROP SCHEMAs — stub engine + drop helper so
+        # the success path doesn't reach a real DB.
+        from mypalace.api import tenants as api
 
-        r = client.delete("/v1/admin/tenants/acme")
+        class _FakeConn:
+            async def run_sync(self, fn):
+                fn(MagicMock())
+
+        fake_engine = MagicMock()
+        fake_engine.begin = MagicMock()
+        fake_engine.begin.return_value.__aenter__ = AsyncMock(return_value=_FakeConn())
+        fake_engine.begin.return_value.__aexit__ = AsyncMock(return_value=None)
+        monkeypatch.setattr(api, "engine", fake_engine)
+        monkeypatch.setattr(api, "drop_tenant_schema", lambda *a, **k: None)
+
+    def test_with_confirm_no_data_succeeds(self, client, monkeypatch):
+        self._stub_db(monkeypatch, has_data=False)
+        self._stub_schema_drop(monkeypatch)
+
+        r = client.delete("/v1/admin/tenants/acme?confirm=acme")
         assert r.status_code == 200
 
-    def test_table_mode_with_data_returns_409(self, client, monkeypatch):
-        from mypalace.config import settings
-        monkeypatch.setattr(settings, "tenant_schema_mode", "table")
+    def test_with_confirm_and_data_returns_409(self, client, monkeypatch):
+        # 409 fires before the schema drop, so no engine stub needed.
         self._stub_db(monkeypatch, has_data=True)
 
-        r = client.delete("/v1/admin/tenants/acme")
+        r = client.delete("/v1/admin/tenants/acme?confirm=acme")
         assert r.status_code == 409
         assert "force=true" in r.json()["detail"]
 
-    def test_schema_mode_requires_confirm(self, client, monkeypatch):
-        from mypalace.config import settings
-        monkeypatch.setattr(settings, "tenant_schema_mode", "schema")
+    def test_no_confirm_rejected(self, client, monkeypatch):
+        # v0.12.0: delete is always destructive → confirm required.
         self._stub_db(monkeypatch, has_data=False)
 
-        # No confirm → 400 destructive guard.
         r = client.delete("/v1/admin/tenants/acme")
         assert r.status_code == 400
         assert "confirm=acme" in r.json()["detail"]
 
     def test_force_requires_confirm(self, client, monkeypatch):
-        from mypalace.config import settings
-        monkeypatch.setattr(settings, "tenant_schema_mode", "table")
         self._stub_db(monkeypatch, has_data=True)
 
         r = client.delete("/v1/admin/tenants/acme?force=true")
@@ -240,8 +212,6 @@ class TestDeleteTenantConfirmGuard:
         assert "confirm=acme" in r.json()["detail"]
 
     def test_confirm_mismatch_rejected(self, client, monkeypatch):
-        from mypalace.config import settings
-        monkeypatch.setattr(settings, "tenant_schema_mode", "schema")
         self._stub_db(monkeypatch, has_data=False)
 
         r = client.delete("/v1/admin/tenants/acme?confirm=globex")
