@@ -12,6 +12,8 @@
 
 **Ported source:** `mypalclara/core/memory/context/emotional.py`, `.../context/topics.py`, `mypalclara/core/sentiment.py`.
 
+**Toolchain (verified):** `uv` 0.11.x. The server (repo root) and the client (`mypalace_client/`) are **separate uv projects**. Run server tests from the root after `uv sync --extra dev`; run client tests from inside `mypalace_client/` via `uv run --extra dev pytest`. `mypalace_client` is NOT importable from the server venv.
+
 ---
 
 ## File Structure
@@ -43,6 +45,11 @@
 - Modify: `pyproject.toml` (dependencies)
 - Create: `mypalace/_sentiment.py`
 - Test: `tests/test_sentiment.py`
+
+- [ ] **Step 0: Ensure the server test env is synced**
+
+Run: `cd /Volumes/Storage/Code/MyPalace && uv sync --extra dev`
+Expected: pytest, ruff, etc. installed. (`uv run pytest` fails with "Failed to spawn: pytest" without this.)
 
 - [ ] **Step 1: Add the dependency**
 
@@ -812,7 +819,7 @@ async def test_get_emotional_context():
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd /Volumes/Storage/Code/MyPalace && uv run pytest mypalace_client/tests/test_client_emotional.py -v`
+Run: `cd /Volumes/Storage/Code/MyPalace/mypalace_client && uv run --extra dev pytest tests/test_client_emotional.py -v`
 Expected: FAIL — `ImportError: cannot import name 'EmotionalContext'` from `mypalace_client.models`
 
 - [ ] **Step 3: Add the client model**
@@ -881,7 +888,7 @@ In `mypalace_client/mypalace_client/client.py`, add `EmotionalContext` to the mo
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `cd /Volumes/Storage/Code/MyPalace && uv run pytest mypalace_client/tests/test_client_emotional.py -v`
+Run: `cd /Volumes/Storage/Code/MyPalace/mypalace_client && uv run --extra dev pytest tests/test_client_emotional.py -v`
 Expected: PASS (2 passed)
 
 - [ ] **Step 6: Commit**
@@ -1854,7 +1861,7 @@ async def test_get_topic_recurrence():
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd /Volumes/Storage/Code/MyPalace && uv run pytest mypalace_client/tests/test_client_topics.py -v`
+Run: `cd /Volumes/Storage/Code/MyPalace/mypalace_client && uv run --extra dev pytest tests/test_client_topics.py -v`
 Expected: FAIL — `ImportError: cannot import name 'TopicRecurrence'`
 
 - [ ] **Step 3: Add the client model**
@@ -1918,7 +1925,7 @@ Add `TopicRecurrence` to the models import in `client.py`, then after the emotio
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `cd /Volumes/Storage/Code/MyPalace && uv run pytest mypalace_client/tests/test_client_topics.py -v`
+Run: `cd /Volumes/Storage/Code/MyPalace/mypalace_client && uv run --extra dev pytest tests/test_client_topics.py -v`
 Expected: PASS (2 passed)
 
 - [ ] **Step 6: Commit**
@@ -1971,10 +1978,11 @@ change for existing callers.
 - `2026_05_31_0011_emotional_contexts`, `2026_05_31_0012_topic_mentions`.
 ```
 
-- [ ] **Step 3: Run the full test suite**
+- [ ] **Step 3: Run the full test suite (both projects)**
 
-Run: `cd /Volumes/Storage/Code/MyPalace && uv run pytest tests/ mypalace_client/tests/ -q`
-Expected: all pass (including the existing suite — the `client` fixture changes must not break other API tests).
+Run (server): `cd /Volumes/Storage/Code/MyPalace && uv run pytest tests/ -q`
+Run (client): `cd /Volumes/Storage/Code/MyPalace/mypalace_client && uv run --extra dev pytest -q`
+Expected: all pass (the server `client` fixture changes must not break other API tests). Note: some server `tests/integration/` cases may require Docker (testcontainers); if those fail purely for environment reasons, report it rather than treat as a code regression.
 
 - [ ] **Step 4: Lint**
 
