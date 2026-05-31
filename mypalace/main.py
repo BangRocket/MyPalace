@@ -35,7 +35,7 @@ from mypalace.audit.middleware import AuditMiddleware
 from mypalace.auth.key_service import key_service
 from mypalace.auth.middleware import AuthMiddleware
 from mypalace.config import settings
-from mypalace.database import async_session, init_db
+from mypalace.database import async_session, engine, init_db
 from mypalace.episode_service import episode_service
 from mypalace.memory_service import memory_service
 from mypalace.models import Tenant
@@ -74,6 +74,16 @@ async def _ensure_default_tenant() -> None:
             )
             await db.execute(stmt)
             await db.commit()
+
+    # v0.12.0: schema isolation is mandatory — ensure the default tenant's
+    # per-tenant schema + DDL exist before serving the first request.
+    # Idempotent (CREATE SCHEMA / CREATE TABLE IF NOT EXISTS).
+    from mypalace.tenancy import replicate_per_tenant_schema
+
+    async with engine.begin() as conn:
+        await conn.run_sync(
+            lambda sc: replicate_per_tenant_schema(settings.default_tenant_id, sc),
+        )
 
 
 @asynccontextmanager
