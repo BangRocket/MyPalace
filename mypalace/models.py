@@ -347,6 +347,36 @@ class EntityAlias(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
 
 
+class EmotionalContext(SQLModel, table=True):
+    """Per-conversation emotional summary (arc over a sentiment timeline).
+
+    Source mypalclara/core/memory/context/emotional.py. mypalclara sends the
+    finalized conversation; the service scores it with VADER and stores the arc.
+    """
+
+    __tablename__ = "emotional_contexts"
+    __table_args__ = (
+        Index(
+            "ix_emotional_contexts_tenant_user_created",
+            "tenant_id", "user_id", "created_at",
+        ),
+    )
+
+    id: str = Field(primary_key=True, default_factory=lambda: str(uuid4()))
+    tenant_id: str = Field(default=DEFAULT_TENANT_ID, max_length=32)
+    user_id: str = Field(index=True)
+    agent_id: str = Field(default="default", max_length=64)
+    channel_id: str = Field(default="", max_length=200)
+    channel_name: str = Field(default="", max_length=200)
+    is_dm: bool = Field(default=False)
+    starting_sentiment: float = Field(default=0.0)
+    ending_sentiment: float = Field(default=0.0)
+    emotional_arc: str = Field(default="stable", max_length=20)
+    energy_level: str = Field(default="neutral", max_length=50)
+    topic_summary: str = Field(default="")
+    created_at: datetime = Field(default_factory=utcnow, sa_column=_ts_column())
+
+
 class MemorySupersession(SQLModel, table=True):
     """Audit log linking a superseded memory to its replacement (slice 5).
 
