@@ -37,6 +37,7 @@ dependencies = [
     "grpcio-tools>=1.60",
     "protobuf>=4.25",
     "prometheus-client>=0.20",
+    "vadersentiment>=3.3.2",
 ]
 
 [project.optional-dependencies]
