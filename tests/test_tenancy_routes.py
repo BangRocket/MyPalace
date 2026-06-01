@@ -10,9 +10,26 @@ from mypalace.models import Tenant
 
 class TestCreateTenant:
     def test_create_tenant(self, client):
-        with patch("mypalace.api.tenants.async_session") as mock_session:
+        from unittest.mock import AsyncMock, MagicMock
+
+        # v0.12.0: create always provisions the per-tenant schema, so the
+        # engine + replicate helper must be stubbed to avoid a real DB.
+        class _FakeConn:
+            async def run_sync(self, fn):
+                fn(MagicMock())
+
+        fake_engine = MagicMock()
+        fake_engine.begin = MagicMock()
+        fake_engine.begin.return_value.__aenter__ = AsyncMock(return_value=_FakeConn())
+        fake_engine.begin.return_value.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("mypalace.api.tenants.async_session") as mock_session, \
+                patch("mypalace.api.tenants.engine", fake_engine), \
+                patch(
+                    "mypalace.api.tenants.replicate_per_tenant_schema",
+                    lambda *a, **k: None,
+                ):
             db = mock_session.return_value.__aenter__.return_value
-            from unittest.mock import AsyncMock, MagicMock
 
             no_existing = MagicMock()
             no_existing.scalar_one_or_none.return_value = None
@@ -79,7 +96,9 @@ class TestDeleteTenant:
             no_row = MagicMock()
             no_row.scalar_one_or_none.return_value = None
             db.execute = AsyncMock(return_value=no_row)
-            r = client.delete("/v1/admin/tenants/missing")
+            # v0.12.0: delete always requires confirm; pass it so the
+            # 404-not-found path is reached (else the confirm guard 400s).
+            r = client.delete("/v1/admin/tenants/missing?confirm=missing")
             assert r.status_code == 404
 
     def test_delete_invalid_id(self, client):

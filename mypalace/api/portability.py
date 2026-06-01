@@ -20,7 +20,7 @@ from sqlalchemy import select
 from mypalace.api.common import ApiResponse, Meta
 from mypalace.auth.context import AuthContext, get_auth_context
 from mypalace.auth.tenant import is_valid_tenant_id
-from mypalace.database import async_session
+from mypalace.database import async_session, engine
 from mypalace.memory_service import memory_service
 from mypalace.models import (
     Intention,
@@ -31,6 +31,7 @@ from mypalace.models import (
     Tenant,
 )
 from mypalace.models import Session as SessionModel
+from mypalace.tenancy import replicate_per_tenant_schema, tenant_scope
 
 router = APIRouter()
 
@@ -61,17 +62,23 @@ def _row_to_dict(row: Any) -> dict[str, Any]:
 
 
 async def _stream_export(tenant_id: str) -> AsyncIterator[bytes]:
-    """Yield NDJSON lines for every exportable row in tenant_id."""
-    async with async_session() as db:
-        for type_name, model in EXPORTABLE:
-            if model is Tenant:
-                stmt = select(Tenant).where(Tenant.id == tenant_id)
-            else:
-                stmt = select(model).where(model.tenant_id == tenant_id)
-            result = await db.execute(stmt)
-            for row in result.scalars().all():
-                payload = {"_type": type_name, **_row_to_dict(row)}
-                yield (json.dumps(payload, default=str) + "\n").encode("utf-8")
+    """Yield NDJSON lines for every exportable row in tenant_id.
+
+    v0.12.0: wrap in tenant_scope so per-table reads hit <tenant>.<table>.
+    Required because StreamingResponse iterates this generator after the
+    request handler returns, so we can't rely on the request contextvar.
+    """
+    with tenant_scope(tenant_id):
+        async with async_session() as db:
+            for type_name, model in EXPORTABLE:
+                if model is Tenant:
+                    stmt = select(Tenant).where(Tenant.id == tenant_id)
+                else:
+                    stmt = select(model).where(model.tenant_id == tenant_id)
+                result = await db.execute(stmt)
+                for row in result.scalars().all():
+                    payload = {"_type": type_name, **_row_to_dict(row)}
+                    yield (json.dumps(payload, default=str) + "\n").encode("utf-8")
 
 
 @router.get("/export")
@@ -140,65 +147,76 @@ async def _ingest_records(
     summary = ImportSummary(target_tenant=target_tenant)
     memory_payloads: list[dict] = []
 
+    # Ensure target tenant row exists (public.tenants).
     async with async_session() as db:
-        # Ensure target tenant exists.
         existing = await db.execute(select(Tenant).where(Tenant.id == target_tenant))
         if existing.scalar_one_or_none() is None:
             db.add(Tenant(id=target_tenant, label=f"imported {target_tenant}"))
             await db.commit()
 
-        for raw in lines:
-            raw = raw.strip()
-            if not raw:
-                continue
-            try:
-                record = json.loads(raw)
-            except json.JSONDecodeError:
-                summary.skipped += 1
-                summary.skipped_reasons.append("malformed json")
-                continue
+    # v0.12.0: ensure the target tenant's per-tenant schema + DDL exist
+    # before writing per-tenant rows into it (idempotent). DR/migration
+    # imports into a fresh tenant rely on this — otherwise the writes
+    # below would fall through to public.* via search_path.
+    async with engine.begin() as conn:
+        await conn.run_sync(lambda sc: replicate_per_tenant_schema(target_tenant, sc))
 
-            type_name = record.pop("_type", None)
-            if type_name == "tenant":
-                summary.tenants_seen += 1
-                continue  # we already ensured target_tenant; ignore source label
+    # v0.12.0: scope the upsert loop so per-tenant rows land in
+    # <target>.<table>. Tenant rows are public and ignored below anyway.
+    with tenant_scope(target_tenant):
+        async with async_session() as db:
+            for raw in lines:
+                raw = raw.strip()
+                if not raw:
+                    continue
+                try:
+                    record = json.loads(raw)
+                except json.JSONDecodeError:
+                    summary.skipped += 1
+                    summary.skipped_reasons.append("malformed json")
+                    continue
 
-            model = _TYPE_TO_MODEL.get(type_name)
-            if model is None or model is Tenant:
-                summary.skipped += 1
-                summary.skipped_reasons.append(f"unknown _type: {type_name!r}")
-                continue
+                type_name = record.pop("_type", None)
+                if type_name == "tenant":
+                    summary.tenants_seen += 1
+                    continue  # we already ensured target_tenant; ignore source label
 
-            # Force tenant_id to the target — never let an import smuggle
-            # data into a different tenant than the operator requested.
-            record["tenant_id"] = target_tenant
-            coerced = _coerce_timestamps(record, model)
+                model = _TYPE_TO_MODEL.get(type_name)
+                if model is None or model is Tenant:
+                    summary.skipped += 1
+                    summary.skipped_reasons.append(f"unknown _type: {type_name!r}")
+                    continue
 
-            # Memories need an embedding pass after the SQL upsert.
-            if model is Memory and reembed_memories:
-                memory_payloads.append(coerced)
+                # Force tenant_id to the target — never let an import smuggle
+                # data into a different tenant than the operator requested.
+                record["tenant_id"] = target_tenant
+                coerced = _coerce_timestamps(record, model)
 
-            try:
-                # Use db.merge() for upsert semantics (insert or update by PK)
-                obj = model(**coerced)
-                await db.merge(obj)
-                if model is Memory:
-                    summary.memories_imported += 1
-                elif model is SessionModel:
-                    summary.sessions_imported += 1
-                elif model is NarrativeArc:
-                    summary.arcs_imported += 1
-                elif model is Intention:
-                    summary.intentions_imported += 1
-                elif model is MemoryDynamics:
-                    summary.dynamics_imported += 1
-                elif model is MemorySupersession:
-                    summary.supersessions_imported += 1
-            except Exception as e:
-                summary.skipped += 1
-                summary.skipped_reasons.append(f"{type_name}: {e!r}"[:200])
+                # Memories need an embedding pass after the SQL upsert.
+                if model is Memory and reembed_memories:
+                    memory_payloads.append(coerced)
 
-        await db.commit()
+                try:
+                    # Use db.merge() for upsert semantics (insert or update by PK)
+                    obj = model(**coerced)
+                    await db.merge(obj)
+                    if model is Memory:
+                        summary.memories_imported += 1
+                    elif model is SessionModel:
+                        summary.sessions_imported += 1
+                    elif model is NarrativeArc:
+                        summary.arcs_imported += 1
+                    elif model is Intention:
+                        summary.intentions_imported += 1
+                    elif model is MemoryDynamics:
+                        summary.dynamics_imported += 1
+                    elif model is MemorySupersession:
+                        summary.supersessions_imported += 1
+                except Exception as e:
+                    summary.skipped += 1
+                    summary.skipped_reasons.append(f"{type_name}: {e!r}"[:200])
+
+            await db.commit()
 
     # Re-embed memories outside the SQL transaction so vector ops don't
     # block the DB. Failures here log but don't roll back the import — the

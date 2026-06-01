@@ -26,6 +26,7 @@ from mypalace.models import (
     utcnow,
 )
 from mypalace.models import Session as SessionModel
+from mypalace.tenancy import tenant_scope
 
 router = APIRouter()
 
@@ -226,7 +227,12 @@ async def get_stats(
                 detail="cross-tenant rollup requires a cross-tenant admin key",
             )
         ids = await _all_tenant_ids()
-        per = [await _stats_for(t) for t in ids]
+        # v0.12.0: seat each tenant's search_path so _stats_for's inner
+        # sessions read <t>.<table>, not stale public.*.
+        per = []
+        for t in ids:
+            with tenant_scope(t):
+                per.append(await _stats_for(t))
         return ApiResponse(
             data=AllTenantsStats(tenants=per),
             meta=Meta(count=len(per)),

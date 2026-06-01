@@ -11,7 +11,6 @@ from sqlalchemy import select
 
 from mypalace.api.common import ApiResponse, Meta
 from mypalace.auth.tenant import validate_tenant_id
-from mypalace.config import settings
 from mypalace.database import async_session, engine
 from mypalace.models import (
     ApiKey,
@@ -22,7 +21,7 @@ from mypalace.models import (
     utcnow,
 )
 from mypalace.models import Session as SessionModel
-from mypalace.tenancy import drop_tenant_schema, replicate_per_tenant_schema
+from mypalace.tenancy import drop_tenant_schema, replicate_per_tenant_schema, tenant_scope
 
 logger = logging.getLogger(__name__)
 
@@ -60,29 +59,28 @@ async def create_tenant(req: CreateTenantRequest) -> Any:
         await db.commit()
         await db.refresh(row)
 
-    # Phase 12.2: when running in schema-mode, provision the per-tenant
-    # schema and replicate per-tenant DDL into it. Done outside the
-    # tenant-row commit so a DDL failure surfaces as a 500 with the
-    # tenant row already on disk — operators can re-call create or run
-    # `mypalace-admin tenants reprovision` (added in a follow-up).
-    if settings.tenant_schema_mode == "schema":
-        try:
-            async with engine.begin() as conn:
-                await conn.run_sync(
-                    lambda sc: replicate_per_tenant_schema(req.id, sc),
-                )
-        except Exception:
-            logger.exception(
-                "tenant created but schema replication failed; tenant_id=%s",
-                req.id,
+    # v0.12.0: per-tenant schema isolation is mandatory — always
+    # provision the per-tenant schema and replicate per-tenant DDL into
+    # it. Done outside the tenant-row commit so a DDL failure surfaces as
+    # a 500 with the tenant row already on disk; operators can re-call
+    # create to retry the replication (it is idempotent).
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(
+                lambda sc: replicate_per_tenant_schema(req.id, sc),
             )
-            raise HTTPException(
-                status_code=500,
-                detail=(
-                    f"tenant '{req.id}' row created but schema provisioning "
-                    "failed; see server logs"
-                ),
-            ) from None
+    except Exception:
+        logger.exception(
+            "tenant created but schema replication failed; tenant_id=%s",
+            req.id,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                f"tenant '{req.id}' row created but schema provisioning "
+                "failed; see server logs"
+            ),
+        ) from None
 
     return ApiResponse(data=TenantOut.from_row(row), meta=Meta(count=1))
 
@@ -121,11 +119,10 @@ async def delete_tenant(
 ) -> Any:
     validate_tenant_id(tenant_id)
 
-    schema_mode = settings.tenant_schema_mode == "schema"
-
-    # Confirmation guard — phase 12 makes tenant-drop irreversible (in
-    # schema-mode). Require an explicit ?confirm=<tenant_id> match.
-    if (force or schema_mode) and confirm != tenant_id:
+    # Confirmation guard — v0.12.0 makes tenant-drop irreversible
+    # (DROP SCHEMA CASCADE). Always require an explicit
+    # ?confirm=<tenant_id> match.
+    if confirm != tenant_id:
         raise HTTPException(
             status_code=400,
             detail=(
@@ -134,45 +131,49 @@ async def delete_tenant(
             ),
         )
 
-    async with async_session() as db:
-        result = await db.execute(select(Tenant).where(Tenant.id == tenant_id))
-        row = result.scalar_one_or_none()
-        if row is None:
-            raise HTTPException(status_code=404, detail=f"tenant '{tenant_id}' not found")
+    # v0.12.0: scope the data-presence check to the tenant's schema so it
+    # inspects <tenant>.<table>, not stale public.*. Tenant/ApiKey are
+    # public tables and still resolve (public is second on search_path).
+    with tenant_scope(tenant_id):
+        async with async_session() as db:
+            result = await db.execute(select(Tenant).where(Tenant.id == tenant_id))
+            row = result.scalar_one_or_none()
+            if row is None:
+                raise HTTPException(status_code=404, detail=f"tenant '{tenant_id}' not found")
 
-        if not force:
-            # Pre-phase-12 safety: refuse if any data still references this
-            # tenant. We check the high-traffic tables; full enumeration
-            # would be expensive.
-            for model in (Memory, SessionModel, NarrativeArc, Intention, ApiKey):
-                check = await db.execute(
-                    select(model).where(model.tenant_id == tenant_id).limit(1),
-                )
-                if check.scalar_one_or_none() is not None:
-                    raise HTTPException(
-                        status_code=409,
-                        detail=(
-                            f"tenant '{tenant_id}' has data in "
-                            f"{model.__tablename__}; pass ?force=true&"
-                            f"confirm={tenant_id} to drop it anyway"
-                        ),
+            if not force:
+                # Safety: refuse if any data still references this tenant.
+                # We check the high-traffic tables; full enumeration would
+                # be expensive.
+                for model in (Memory, SessionModel, NarrativeArc, Intention, ApiKey):
+                    check = await db.execute(
+                        select(model).where(model.tenant_id == tenant_id).limit(1),
                     )
-        await db.delete(row)
-        await db.commit()
+                    if check.scalar_one_or_none() is not None:
+                        raise HTTPException(
+                            status_code=409,
+                            detail=(
+                                f"tenant '{tenant_id}' has data in "
+                                f"{model.__tablename__}; pass ?force=true&"
+                                f"confirm={tenant_id} to drop it anyway"
+                            ),
+                        )
+            await db.delete(row)
+            await db.commit()
 
-    # Phase 12.2: drop the per-tenant schema. CASCADE removes everything
-    # inside it; the tenant row is gone above so this is unrecoverable.
-    if schema_mode:
-        try:
-            async with engine.begin() as conn:
-                await conn.run_sync(lambda sc: drop_tenant_schema(tenant_id, sc))
-        except Exception:
-            logger.exception(
-                "tenant row deleted but schema drop failed; tenant_id=%s",
-                tenant_id,
-            )
-            # Don't 500 here — the tenant row is gone, so the tenant is
-            # effectively deleted from MyPalace's view. Schema cleanup
-            # can be done manually via psql.
+    # v0.12.0: always drop the per-tenant schema. CASCADE removes
+    # everything inside it; the tenant row is gone above so this is
+    # unrecoverable.
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(lambda sc: drop_tenant_schema(tenant_id, sc))
+    except Exception:
+        logger.exception(
+            "tenant row deleted but schema drop failed; tenant_id=%s",
+            tenant_id,
+        )
+        # Don't 500 here — the tenant row is gone, so the tenant is
+        # effectively deleted from MyPalace's view. Schema cleanup
+        # can be done manually via psql.
 
     return ApiResponse(data={"deleted": True}, meta=Meta(count=1))

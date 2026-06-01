@@ -462,3 +462,32 @@ table-mode to fall back to.
 - **`401 unauthenticated` from a known-good key** — the rate-limit
   middleware rejected it; check `Retry-After` header. If you didn't
   expect this key to be limited, mint it with the `unlimited` scope.
+
+## Upgrading to v0.12.0 (per-tenant schema flip)
+
+v0.12.0 makes per-tenant Postgres schema isolation mandatory and removes
+`PALACE_TENANT_SCHEMA_MODE`. Use a maintenance-window cutover. Rollback
+is cheap **only because writers are stopped and `public.*` is intact** —
+writes during the window go to `<tenant>.*` only, so a later
+downgrade-to-table-mode would lose them.
+
+0. **Pre-req:** Palace on the latest 0.11.x with migration `0010`
+   applied (`alembic upgrade head` on 0.11.x).
+1. Announce the window → **stop all writers** (e.g. mypalclara), or set
+   them read-only.
+2. **Backup:** `GET /v1/admin/export?tenant_id=<id>` per tenant (NDJSON,
+   stored off-box) and record `/v1/admin/stats` row counts (accurate
+   here — still table mode).
+3. **Upgrade Palace → 0.12.0** and run `alembic upgrade head` (applies
+   `0013`, which backfills `tenant_id` in the per-tenant schemas). Schema
+   mode is now mandatory.
+4. **Verify gate:** post-upgrade `/v1/admin/stats` counts match the
+   backup; spot-check a `search`; `/health/deep` green.
+5. **Pass →** ensure clients are on the 0.12.0 client pin; restart
+   writers. Done.
+6. **Fail →** downgrade Palace to 0.11.x and set
+   `PALACE_TENANT_SCHEMA_MODE=table` (reads the intact `public.*`),
+   restart, resume writers. Restore-from-backup is the last resort.
+
+The destructive cleanup (dropping the `tenant_id` columns and the
+duplicate `public.<table>` rows) is deferred to v0.13.0.

@@ -4,6 +4,48 @@ All notable changes to MyPalace are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and MyPalace adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.12.0] — 2026-05-31
+
+**Breaking — per-tenant schema isolation is now mandatory.** This
+finishes phase 12 (12.3b). `PALACE_TENANT_SCHEMA_MODE` is removed; all
+deployments serve from per-tenant Postgres schemas via `SET LOCAL
+search_path`. **Upgrade path requires the maintenance-window runbook in
+`docs/deployment.md` — back up before flipping.**
+
+Approach A: the `tenant_id` columns and the legacy `public.<table>` rows
+are **kept** as defense-in-depth and for cheap rollback. Dropping them
+(and the redundant per-tenant filters) is deferred to v0.13.0.
+
+### Changed (breaking)
+
+- **Removed `PALACE_TENANT_SCHEMA_MODE`.** Schema isolation is always on;
+  a leftover env var is ignored. Rollback = downgrade to 0.11.x and set
+  `PALACE_TENANT_SCHEMA_MODE=table`.
+- The `after_begin` event sets `search_path` on every transaction
+  (`"<tenant>", public`, or `public` when no tenant is in context).
+- Tenant create always provisions the per-tenant schema; tenant delete
+  always requires `?confirm=<id>` and always `DROP SCHEMA … CASCADE`.
+- Fresh boot bootstraps the `default` tenant's schema.
+- Cross-tenant rollup (`stats?tenant_id=ALL`), export/import, and
+  `search?tenant_id=ALL` now scope to each tenant's schema. Import into a
+  fresh tenant now provisions its schema first.
+
+### Removed
+
+- The deprecated server-side `mypalace-admin` script (phase 11). Install
+  the CLI from the client package: `pip install 'mypalace-client[cli]'`.
+
+### Migrations
+
+- `2026_05_31_0013_backfill_tenant_id` — populates `tenant_id` in the
+  shadow-copied per-tenant rows (NULL after 0010) so the retained
+  filters stay correct.
+
+### Coming in v0.13.0
+
+- Drop the `tenant_id` columns + the duplicate `public.<table>` rows +
+  the redundant per-tenant filters. That is the irreversible cleanup.
+
 ## [0.11.3] — 2026-05-31
 
 Strictly additive — new tables, routes, and client methods; no behavior

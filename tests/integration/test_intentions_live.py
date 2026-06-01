@@ -79,36 +79,44 @@ async def test_fire_once_deletes_after_first_fire_live(http_client):
 async def test_cleanup_expired_intentions_live(http_client):
     """Intentions with expires_at in the past are deleted by the cleanup
     endpoint."""
+    # Scope the seed + final read to the "test" tenant schema so they match
+    # where the HTTP cleanup endpoint operates (auth-disabled requests run
+    # as the default "test" tenant).
     from mypalace.database import async_session
     from mypalace.models import Intention
+    from mypalace.tenancy import tenant_scope
 
     user_id = "live-int-3"
     past = datetime.now(UTC) - timedelta(days=1)
     future = datetime.now(UTC) + timedelta(days=1)
 
-    async with async_session() as db:
-        db.add(Intention(
-            user_id=user_id,
-            content="expired one",
-            trigger_conditions={"type": "keyword", "keywords": ["x"]},
-            expires_at=past,
-        ))
-        db.add(Intention(
-            user_id=user_id,
-            content="still valid",
-            trigger_conditions={"type": "keyword", "keywords": ["y"]},
-            expires_at=future,
-        ))
-        await db.commit()
+    with tenant_scope("test"):
+        async with async_session() as db:
+            db.add(Intention(
+                user_id=user_id,
+                tenant_id="test",
+                content="expired one",
+                trigger_conditions={"type": "keyword", "keywords": ["x"]},
+                expires_at=past,
+            ))
+            db.add(Intention(
+                user_id=user_id,
+                tenant_id="test",
+                content="still valid",
+                trigger_conditions={"type": "keyword", "keywords": ["y"]},
+                expires_at=future,
+            ))
+            await db.commit()
 
     r = await http_client.post("/v1/maintenance/cleanup-intentions")
     assert r.status_code == 200, r.text
     assert r.json()["data"]["deleted"] == 1
 
-    async with async_session() as db:
-        result = await db.execute(
-            select(Intention).where(Intention.user_id == user_id),
-        )
-        remaining = result.scalars().all()
+    with tenant_scope("test"):
+        async with async_session() as db:
+            result = await db.execute(
+                select(Intention).where(Intention.user_id == user_id),
+            )
+            remaining = result.scalars().all()
     assert len(remaining) == 1
     assert remaining[0].content == "still valid"
