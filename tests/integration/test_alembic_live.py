@@ -18,12 +18,12 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__f
 _ALEMBIC = [sys.executable, "-m", "alembic"]
 
 
-async def test_alembic_upgrade_head_creates_full_schema(postgres_url):
+async def test_alembic_upgrade_head_creates_full_schema(fresh_db_url):
     """Run alembic upgrade head from scratch; assert all expected tables
     + alembic_version exist."""
     # Run alembic in a subprocess so it picks up the env var cleanly.
     import subprocess
-    env = {**os.environ, "PALACE_DATABASE_URL": postgres_url}
+    env = {**os.environ, "PALACE_DATABASE_URL": fresh_db_url}
 
     result = subprocess.run(
         [*_ALEMBIC, "upgrade", "head"],
@@ -41,7 +41,7 @@ async def test_alembic_upgrade_head_creates_full_schema(postgres_url):
     from sqlalchemy import text
     from sqlalchemy.ext.asyncio import create_async_engine
 
-    engine = create_async_engine(postgres_url)
+    engine = create_async_engine(fresh_db_url)
     async with engine.connect() as conn:
         result = await conn.execute(text(
             "SELECT table_name FROM information_schema.tables "
@@ -68,11 +68,11 @@ async def test_alembic_upgrade_head_creates_full_schema(postgres_url):
     assert not missing, f"missing tables after upgrade head: {missing}"
 
 
-async def test_alembic_downgrade_then_upgrade_is_clean(postgres_url):
+async def test_alembic_downgrade_then_upgrade_is_clean(fresh_db_url):
     """Round-trip: upgrade head, downgrade base, upgrade head. Confirms
     downgrade() implementations are correct."""
     import subprocess
-    env = {**os.environ, "PALACE_DATABASE_URL": postgres_url}
+    env = {**os.environ, "PALACE_DATABASE_URL": fresh_db_url}
 
     for cmd in (["upgrade", "head"], ["downgrade", "base"], ["upgrade", "head"]):
         r = subprocess.run(

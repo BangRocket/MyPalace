@@ -74,15 +74,19 @@ async def test_demote_records_failure_log_live(http_client):
     )
     assert r.status_code == 200, r.text
 
-    # Read access logs directly to confirm grade=1 was recorded.
+    # Read access logs directly to confirm grade=1 was recorded. Scope to
+    # the "test" tenant schema so the direct read sees what the HTTP demote
+    # wrote (auth-disabled requests run as the default "test" tenant).
     from mypalace.database import async_session
     from mypalace.models import MemoryAccessLog
+    from mypalace.tenancy import tenant_scope
 
-    async with async_session() as db:
-        result = await db.execute(
-            select(MemoryAccessLog).where(MemoryAccessLog.memory_id == mem_id),
-        )
-        logs = result.scalars().all()
+    with tenant_scope("test"):
+        async with async_session() as db:
+            result = await db.execute(
+                select(MemoryAccessLog).where(MemoryAccessLog.memory_id == mem_id),
+            )
+            logs = result.scalars().all()
 
     assert len(logs) == 1
     assert logs[0].grade == 1  # AGAIN
@@ -93,36 +97,42 @@ async def test_demote_records_failure_log_live(http_client):
 @pytest.mark.asyncio
 async def test_prune_access_logs_live(http_client):
     """Old access logs should be deleted by the prune endpoint."""
-    # Seed dynamics + an old log directly via the DB.
+    # Seed dynamics + an old log directly via the DB. Scope to the "test"
+    # tenant schema so the seed + the final read match where the HTTP prune
+    # endpoint operates (auth-disabled requests run as the default tenant).
     from mypalace.database import async_session
     from mypalace.models import MemoryAccessLog, MemoryDynamics
+    from mypalace.tenancy import tenant_scope
 
     mem_id = "live-prune-mem-1"
     user_id = "live-prune-user-1"
 
-    async with async_session() as db:
-        db.add(MemoryDynamics(memory_id=mem_id, user_id=user_id))
-        await db.flush()
-        # Old log: 100 days ago.
-        old_log = MemoryAccessLog(
-            memory_id=mem_id,
-            user_id=user_id,
-            grade=3,
-            signal_type="used_in_response",
-            retrievability_at_access=0.9,
-            accessed_at=datetime.now(UTC) - timedelta(days=100),
-        )
-        # Recent log: today.
-        recent_log = MemoryAccessLog(
-            memory_id=mem_id,
-            user_id=user_id,
-            grade=3,
-            signal_type="used_in_response",
-            retrievability_at_access=0.95,
-        )
-        db.add(old_log)
-        db.add(recent_log)
-        await db.commit()
+    with tenant_scope("test"):
+        async with async_session() as db:
+            db.add(MemoryDynamics(memory_id=mem_id, user_id=user_id, tenant_id="test"))
+            await db.flush()
+            # Old log: 100 days ago.
+            old_log = MemoryAccessLog(
+                memory_id=mem_id,
+                user_id=user_id,
+                tenant_id="test",
+                grade=3,
+                signal_type="used_in_response",
+                retrievability_at_access=0.9,
+                accessed_at=datetime.now(UTC) - timedelta(days=100),
+            )
+            # Recent log: today.
+            recent_log = MemoryAccessLog(
+                memory_id=mem_id,
+                user_id=user_id,
+                tenant_id="test",
+                grade=3,
+                signal_type="used_in_response",
+                retrievability_at_access=0.95,
+            )
+            db.add(old_log)
+            db.add(recent_log)
+            await db.commit()
 
     # Prune logs older than 30 days.
     r = await http_client.post(
@@ -132,10 +142,11 @@ async def test_prune_access_logs_live(http_client):
     assert r.json()["data"]["deleted"] == 1
 
     # Confirm only the recent log remains.
-    async with async_session() as db:
-        result = await db.execute(
-            select(MemoryAccessLog).where(MemoryAccessLog.memory_id == mem_id),
-        )
-        remaining = result.scalars().all()
+    with tenant_scope("test"):
+        async with async_session() as db:
+            result = await db.execute(
+                select(MemoryAccessLog).where(MemoryAccessLog.memory_id == mem_id),
+            )
+            remaining = result.scalars().all()
     assert len(remaining) == 1
     assert remaining[0].retrievability_at_access == pytest.approx(0.95)

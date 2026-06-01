@@ -78,6 +78,47 @@ def postgres_url() -> Iterator[str]:
         yield async_url
 
 
+@pytest_asyncio.fixture
+async def fresh_db_url(postgres_url: str) -> AsyncIterator[str]:
+    """A brand-new empty database in the same Postgres server.
+
+    For tests that need a pristine schema (e.g. `alembic upgrade head`
+    from scratch) and would otherwise collide with the shared session DB
+    that the autouse init fixture populates. Dropped afterward.
+    """
+    from sqlalchemy import text
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    db_name = f"alembic_{uuid.uuid4().hex[:12]}"
+    base, _, _old = postgres_url.rpartition("/")
+    fresh_url = f"{base}/{db_name}"
+
+    # CREATE DATABASE can't run in a transaction — use AUTOCOMMIT.
+    admin = create_async_engine(postgres_url, isolation_level="AUTOCOMMIT")
+    try:
+        async with admin.connect() as conn:
+            await conn.execute(text(f'CREATE DATABASE "{db_name}"'))
+    finally:
+        await admin.dispose()
+
+    try:
+        yield fresh_url
+    finally:
+        admin = create_async_engine(postgres_url, isolation_level="AUTOCOMMIT")
+        try:
+            async with admin.connect() as conn:
+                await conn.execute(
+                    text(
+                        "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                        "WHERE datname = :d AND pid <> pg_backend_pid()",
+                    ),
+                    {"d": db_name},
+                )
+                await conn.execute(text(f'DROP DATABASE IF EXISTS "{db_name}"'))
+        finally:
+            await admin.dispose()
+
+
 @pytest.fixture(scope="session")
 def qdrant_url() -> Iterator[str]:
     """Spin up qdrant for the test session."""
@@ -225,6 +266,24 @@ async def _truncate_tables(palace_app):
         # creation in tests doesn't have to re-bootstrap the row each time.
         await db.execute(delete(Tenant).where(Tenant.id != "test"))
         await db.commit()
+
+    # v0.12.0: the pass above runs with no tenant in context (search_path =
+    # public), but HTTP-path writes land in the "test" tenant schema. Clean
+    # the per-tenant tables there too so data doesn't leak across tests.
+    from mypalace.tenancy import tenant_scope
+
+    with tenant_scope("test"):
+        async with async_session() as db:
+            await db.execute(delete(MemoryAccessLog))
+            await db.execute(delete(MemoryDynamics))
+            await db.execute(delete(MemorySupersession))
+            await db.execute(delete(Intention))
+            await db.execute(delete(Message))
+            await db.execute(delete(SessionModel))
+            await db.execute(delete(Memory))
+            await db.execute(delete(NarrativeArc))
+            await db.execute(delete(MemoryVersion))
+            await db.commit()
 
     # Clear all vector points by recreating the collections — phase 3 slice 2
     # has per-tenant collections, so iterate every collection whose name starts
