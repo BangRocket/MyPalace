@@ -46,8 +46,24 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection) -> None:
+    from sqlalchemy import text
+
     context.configure(connection=connection, target_metadata=target_metadata)
     with context.begin_transaction():
+        # Alembic hardcodes alembic_version.version_num as VARCHAR(32), but
+        # this project's revision ids exceed 32 chars. Pre-create the table
+        # (empty) with a wide column so Alembic reuses it instead of
+        # creating the narrow one, and widen an existing narrow column.
+        connection.execute(text(
+            "CREATE TABLE IF NOT EXISTS alembic_version ("
+            " version_num VARCHAR(255) NOT NULL,"
+            " CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num)"
+            ")",
+        ))
+        connection.execute(text(
+            "ALTER TABLE alembic_version "
+            "ALTER COLUMN version_num TYPE VARCHAR(255)",
+        ))
         context.run_migrations()
 
 

@@ -20,16 +20,17 @@ async def test_stamp_inserts_when_empty():
     no_row = MagicMock()
     no_row.scalar_one_or_none.return_value = None
 
-    # Two reads (CREATE TABLE then SELECT) followed by an INSERT.
+    # CREATE TABLE, ALTER COLUMN (widen), SELECT, then INSERT.
     conn.execute = AsyncMock(side_effect=[
         MagicMock(),       # CREATE TABLE IF NOT EXISTS
+        MagicMock(),       # ALTER COLUMN version_num TYPE VARCHAR(255)
         no_row,            # SELECT — empty
         MagicMock(),       # INSERT
     ])
     await _ensure_alembic_stamp(conn)
 
-    assert conn.execute.await_count == 3
-    insert_call = conn.execute.await_args_list[2]
+    assert conn.execute.await_count == 4
+    insert_call = conn.execute.await_args_list[3]
     sql_text = str(insert_call.args[0])
     params = insert_call.args[1]
     assert "INSERT INTO alembic_version" in sql_text
@@ -44,12 +45,13 @@ async def test_stamp_skips_when_revision_present():
 
     conn.execute = AsyncMock(side_effect=[
         MagicMock(),  # CREATE TABLE IF NOT EXISTS
+        MagicMock(),  # ALTER COLUMN version_num TYPE VARCHAR(255)
         has_row,      # SELECT — current
     ])
     await _ensure_alembic_stamp(conn)
 
-    # Only 2 calls — no INSERT.
-    assert conn.execute.await_count == 2
+    # CREATE + ALTER + SELECT — no INSERT.
+    assert conn.execute.await_count == 3
 
 
 @pytest.mark.asyncio
@@ -60,13 +62,13 @@ async def test_stamp_warns_on_outdated_revision(caplog):
     has_row = MagicMock()
     has_row.scalar_one_or_none.return_value = "2026_05_04_0001_baseline"  # older
 
-    conn.execute = AsyncMock(side_effect=[MagicMock(), has_row])
+    conn.execute = AsyncMock(side_effect=[MagicMock(), MagicMock(), has_row])
 
     with caplog.at_level(logging.INFO):
         await _ensure_alembic_stamp(conn)
 
     assert any("Run 'alembic upgrade head'" in r.message for r in caplog.records)
-    assert conn.execute.await_count == 2  # no auto-upgrade
+    assert conn.execute.await_count == 3  # CREATE + ALTER + SELECT, no auto-upgrade
 
 
 @pytest.mark.asyncio

@@ -43,9 +43,8 @@ class TestRevisionWiring:
         # Tripwire: chain must include 0009 immediately before us.
         assert migration.down_revision == "2026_05_05_0009_messages_fts"
 
-    def test_database_module_advertises_head(self):
-        from mypalace.database import LATEST_ALEMBIC_REVISION
-        assert LATEST_ALEMBIC_REVISION == "2026_05_05_0010_per_tenant_shadow_copy"
+    # LATEST_ALEMBIC_REVISION head-tracking is asserted dynamically in
+    # tests/test_alembic_revision_guard.py (no hardcoded revision id).
 
 
 class TestPerTenantTableEnumeration:

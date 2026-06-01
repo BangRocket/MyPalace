@@ -66,7 +66,7 @@ def _set_search_path_after_begin(session, transaction, connection):  # noqa: ARG
 # Bumped each time we add a new alembic revision. Lifespan stamps this
 # revision on a fresh DB so future ``alembic upgrade head`` calls find a
 # known starting point.
-LATEST_ALEMBIC_REVISION = "2026_05_05_0010_per_tenant_shadow_copy"
+LATEST_ALEMBIC_REVISION = "2026_05_31_0013_backfill_tenant_id"
 
 
 async def get_db() -> AsyncSession:
@@ -100,11 +100,19 @@ async def init_db() -> None:
 async def _ensure_alembic_stamp(conn) -> None:
     # Use raw SQL — we avoid importing alembic here to keep this hot path
     # cheap and to skip env.py side effects.
+    # Alembic's own version_table_impl hardcodes version_num as
+    # VARCHAR(32), but this project's revision ids exceed 32 chars (e.g.
+    # 2026_05_05_0010_per_tenant_shadow_copy = 38). Create the column
+    # wide, and widen an existing narrow column from older deploys.
     await conn.execute(text(
         "CREATE TABLE IF NOT EXISTS alembic_version ("
-        " version_num VARCHAR(32) NOT NULL,"
+        " version_num VARCHAR(255) NOT NULL,"
         " CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num)"
         ")",
+    ))
+    await conn.execute(text(
+        "ALTER TABLE alembic_version "
+        "ALTER COLUMN version_num TYPE VARCHAR(255)",
     ))
     result = await conn.execute(text("SELECT version_num FROM alembic_version LIMIT 1"))
     existing = result.scalar_one_or_none()
